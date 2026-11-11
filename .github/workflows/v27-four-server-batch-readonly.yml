@@ -1,6 +1,10 @@
 name: V2.7 Four Server Read-Only Batch
 on:
   workflow_dispatch:
+  push:
+    branches: [build/tokyo-korea-migration-prep-20261014]
+    paths:
+      - '.github/workflows/v27-four-server-batch-readonly.yml'
 permissions:
   contents: read
 concurrency:
@@ -8,26 +12,960 @@ concurrency:
   cancel-in-progress: false
 jobs:
   uk:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-uk-dev]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh uk
   tokyo:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh tokyo
   korea:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh korea
   domestic:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/v27-batch-readonly.sh domestic
+  korea-phase-c-fixed-channel-inspect:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_PHASE_C_FIXED_CHANNEL_INSPECT_ONCE_6213125007' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-korea-binance]
+    timeout-minutes: 2
+    steps:
+      - name: Invoke installed fixed inspect once without checkout or install
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+          test "$(hostname -s)" = iZmj7a5kwr75qc1tul4kf9Z
+          test "$(id -un)" = githubrunner
+          test "$(id -u)" = 1001
+          for p in /usr /usr/local /usr/local/sbin /usr/local/libexec; do
+            test -d "$p" && test ! -L "$p"
+            test "$(stat -c %u "$p")" = 0
+            m=$(stat -c %a "$p")
+            (( (8#$m & 0022) == 0 ))
+          done
+          p=/usr/local/sbin/xuanjun-pr99-phase-c
+          test -f "$p" && test ! -L "$p"
+          test "$(stat -c %u:%a:%h "$p")" = 0:755:1
+          printf '%s  %s\n' 7fc89a85734a84c0ca8787423042bfaa98bd813c579ba71f774cd3a6a2086d76 "$p" | sha256sum -c -
+          p=/usr/local/libexec/xuanjun-pr99-phase-c-channel.py
+          test -f "$p" && test ! -L "$p"
+          test "$(stat -c %u:%a:%h "$p")" = 0:444:1
+          printf '%s  %s\n' a40371227b95a5fe78631b7c9e49c9b089dfeff8cf82175b9e8ca3f04c0c6497 "$p" | sha256sum -c -
+          echo PR99_CHANNEL_RECEIPT_BEGIN
+          /usr/bin/sudo -n /usr/local/sbin/xuanjun-pr99-phase-c inspect
+          echo PR99_CHANNEL_RECEIPT_END
+          echo CHANNEL_INSTALLED_BYTE_CHECK=PASS FIXED_INSPECT=PASS PHASE_C_INSTALL=NOT_CALLED SERVICE_ACTIONS=0
+
+  phase-c-binding-metadata:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_PHASE_C_BINDING_METADATA_ONCE_20261016' &&
+      github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: korea
+            label: xuanjun-korea-binance
+          - side: tokyo
+            label: xuanjun-tokyo-readonly
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 2
+    steps:
+      - name: New worker allocation and DNS / source file identity only; no checkout
+        env:
+          XJ_SIDE: ${{ matrix.side }}
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import grp,ipaddress,json,os,pwd,socket,stat,time
+          from pathlib import Path
+          side=os.environ["XJ_SIDE"]
+          hosts={"korea":"iZmj7a5kwr75qc1tul4kf9Z","tokyo":"iZ6wee8q9z4t03hvqumwfhZ"}
+          assert os.geteuid()==1001 and os.uname().nodename==hosts[side]
+          report={"schema_version":1,"host":hosts[side],"side":side,"observed_epoch":int(time.time()),"delivery_commit":os.environ["GITHUB_SHA"],"uid":os.geteuid(),"scope":"NEW_BINDING_METADATA_ONLY","database_opened":False,"credentials_read":False,"http_requests":0,"sudo_calls":0,"service_actions":0,"production_changes":0}
+          def metadata(name):
+              try:
+                  s=Path(name).lstat()
+                  return {"status":"OBSERVED","uid":s.st_uid,"gid":s.st_gid,"mode":oct(stat.S_IMODE(s.st_mode)),"device":s.st_dev,"inode":s.st_ino,"size":s.st_size,"mtime_ns":s.st_mtime_ns,"regular":stat.S_ISREG(s.st_mode),"symlink":stat.S_ISLNK(s.st_mode)}
+              except FileNotFoundError:return {"status":"ABSENT"}
+              except PermissionError:return {"status":"UNKNOWN_PERMISSION_DENIED"}
+          report["new_candidate_paths"]={p:metadata(p) for p in ("/opt/xuanjun-binance-phase-c","/etc/xuanjun-binance-phase-c","/var/lib/xuanjun-binance-phase-c")}
+          if side=="korea":
+              users=pwd.getpwall();groups=grp.getgrall()
+              candidates=list(range(1986,1996))
+              named_users=[u for u in users if u.pw_name=="xuanjun_binance_shadow"]
+              named_groups=[g for g in groups if g.gr_name=="xuanjun_binance_shadow"]
+              report["worker_name"]={"user_present":bool(named_users),"group_present":bool(named_groups),"uid":named_users[0].pw_uid if len(named_users)==1 else None,"gid":named_groups[0].gr_gid if len(named_groups)==1 else None}
+              report["unallocated_uid_gid_candidates"]=[u for u in candidates if not any(v.pw_uid==u for v in users) and not any(v.gr_gid==u for v in groups)]
+              report["broker_identity"]=[{"uid":u.pw_uid,"gid":u.pw_gid,"nologin":u.pw_shell in ("/sbin/nologin","/usr/sbin/nologin")} for u in users if u.pw_name=="xuanjun_binance"]
+              try:
+                  ips=sorted(set(row[4][0] for row in socket.getaddrinfo("fapi.binance.com",443,type=socket.SOCK_STREAM)))
+                  report["binance_dns"]={"status":"RESOLVED_NO_HTTP","host":"fapi.binance.com","public_addresses":[v for v in ips if ipaddress.ip_address(v).is_global],"observed_epoch":int(time.time()),"api_permission_proven":False,"egress_policy_loaded":False}
+              except OSError as e:report["binance_dns"]={"status":"UNKNOWN_DNS_ERROR","error_type":type(e).__name__}
+          else:
+              root="/opt/trading-system/database/data/trading.db"
+              report["source_database_metadata"]={p:metadata(p) for p in (root,root+"-wal",root+"-shm")}
+              report["actual_schema"]="NOT_READ"
+              report["actual_orders_and_protection"]="NOT_READ"
+          report["status"]="BINDING_METADATA_COLLECTED_NOT_INSTALL_OR_LIVE_ACCEPTANCE"
+          print("PR99_C_BINDING_PREFLIGHT_RECEIPT="+json.dumps(report,sort_keys=True))
+          
+          PY
+
+  tokyo-ssh-public-host-identity:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_TOKYO_SSH_PUBLIC_HOST_IDENTITY_ONCE' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 2
+    steps:
+      - name: Read fixed root-owned public host keys only; no private key or ssh login
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import base64,hashlib,json,os,stat
+          from pathlib import Path
+          assert os.geteuid()==1001 and os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
+          rows=[]
+          for name in ("ssh_host_ecdsa_key.pub","ssh_host_ed25519_key.pub","ssh_host_rsa_key.pub"):
+           p=Path("/etc/ssh")/name
+           try:
+            for parent in reversed(p.parents):
+             s=parent.lstat();assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022
+            fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+            with os.fdopen(fd,"rb") as f:
+             s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and s.st_nlink==1 and not s.st_mode&0o022
+             raw=f.read(16385);assert len(raw)<=16384
+             after=os.fstat(f.fileno())
+            current=p.lstat()
+            fields=("st_dev","st_ino","st_size","st_mtime_ns","st_ctime_ns")
+            assert all(getattr(s,k)==getattr(after,k)==getattr(current,k) for k in fields)
+            parts=raw.decode("ascii").strip().split()
+            assert len(parts)>=2 and parts[0] in ("ecdsa-sha2-nistp256","ecdsa-sha2-nistp384","ecdsa-sha2-nistp521","ssh-ed25519","ssh-rsa")
+            key=base64.b64decode(parts[1],validate=True)
+            assert 0<len(key)<8192
+            rows.append({"file":name,"type":parts[0],"public_key":parts[0]+" "+parts[1],"fingerprint":"SHA256:"+base64.b64encode(hashlib.sha256(key).digest()).decode().rstrip("="),"uid":s.st_uid,"mode":oct(stat.S_IMODE(s.st_mode))})
+           except FileNotFoundError:rows.append({"file":name,"status":"ABSENT"})
+           except PermissionError:rows.append({"file":name,"status":"UNREADABLE"})
+          assert any("public_key" in row for row in rows)
+          print("PR99_TOKYO_SSH_PUBLIC_HOST_IDENTITY="+json.dumps({"host":os.uname().nodename,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],"public_host_keys":rows,"private_keys_read":False,"production_changes":0},sort_keys=True))
+          
+          PY
+
+  offline-environment-and-remaining-channel-metadata:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_OFFLINE_ENV_AND_CHANNEL_METADATA_ONCE_20261016' &&
+      github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: korea
+            label: xuanjun-korea-binance
+          - side: tokyo
+            label: xuanjun-tokyo-readonly
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 3
+    steps:
+      - name: New environment metadata and remaining Tokyo responsibilities; no checkout or sudo
+        env:
+          XJ_SIDE: ${{ matrix.side }}
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import hashlib,ipaddress,json,os,stat,subprocess,time
+          from pathlib import Path
+          side=os.environ["XJ_SIDE"]
+          hosts={"korea":"iZmj7a5kwr75qc1tul4kf9Z","tokyo":"iZ6wee8q9z4t03hvqumwfhZ"}
+          assert os.geteuid()==1001 and os.uname().nodename==hosts[side]
+          r={"schema_version":1,"host":hosts[side],"side":side,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],"epoch":int(time.time()),"sudo_calls":0,"database_opened":False,"credentials_read":False,"http_requests":0,"service_actions":0,"production_changes":0}
+          def call(args):
+           p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=20)
+           return p
+          def props(unit):
+           p=call(["systemctl","show",unit,"-p","Id","-p","User","-p","WorkingDirectory","-p","FragmentPath","-p","ActiveState","-p","SubState","-p","MainPID","--no-pager"])
+           return {"exit":p.returncode,"metadata":dict(x.split("=",1) for x in p.stdout.splitlines() if "=" in x)}
+          def port_scopes():
+           p=call(["ss","-H","-lnt"])
+           result=[]
+           for line in p.stdout.splitlines():
+            x=line.split()
+            if len(x)<4:continue
+            raw=x[3]
+            try:host,port=raw.rsplit(":",1);port=int(port)
+            except ValueError:continue
+            if port not in (22,80,443,18080,18443,18761,18770,18780,18781,19443,19444):continue
+            host=host.strip("[]")
+            try:kind="loopback" if ipaddress.ip_address(host).is_loopback else ("wildcard" if ipaddress.ip_address(host).is_unspecified else "bound_address")
+            except ValueError:kind="wildcard" if host=="*" else "unknown"
+            result.append({"port":port,"bind_scope":kind})
+           return {"exit":p.returncode,"listeners":result}
+          r["scoped_listeners"]=port_scopes()
+          if side=="korea":
+           expected={"ccxt":"4.5.78","cryptography":"50.0.1","loguru":"0.7.3","numpy":"2.4.6","pandas":"3.0.5","pymysql":"1.2.2","python-dotenv":"1.2.3","pyyaml":"6.0.3","redis":"8.1.0","requests":"2.34.2","sqlalchemy":"2.0.54","ta":"0.11.0","websocket-client":"1.9.2"}
+           root=Path("/opt/xuanjun-binance-offline-env-20261016")
+           for d in (Path("/opt"),root,root/"venv",root/"venv/bin"):
+            s=d.lstat();assert stat.S_ISDIR(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022,"UNTRUSTED_ENVIRONMENT_CHAIN"
+           py=root/"venv/bin/python"
+           s=py.lstat();assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022
+           code="import importlib.metadata as m,json; names="+repr(tuple(expected))+";print(json.dumps({n:m.version(n) for n in names},sort_keys=True))"
+           p=call([str(py),"-I","-B","-c",code]);assert p.returncode==0,"PACKAGE_METADATA_READ_FAILED"
+           actual=json.loads(p.stdout);assert actual==expected,"TARGET_PACKAGES_DRIFTED"
+           r["dependency_environment"]={"status":"13_EXACT_PACKAGE_VERSIONS_READ_BACK","versions":actual,"interpreter_sha256":hashlib.sha256(py.read_bytes()).hexdigest(),"production_imports":0,"third_party_modules_imported":False,"root_private_receipts_read":False}
+           r["existing_phase_b_service"]=props("xuanjun-binance-shadow.service")
+           p=call(["systemctl","is-enabled","xuanjun-binance-shadow.service"]);r["existing_phase_b_enabled"]=p.stdout.strip()
+           info=r["existing_phase_b_service"]["metadata"];assert info.get("ActiveState")=="inactive" and info.get("MainPID")=="0" and r["existing_phase_b_enabled"]=="disabled"
+           r["phase_b_current"]=os.readlink("/opt/xuanjun-binance/current")
+           assert r["phase_b_current"]=="/opt/xuanjun-binance/releases/f887b085508e3ed4"
+           r["status"]="KOREA_NEW_ENV_METADATA_AND_STOPPED_PHASE_B_PASS"
+          else:
+           p=call(["systemctl","list-units","--type=service","--state=running","--no-legend","--plain","--no-pager"])
+           assert p.returncode==0,"SERVICE_LIST_UNREADABLE"
+           names=[line.split()[0] for line in p.stdout.splitlines() if line.split() and line.split()[0].endswith(".service")]
+           r["running_services_count"]=len(names)
+           r["service_list_truncated"]=len(names)>100
+           rows=[]
+           for name in names[:100]:
+            v=props(name);meta=v["metadata"]
+            if meta.get("FragmentPath","").startswith("/etc/systemd/system/") or name in ("nginx.service","sshd.service"):
+             rows.append(v)
+           r["running_custom_and_entry_services"]=rows
+           p=call(["systemctl","list-timers","--all","--no-legend","--no-pager"])
+           timers=[]
+           for line in p.stdout.splitlines():
+            x=line.split()
+            if len(x)>=2 and x[-2].endswith(".timer"):
+             timers.append({"timer":x[-2],"activates":x[-1]})
+           r["loaded_timers"]={"exit":p.returncode,"items":timers}
+           r["portal_entry_identity"]={}
+           path=Path("/opt/trading-system/scripts/secure_secrets_portal_server.py")
+           try:
+            s=path.lstat();assert stat.S_ISREG(s.st_mode) and not s.st_mode&0o022
+            data=path.read_bytes();after=path.lstat();assert (s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns)==(after.st_dev,after.st_ino,after.st_size,after.st_mtime_ns)
+            r["portal_entry_identity"]={"sha256":hashlib.sha256(data).hexdigest(),"bytes":len(data),"uid":s.st_uid}
+           except PermissionError:r["portal_entry_identity"]={"status":"UNKNOWN_PERMISSION_DENIED"}
+           r["root_and_admin_crontabs"]="NOT_READ_NONROOT"
+           r["source_database_and_business_state"]="NOT_READ"
+           r["channel_configuration_and_credentials"]="NOT_READ"
+           r["status"]="TOKYO_REMAINING_DEPENDENCY_METADATA_COLLECTED_NOT_MIGRATED"
+          print("PR99_OFFLINE_ENV_CHANNEL_RECEIPT="+json.dumps(r,sort_keys=True))
+          
+          PY
+
+  tokyo-current-source-and-wal-metadata:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_CURRENT_SOURCE_IDENTITY_ONCE_6215371855' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 3
+    steps:
+      - name: Current selected source identity and DB/WAL metadata; no checkout or sudo
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import hashlib,json,os,stat,subprocess,time
+          from pathlib import Path
+          assert os.geteuid()==1001 and os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
+          root=Path("/opt/trading-system")
+          excluded={".git",".venv","venv","node_modules","__pycache__",".pytest_cache","site-packages","runtime","logs","backups","secrets","credentials","config","state","data"}
+          rows=[];unknown=[];budget=0;started=time.monotonic()
+          for base,dirs,files in os.walk(root,followlinks=False):
+           dirs[:]=sorted(d for d in dirs if d.lower() not in excluded and not d.startswith(".") and not (Path(base)/d).is_symlink())
+           for leaf in sorted(files):
+            dependency=leaf in {"pyproject.toml","setup.cfg","Pipfile","Pipfile.lock","poetry.lock","uv.lock"} or leaf.endswith(".txt") and leaf.startswith(("requirements","constraints"))
+            if leaf.startswith(".") or not (dependency or leaf.endswith((".py",".pyi",".sql",".sh"))):continue
+            p=Path(base)/leaf;rel=str(p.relative_to(root))
+            assert len(rows)+len(unknown)<20000 and time.monotonic()-started<90,"INVENTORY_BUDGET"
+            try:
+             s=p.lstat()
+             if not stat.S_ISREG(s.st_mode) or s.st_uid not in (0,1000) or s.st_mode&0o022 or s.st_nlink!=1:
+              unknown.append({"path":rel,"reason":"IDENTITY_NOT_ACCEPTED"});continue
+             if not 0<=s.st_size<=64*1048576:unknown.append({"path":rel,"reason":"SIZE_LIMIT"});continue
+             budget+=s.st_size;assert budget<=512*1048576,"SOURCE_SIZE_BUDGET"
+             fd=os.open(p,os.O_RDONLY|os.O_NOFOLLOW)
+             with os.fdopen(fd,"rb") as f:
+              first=os.fstat(f.fileno());h=hashlib.sha256();count=0
+              for block in iter(lambda:f.read(1048576),b""):h.update(block);count+=len(block)
+              after=os.fstat(f.fileno())
+             current=p.lstat();fields=("st_dev","st_ino","st_size","st_mtime_ns","st_ctime_ns")
+             if not count==first.st_size or any(getattr(first,k)!=getattr(after,k) or getattr(after,k)!=getattr(current,k) for k in fields):
+              unknown.append({"path":rel,"reason":"CHANGED_DURING_READ"});continue
+             rows.append({"path":rel,"sha256":h.hexdigest(),"bytes":count,"mtime_ns":current.st_mtime_ns,"dependency_manifest":dependency})
+            except (PermissionError,FileNotFoundError):unknown.append({"path":rel,"reason":"UNREADABLE_OR_CHANGED"})
+          rows.sort(key=lambda x:x["path"]);aggregate=hashlib.sha256()
+          for row in rows:aggregate.update((row["path"]+"\0"+row["sha256"]+"\0"+str(row["bytes"])+"\n").encode())
+          def identity(p):
+           try:
+            s=Path(p).lstat()
+            return {"present":True,"regular":stat.S_ISREG(s.st_mode),"symlink":stat.S_ISLNK(s.st_mode),"uid":s.st_uid,"gid":s.st_gid,"mode":oct(stat.S_IMODE(s.st_mode)),"bytes":s.st_size,"device":s.st_dev,"inode":s.st_ino,"mtime_ns":s.st_mtime_ns}
+           except FileNotFoundError:return {"present":False}
+           except PermissionError:return {"status":"UNKNOWN_PERMISSION"}
+          env=dict(os.environ,GIT_OPTIONAL_LOCKS="0",GIT_TERMINAL_PROMPT="0")
+          g=subprocess.run(["git","--no-optional-locks","-c","safe.directory=/opt/trading-system","-C",str(root),"rev-parse","--verify","HEAD"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env,timeout=15)
+          head=g.stdout.strip() if g.returncode==0 and len(g.stdout.strip())==40 else "UNKNOWN_GIT_IDENTITY"
+          r={"schema_version":1,"host":os.uname().nodename,"uid":os.geteuid(),"delivery_commit":os.environ["GITHUB_SHA"],"epoch":int(time.time()),"source_git_head":head,"source_files":len(rows),"source_bytes":sum(x["bytes"] for x in rows),"aggregate_algorithm":"SHA256(sorted relative_path NUL file_sha256 NUL decimal_bytes LF)","source_aggregate_sha256":aggregate.hexdigest(),"files":rows,"unresolved":unknown,"database_file_identities":{p:identity(p) for p in ("/opt/trading-system/database/data/trading.db","/opt/trading-system/database/data/trading.db-wal","/opt/trading-system/database/data/trading.db-shm")},"database_opened":False,"wal_bytes_read":False,"credentials_read":False,"source_literal_values_exported":False,"sudo_calls":0,"service_actions":0,"api_requests":0,"production_changes":0,"collection_atomic_across_tree":False,"root_cron":"NOT_READ_NONROOT","status":"CURRENT_SOURCE_IDENTITY_AND_DB_WAL_METADATA_ONLY"}
+          print("PR99_CURRENT_SOURCE_IDENTITY_RECEIPT="+json.dumps(r,sort_keys=True))
+          
+          PY
+
+  pr99-current-offline-point-review:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_CURRENT_POINT_OFFLINE_REVIEW_ONCE_20261016' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: New synthetic current-point tests only (Hosted root, no production host)
+        working-directory: evidence/pr99-current-point
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo "$(command -v python)" -B -m unittest -v test_current_point
+      - name: Bind exact candidate and build source-only review archive
+        working-directory: evidence/pr99-current-point
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PY'
+          import gzip,hashlib,io,json,os,tarfile
+          from pathlib import Path
+          p=Path('.')
+          binding=json.loads((p/'BINDING.json').read_text())
+          expected={'current_point.py','run_current_point.py','source-identities.json','test_current_point.py','README.md'}
+          assert set(binding['files'])==expected
+          for n,h in binding['files'].items():
+              f=p/n
+              assert f.is_file() and not f.is_symlink()
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==h
+          tarpath=Path(os.environ['RUNNER_TEMP'])/'PR99_CURRENT_POINT_REVIEW.tar.gz'
+          with tarpath.open('xb') as raw:
+              with gzip.GzipFile(fileobj=raw,mode='wb',filename='',mtime=0) as gz:
+                  with tarfile.open(fileobj=gz,mode='w',format=tarfile.USTAR_FORMAT) as t:
+                      for n in sorted(expected|{'BINDING.json'}):
+                          data=(p/n).read_bytes()
+                          m=tarfile.TarInfo(n);m.size=len(data);m.mode=0o400;m.mtime=0
+                          t.addfile(m,io.BytesIO(data))
+          r={'status':'OFFLINE_CANDIDATE_TESTED_NOT_PRODUCTION_AUTHORITY','source_commit':os.environ['GITHUB_SHA'],'tests':20,'skipped':0,'binding_sha256':hashlib.sha256((p/'BINDING.json').read_bytes()).hexdigest(),'tar_sha256':hashlib.sha256(tarpath.read_bytes()).hexdigest(),'tar_bytes':tarpath.stat().st_size,'bound_files':5,'regular_members':6,'production_hosts_used':False,'database_exported':False,'server_actions':0}
+          print('PR99_CURRENT_POINT_REVIEW_RECEIPT='+json.dumps(r,sort_keys=True))
+          (tarpath.parent/'PR99_CURRENT_POINT_CI_RECEIPT.json').write_text(json.dumps(r,sort_keys=True,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-current-point-review-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/PR99_CURRENT_POINT_REVIEW.tar.gz
+            ${{ runner.temp }}/PR99_CURRENT_POINT_CI_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 14
+
+  pr99-channel-target-dependencies:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_CHANNEL_DEPENDENCY_METADATA_ONCE_20261016' &&
+      github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            label: xuanjun-tokyo-readonly
+          - side: korea
+            label: xuanjun-korea-binance
+          - side: domestic
+            label: xuanjun-domestic-ops
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 3
+    steps:
+      - name: Fixed metadata only; no checkout or privileged operations
+        env:
+          XJ_SIDE: ${{ matrix.side }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I -B - <<'PY'
+          import json,os,re,socket,subprocess,time
+          from pathlib import Path
+          side=os.environ["XJ_SIDE"]
+          hosts={"tokyo":"iZ6wee8q9z4t03hvqumwfhZ","korea":"iZmj7a5kwr75qc1tul4kf9Z","domestic":"iZvt5t8tlrm8oiZ"}
+          assert os.uname().nodename==hosts[side]
+          assert os.geteuid()!=0
+          units={
+          "tokyo":["secure-secrets-portal.service","domestic-model-rpc-tunnel.service","korea-novel-model-rpc-tunnel.service","provider-neutral-tokyo-tunnel.service","restricted-rpc-openai-shim.service","tokyo-restricted-model-executor.service","xj-tokyo-vpn.service","xuanjun-wecom-customer-contact.service","xuanjun-wecom-customer-service.service","xuanjun-wecom-novel-ingress.service","nginx.service","docker.service"],
+          "korea":["xuanjun-binance-shadow.service","xuanjun-novel-factory.service","morelogin-socks5-permanent.service","postgresql.service","redis.service","yibi-api.service","yibi-scheduler.service","tailscaled.service","nginx.service"],
+          "domestic":["provider-neutral-domestic-bridge.service","nginx.service","secure-secrets-portal.service","xuanjun-wecom-customer-contact.service","xuanjun-wecom-customer-service.service","xuanjun-wecom-novel-ingress.service","domestic-model-rpc-tunnel.service"]}
+          properties=["Id","LoadState","ActiveState","SubState","MainPID","User","Group","WorkingDirectory","FragmentPath","DropInPaths","Requires","Wants","After","BindsTo","PartOf","PrivateNetwork","RestrictAddressFamilies"]
+          def run(cmd):
+              p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,universal_newlines=True,timeout=12)
+              return p.returncode,p.stdout
+          records=[]
+          for unit in units[side]:
+              rc,out=run(["systemctl","show",unit,"--no-pager"]+[v for name in properties for v in ("-p",name)])
+              values=dict(s.split("=",1) for s in out.splitlines() if "=" in s)
+              records.append({"unit":unit,"exit":rc,"properties":values})
+          ports={22,80,443,18080,18443,18761,18770,18780,18781,19443,19444}
+          rc,out=run(["ss","-H","-lnt"])
+          listeners=[]
+          for line in out.splitlines():
+              fields=line.split()
+              if len(fields)<5: continue
+              endpoint=fields[3]
+              try: port=int(endpoint.rsplit(":",1)[1])
+              except ValueError: continue
+              if port not in ports: continue
+              address=endpoint.rsplit(":",1)[0].strip("[]")
+              scope="loopback" if address in ("127.0.0.1","::1") else "wildcard" if address in ("0.0.0.0","*","::") else "specific"
+              listeners.append({"port":port,"scope":scope})
+          timers=["finance-collection-sync.timer","owner-commercial-ledger-sync.timer","billing-operations-weekly-settlement.timer","billing-operations-weekly-final-invoice.timer"]
+          timer_state=[]
+          if side=="tokyo":
+              for unit in timers:
+                  rc,out=run(["systemctl","show",unit,"-p","Id","-p","LoadState","-p","ActiveState","-p","Triggers","--no-pager"])
+                  timer_state.append({"unit":unit,"exit":rc,"properties":dict(s.split("=",1) for s in out.splitlines() if "=" in s)})
+          value={"schema_version":1,"host":hosts[side],"side":side,"uid":os.geteuid(),"epoch":int(time.time()),"delivery_commit":os.environ["GITHUB_SHA"],"units":records,"listeners":listeners,"ss_exit":rc,"finance_timer_metadata":timer_state,"credentials_read":False,"unit_contents_read":False,"process_arguments_read":False,"database_opened":False,"http_requests":0,"sudo_calls":0,"service_actions":0,"root_admin_cron":"UNKNOWN_NONROOT_NOT_READ","container_contents":"NOT_READ","user_manager":"NOT_READ","status":"THREE_HOST_SERVICE_DEPENDENCY_METADATA_ONLY_NOT_CUTOVER"}
+          print("PR99_CHANNEL_DEPENDENCY_RECEIPT="+json.dumps(value,sort_keys=True))
+          
+          PY
+
+  pr99-failed-source-set-diagnosis:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_FAILED_SOURCE_SET_DIAGNOSIS_ONCE_6216441589' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-tokyo-readonly]
+    timeout-minutes: 2
+    steps:
+      - name: Read names and traversal errors only; never call failed coordinator
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3.11 -I -B - <<'PY'
+          import hashlib,json,os,stat,time,urllib.request
+          from pathlib import Path
+          assert os.geteuid()==1001 and os.uname().nodename=="iZ6wee8q9z4t03hvqumwfhZ"
+          url="https://raw.githubusercontent.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d/evidence/pr99-current-point/source-identities.json"
+          opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          with opener.open(url,timeout=30) as f: raw=f.read(1000001)
+          assert len(raw)<=1000000 and hashlib.sha256(raw).hexdigest()=="4114048fe0ecf17ed5e4185b0bbc37d114ed485a2340f8cce2418817cc6ae941"
+          expected={r["path"]:r for r in json.loads(raw)["files"]}
+          root=Path("/opt/trading-system")
+          excluded={".git",".venv","venv","node_modules","__pycache__",".pytest_cache","site-packages","runtime","logs","backups","secrets","credentials","config","state","data"}
+          actual=set();errors=[];started=time.monotonic()
+          def error(e):
+              errors.append({"path":os.path.relpath(e.filename,str(root)) if e.filename else "UNKNOWN","errno":e.errno})
+          for current,dirs,files in os.walk(root,followlinks=False,onerror=error):
+              assert time.monotonic()-started<60 and len(actual)<20000
+              dirs[:]=sorted(d for d in dirs if d.lower() not in excluded and not d.startswith(".") and not (Path(current)/d).is_symlink())
+              for leaf in files:
+                  dep=leaf in {"pyproject.toml","setup.cfg","Pipfile","Pipfile.lock","poetry.lock","uv.lock"} or leaf.endswith(".txt") and leaf.startswith(("requirements","constraints"))
+                  if not leaf.startswith(".") and (dep or leaf.endswith((".py",".pyi",".sql",".sh"))):
+                      actual.add(str((Path(current)/leaf).relative_to(root)))
+          value={"schema_version":1,"status":"FAILED_ATTEMPT_SOURCE_SET_DIAGNOSIS_ONLY","host":os.uname().nodename,"uid":os.geteuid(),"epoch":int(time.time()),"delivery_commit":os.environ["GITHUB_SHA"],"approved_count":len(expected),"visible_current_count":len(actual),"visible_added":sorted(actual-set(expected)),"visible_missing":sorted(set(expected)-actual),"walk_errors":errors,"source_file_contents_read":False,"business_database_opened":False,"sudo_calls":0,"service_actions":0,"business_http_requests":0,"public_github_manifest_downloads":1,"production_changes":0,"root_private_stage_read":False}
+          print("PR99_SOURCE_SET_DIAGNOSIS_RECEIPT="+json.dumps(value,sort_keys=True))
+          
+          PY
+
+  pr99-current-point-r2-offline-review:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_CURRENT_POINT_R2_OFFLINE_REVIEW_ONCE_20261016' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Only seven new R2 regression cases; no production host
+        working-directory: evidence/pr99-current-point-r2
+        run: sudo "$(command -v python)" -B -m unittest -v test_current_point.RecoveryR2
+      - name: Verify inherited core source and bind deterministic R2 artifact
+        working-directory: evidence/pr99-current-point-r2
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -B - <<'PY'
+          import ast,gzip,hashlib,io,json,os,tarfile
+          from pathlib import Path
+          old=Path('../pr99-current-point');new=Path('.')
+          unchanged={}
+          for name,functions in [('current_point.py',('backup_database','sqlite_check','stable_bytes','make_archive','receive_archive','prepare','manifest_rows')),('run_current_point.py',('verify_approval','get_approval','load_bundle'))]:
+              def bodies(p):
+                  s=p.read_text();t=ast.parse(s)
+                  return {n.name:ast.get_source_segment(s,n) for n in t.body if isinstance(n,ast.FunctionDef)}
+              a,b=bodies(old/name),bodies(new/name)
+              for f in functions: assert a[f]==b[f],f
+              unchanged[name]=list(functions)
+          assert hashlib.sha256((old/'current_point.py').read_bytes()).hexdigest()=='56d0a9d7fc1ff6447fc9fd5cf995bf79c61765d04ca2e058e675675967627e03'
+          assert hashlib.sha256((old/'run_current_point.py').read_bytes()).hexdigest()=='088d80531066c20e0f2bca74393d73633a51830c7a500f651afd66bee9f3b2f1'
+          assert (new/'source-identities.json').read_bytes()==(old/'source-identities.json').read_bytes()
+          binding=json.loads((new/'BINDING.json').read_text())
+          expected={'README.md','current_point.py','run_current_point.py','source-identities.json','test_current_point.py'}
+          assert set(binding['files'])==expected
+          for n,h in binding['files'].items(): assert hashlib.sha256((new/n).read_bytes()).hexdigest()==h
+          p=Path(os.environ['RUNNER_TEMP'])/'PR99_CURRENT_POINT_R2_REVIEW.tar.gz'
+          with p.open('xb') as raw:
+              with gzip.GzipFile(fileobj=raw,mode='wb',filename='',mtime=0) as gz:
+                  with tarfile.open(fileobj=gz,mode='w',format=tarfile.USTAR_FORMAT) as t:
+                      for n in sorted(expected|{'BINDING.json'}):
+                          data=(new/n).read_bytes();m=tarfile.TarInfo(n);m.size=len(data);m.mode=0o400;m.mtime=0
+                          t.addfile(m,io.BytesIO(data))
+          r={'schema_version':1,'source_commit':os.environ['GITHUB_SHA'],'new_tests':7,'skipped':0,'original_20':'INHERITED_NOT_REEXECUTED','unchanged_functions':unchanged,'binding_sha256':hashlib.sha256((new/'BINDING.json').read_bytes()).hexdigest(),'tar_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'tar_bytes':p.stat().st_size,'bound_files':5,'regular_members':6,'production_hosts_used':False,'database_exported':False,'production_actions':0,'status':'R2_OFFLINE_INCREMENTAL_REVIEW_ONLY'}
+          print('PR99_CURRENT_POINT_R2_CI_RECEIPT='+json.dumps(r,sort_keys=True))
+          (p.parent/'PR99_CURRENT_POINT_R2_CI_RECEIPT.json').write_text(json.dumps(r,sort_keys=True,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-current-point-r2-review-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/PR99_CURRENT_POINT_R2_REVIEW.tar.gz
+            ${{ runner.temp }}/PR99_CURRENT_POINT_R2_CI_RECEIPT.json
+          if-no-files-found: error
+          retention-days: 14
+
+  service-runtime-contract-metadata:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_S06_RUNTIME_METADATA_ONCE_6217030577' &&
+      github.run_attempt == 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: tokyo
+            label: xuanjun-tokyo-readonly
+          - side: domestic
+            label: xuanjun-domestic-ops
+          - side: korea
+            label: xuanjun-korea-binance
+    runs-on: [self-hosted, Linux, X64, "${{ matrix.label }}"]
+    timeout-minutes: 3
+    steps:
+      - name: Inspect non-secret runtime contracts; no checkout, sudo or credentials
+        env:
+          XJ_SIDE: ${{ matrix.side }}
+        shell: /bin/bash --noprofile --norc -euo pipefail {0}
+        run: |
+          /usr/bin/python3.11 -I -B - <<'PY'
+          """Non-root runtime metadata; never read unit bodies, argv, env, DB or credentials."""
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import stat
+          import subprocess
+          import time
+          
+          HOSTS = {
+              "tokyo": ("iZ6wee8q9z4t03hvqumwfhZ", 1001),
+              "korea": ("iZmj7a5kwr75qc1tul4kf9Z", 1001),
+              "domestic": ("iZvt5t8tlrm8oiZ", 1002),
+          }
+          UNITS = (
+              "secure-secrets-portal.service", "provider-neutral-tunnel.service",
+              "provider-neutral-tokyo-tunnel.service", "provider-neutral-domestic-bridge.service",
+              "domestic-model-rpc-tunnel.service", "korea-novel-model-rpc-tunnel.service",
+              "restricted-rpc-openai-shim.service", "tokyo-restricted-model-executor.service",
+              "xuanjun-wecom-customer-contact.service", "xuanjun-wecom-customer-service.service",
+              "xuanjun-wecom-novel-ingress.service", "xj-tokyo-vpn.service", "docker.service",
+              "nginx.service", "xuanjun-novel-factory.service", "tailscaled.service",
+          )
+          PROPS = (
+              "Id", "Names", "LoadState", "UnitFileState", "ActiveState", "SubState",
+              "User", "Group", "DynamicUser", "WorkingDirectory", "RootDirectory",
+              "MainPID", "ControlGroup", "FragmentPath", "DropInPaths", "Requires", "Wants",
+              "BindsTo", "PartOf", "After", "TriggeredBy", "Restart", "RuntimeDirectory",
+              "StateDirectory", "CacheDirectory", "LogsDirectory", "ReadWritePaths",
+          )
+          
+          
+          def call(args):
+              try:
+                  p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     text=True, timeout=12)
+                  return p.returncode, p.stdout
+              except (OSError, subprocess.TimeoutExpired) as e:
+                  return type(e).__name__, ""
+          
+          
+          def metadata(path):
+              try:
+                  s = Path(path).lstat()
+                  return {"status": "OBSERVED_METADATA_ONLY", "uid": s.st_uid,
+                          "gid": s.st_gid, "mode": oct(stat.S_IMODE(s.st_mode)),
+                          "device": s.st_dev, "inode": s.st_ino,
+                          "regular": stat.S_ISREG(s.st_mode), "symlink": stat.S_ISLNK(s.st_mode)}
+              except FileNotFoundError:
+                  return {"status": "ABSENT"}
+              except PermissionError:
+                  return {"status": "UNKNOWN_PERMISSION_DENIED"}
+              except OSError as e:
+                  return {"status": "UNKNOWN", "error_type": type(e).__name__}
+          
+          
+          def process(pid):
+              result = {"pid": pid}
+              if not pid.isdigit() or int(pid) <= 0:
+                  return result
+              for key in ("exe", "cwd"):
+                  try:
+                      result[key] = os.readlink("/proc/" + pid + "/" + key)
+                  except OSError as e:
+                      result[key] = {"status": "UNKNOWN", "error_type": type(e).__name__}
+              return result
+          
+          
+          def main():
+              side = os.environ["XJ_SIDE"]
+              host, uid = HOSTS[side]
+              assert os.uname().nodename == host and os.geteuid() == uid and uid != 0
+              r = {"schema_version": 1, "side": side, "host": host, "uid": uid,
+                   "delivery_commit": os.environ["GITHUB_SHA"], "epoch": int(time.time()),
+                   "sudo_calls": 0, "database_opened": False, "credentials_read": False,
+                   "unit_bodies_read": False, "argv_or_environment_read": False,
+                   "cron_contents_read": False, "http_requests": 0, "service_actions": 0,
+                   "production_changes": 0, "units": {}}
+              for unit in UNITS:
+                  rc, text = call(["/usr/bin/systemctl", "show", unit, "--no-pager"] +
+                                  [v for key in PROPS for v in ("-p", key)])
+                  props = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+                  row = {"exit": rc, "properties": props}
+                  row["process"] = process(props.get("MainPID", "0"))
+                  fragment = props.get("FragmentPath", "")
+                  if fragment.startswith("/"):
+                      row["fragment_identity"] = metadata(fragment)
+                  r["units"][unit] = row
+              catalog = {}
+              for title, args in (
+                  ("loaded_services", ["list-units", "--type=service", "--all", "--plain"]),
+                  ("installed_services", ["list-unit-files", "--type=service"]),
+              ):
+                  rc, text = call(["/usr/bin/systemctl"] + args + ["--no-legend", "--no-pager"])
+                  rows = []
+                  for line in text.splitlines():
+                      parts = line.split()
+                      if parts and re.fullmatch(r"[A-Za-z0-9_.:@\\-]+\.service", parts[0]):
+                          # Drop free-form descriptions. These are discovery names, not deployment scope.
+                          rows.append(parts[:4] if title == "loaded_services" else parts[:2])
+                  catalog[title] = {"exit": rc, "rows": rows[:500], "truncated": len(rows) > 500}
+              r["discovery_only"] = catalog
+              rc, text = call(["/usr/sbin/ss", "-H", "-lntp"])
+              listeners = []
+              for line in text.splitlines():
+                  parts = line.split()
+                  if len(parts) < 5:
+                      continue
+                  try:
+                      port = int(parts[3].rsplit(":", 1)[1])
+                  except (IndexError, ValueError):
+                      continue
+                  if port not in (80, 443, 18080, 18443, 18761, 18770, 18780, 18781, 19443, 19444):
+                      continue
+                  pids = sorted(set(re.findall(r"pid=(\d+)", line)))
+                  listeners.append({"local_endpoint": parts[3], "port": port,
+                                    "visible_pids": [process(pid) for pid in pids],
+                                    "owner_proven": bool(pids)})
+              r["listeners"] = {"exit": rc, "rows": listeners,
+                                "missing_pid_means": "UNKNOWN_NONROOT_NOT_NO_OWNER"}
+              r["private_scheduling_metadata"] = {
+                  name: metadata(name) for name in (
+                      "/var/spool/cron/root", "/var/spool/cron/admin", "/etc/cron.d",
+                      "/etc/systemd/user", "/root/.config/systemd/user", "/home/admin/.config/systemd/user")}
+              one = r["units"]["provider-neutral-tunnel.service"]["properties"]
+              two = r["units"]["provider-neutral-tokyo-tunnel.service"]["properties"]
+              if one.get("LoadState") == two.get("LoadState") == "loaded":
+                  r["tunnel_alias"] = {"status": "SAME_UNIT" if one.get("Id") == two.get("Id") else "DISTINCT_UNITS",
+                                       "generic_id": one.get("Id"), "tokyo_id": two.get("Id")}
+              else:
+                  r["tunnel_alias"] = {"status": "NOT_BOTH_LOADED_NOT_PROVEN_SAME",
+                                       "generic_load": one.get("LoadState"), "tokyo_load": two.get("LoadState")}
+              r["status"] = "RUNTIME_METADATA_COLLECTED_NOT_PRIVATE_CONFIG_OR_INSTALL_ACCEPTANCE"
+              print("PR99_SERVICE_RUNTIME_RECEIPT=" + json.dumps(r, sort_keys=True))
+          
+          
+          if __name__ == "__main__":
+              main()
+          PY
+
+  pr99-s06-runtime-offline-review:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_S06_RUNTIME_REVIEW_ONCE_20261016' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        id: python
+        with:
+          python-version: '3.11'
+      - name: New private-contract synthetic tests only, no production host
+        env:
+          XJ_S06_PYTHON: ${{ steps.python.outputs.python-path }}
+        shell: bash
+        run: |
+          sudo -n -- "$XJ_S06_PYTHON" -I -B - <<'PY'
+          import sys,unittest
+          sys.path.insert(0,'evidence/pr99-service-handoff/s06-candidate')
+          suite=unittest.defaultTestLoader.loadTestsFromName('test_runtime_contract')
+          r=unittest.TextTestRunner(verbosity=2).run(suite)
+          print('S06_NEW_TESTS=%d SKIPPED=%d PRODUCTION_HOST_ACTIONS=0'%(r.testsRun,len(r.skipped)))
+          raise SystemExit(not r.wasSuccessful() or bool(r.skipped))
+          PY
+      - name: Bind exact small review package, no private runtime contents
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.sha }}
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          python -I -B - <<'PY'
+          import gzip,hashlib,io,json,os,pathlib,tarfile
+          root=pathlib.Path('evidence/pr99-service-handoff/s06-candidate')
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          files={p:(root/p).read_bytes() for p in ('runtime_contract.py','test_runtime_contract.py','README.md','BINDING.json')}
+          b=json.loads(files['BINDING.json'])
+          assert set(b['files'])==set(files)-{'BINDING.json'}
+          assert all(sha(files[p])==h for p,h in b['files'].items())
+          buf=io.BytesIO()
+          with tarfile.open(fileobj=buf,mode='w',format=tarfile.USTAR_FORMAT) as t:
+              for p,data in sorted(files.items()):
+                  i=tarfile.TarInfo(p);i.size=len(data);i.uid=i.gid=i.mtime=0;i.mode=0o400;t.addfile(i,io.BytesIO(data))
+          raw=gzip.compress(buf.getvalue(),mtime=0)
+          out=pathlib.Path('/tmp/pr99-s06-runtime-review');out.mkdir(mode=0o700)
+          (out/'PR99_S06_RUNTIME_REVIEW.tar.gz').write_bytes(raw)
+          r=dict(schema_version=1,source_commit=os.environ['XJ_EXPECTED_HEAD'],script_sha256=sha(files['runtime_contract.py']),binding_sha256=sha(files['BINDING.json']),tar_sha256=sha(raw),tar_bytes=len(raw),bound_files=3,regular_members=4,new_tests=19,production_executed=False)
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(r,sort_keys=True)+'\n')
+          print(json.dumps(r,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr99-s06-runtime-private-contract-review
+          path: /tmp/pr99-s06-runtime-review/
+          if-no-files-found: error
+          retention-days: 7
+
+  pr99-handoff-resolution-offline-review:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_HANDOFF_RESOLUTION_REVIEW_FINAL_20261016' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Ten new resolution tests only; no production host or private input
+        run: |
+          python -I -B - <<'PY'
+          import sys,unittest
+          sys.path.insert(0,'evidence/pr99-service-handoff/handoff-resolution-candidate')
+          r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromName('test_handoff_resolution'))
+          print('HANDOFF_RESOLUTION_TESTS=%d SKIPPED=%d PRODUCTION_HOST_ACTIONS=0'%(r.testsRun,len(r.skipped)))
+          raise SystemExit(not r.wasSuccessful() or bool(r.skipped) or r.testsRun!=10)
+          PY
+      - name: Bind exact source-only resolution review package
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          python -I -B - <<'PY'
+          import gzip,hashlib,io,json,os,pathlib,tarfile
+          root=pathlib.Path('evidence/pr99-service-handoff/handoff-resolution-candidate')
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          files={p:(root/p).read_bytes() for p in ('resolve_received_handoff.py','test_handoff_resolution.py','RESOLUTION_README.md','RESOLUTION_BINDING.json')}
+          b=json.loads(files['RESOLUTION_BINDING.json'])
+          assert set(b['files'])==set(files)-{'RESOLUTION_BINDING.json'}
+          assert all(sha(files[p])==h for p,h in b['files'].items())
+          buf=io.BytesIO()
+          with tarfile.open(fileobj=buf,mode='w',format=tarfile.USTAR_FORMAT) as t:
+              for p,data in sorted(files.items()):
+                  i=tarfile.TarInfo(p);i.size=len(data);i.uid=i.gid=i.mtime=0;i.mode=0o400;t.addfile(i,io.BytesIO(data))
+          raw=gzip.compress(buf.getvalue(),mtime=0)
+          out=pathlib.Path('/tmp/pr99-handoff-resolution-review');out.mkdir(mode=0o700)
+          (out/'PR99_HANDOFF_RESOLUTION_REVIEW.tar.gz').write_bytes(raw)
+          r=dict(schema_version=1,source_commit=os.environ['XJ_EXPECTED_HEAD'],script_sha256=sha(files['resolve_received_handoff.py']),binding_sha256=sha(files['RESOLUTION_BINDING.json']),tar_sha256=sha(raw),tar_bytes=len(raw),bound_files=3,regular_members=4,new_tests=10,production_executed=False)
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(r,sort_keys=True)+'\n')
+          print(json.dumps(r,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr99-received-handoff-resolution-review
+          path: /tmp/pr99-handoff-resolution-review/
+          if-no-files-found: error
+          retention-days: 7
+
+  s07-domestic-install-target-preflight:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_S07_DOMESTIC_INSTALL_PREFLIGHT_20261017' &&
+      github.run_attempt == 1
+    runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
+    timeout-minutes: 3
+    steps:
+      - name: Target public identity and protected service metadata only
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 -I -B - <<'PY'
+          import base64,hashlib,json,os,shutil,socket,stat,subprocess,sys
+          from pathlib import Path
+          assert os.geteuid()!=0 and os.uname().nodename=='iZvt5t8tlrm8oiZ'
+          result={'schema_version':1,'status':'DOMESTIC_INSTALL_TARGET_PREFLIGHT','host':os.uname().nodename,'uid':os.geteuid(),'python':sys.version.split()[0],'python_path':sys.executable,'architecture':os.uname().machine,'free_bytes':shutil.disk_usage('/opt').free,'sudo_calls':0,'private_key_reads':0,'business_requests':0,'service_actions':0}
+          pub=Path('/etc/ssh/ssh_host_ecdsa_key.pub')
+          fd=os.open(pub,os.O_RDONLY|os.O_NOFOLLOW)
+          with os.fdopen(fd,'rb') as f:
+              s=os.fstat(f.fileno());assert stat.S_ISREG(s.st_mode) and s.st_uid==0 and not s.st_mode&0o022 and s.st_size<4096
+              raw=f.read(4096)
+          fields=raw.decode().split();assert fields[0]=='ecdsa-sha2-nistp256'
+          key=base64.b64decode(fields[1],validate=True)
+          result['ssh_public_host_key']='47.101.152.210 '+fields[0]+' '+fields[1]
+          result['ssh_fingerprint']='SHA256:'+base64.b64encode(hashlib.sha256(key).digest()).decode().rstrip('=')
+          units=['nginx.service','provider-neutral-domestic-bridge.service','xuanjun-site-hub-preview.service','secure-secrets-portal.service','xuanjun-wecom-customer-contact.service','xuanjun-wecom-customer-service.service']
+          r=subprocess.run(['/usr/bin/systemctl','show',*units,'-p','Id','-p','LoadState','-p','ActiveState','-p','SubState','-p','MainPID','--no-pager'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=15)
+          result['protected_service_metadata']={'exit':r.returncode,'text':r.stdout}
+          try:
+              s=Path('/opt/xuanjun-migration-s07').lstat();result['candidate_base']='EXISTS'
+          except FileNotFoundError:result['candidate_base']='ABSENT'
+          except PermissionError:result['candidate_base']='UNKNOWN_PERMISSION'
+          print('PR99_S07_TARGET_RECEIPT='+json.dumps(result,sort_keys=True))
+          PY
+
+  s07-private-stage-mechanism-tests:
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.actor == 'huhongchuan0422-creator' &&
+      github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014' &&
+      github.event.head_commit.message == 'PR99_S07_STAGE_TESTS_20261017' &&
+      github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: '3.11'
+      - name: Only ten new synthetic install-mechanism tests; no production host
+        env:
+          XJ_STAGE_PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          sudo -n -- "$XJ_STAGE_PYTHON" -I -B - <<'PY'
+          import sys,unittest
+          sys.path.insert(0,'evidence/pr99-service-handoff/s07-domestic-stage')
+          r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromName('test_install_received_services'))
+          print('S07_INSTALL_MODEL_TESTS=%d SKIPPED=%d PRODUCTION_HOST_ACTIONS=0'%(r.testsRun,len(r.skipped)))
+          raise SystemExit(not r.wasSuccessful() or bool(r.skipped) or r.testsRun!=10)
+          PY
+      - name: Build exact source-only package without private source data
+        env:
+          XJ_EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$XJ_EXPECTED_HEAD"
+          python -I -B - <<'PY'
+          import gzip,hashlib,io,json,os,pathlib,tarfile
+          root=pathlib.Path('evidence/pr99-service-handoff/s07-domestic-stage')
+          sha=lambda b:hashlib.sha256(b).hexdigest()
+          files={p:(root/p).read_bytes() for p in ('install_received_services.py','test_install_received_services.py','README.md','BINDING.json')}
+          b=json.loads(files['BINDING.json'])
+          assert set(b['files'])==set(files)-{'BINDING.json'} and all(sha(files[p])==h for p,h in b['files'].items())
+          buf=io.BytesIO()
+          with tarfile.open(fileobj=buf,mode='w',format=tarfile.USTAR_FORMAT) as t:
+              for p,data in sorted(files.items()):
+                  i=tarfile.TarInfo(p);i.size=len(data);i.mode=0o400;i.uid=i.gid=i.mtime=0;t.addfile(i,io.BytesIO(data))
+          raw=gzip.compress(buf.getvalue(),mtime=0)
+          out=pathlib.Path('/tmp/pr99-s07-stage-review');out.mkdir(mode=0o700)
+          (out/'PR99_S07_STAGE_SOURCE_REVIEW.tar.gz').write_bytes(raw)
+          r=dict(source_commit=os.environ['XJ_EXPECTED_HEAD'],script_sha256=sha(files['install_received_services.py']),binding_sha256=sha(files['BINDING.json']),tar_sha256=sha(raw),tar_bytes=len(raw),bound_files=3,regular_members=4,new_tests=10,production_executed=False)
+          (out/'BUILD_RECEIPT.json').write_text(json.dumps(r,sort_keys=True)+'\n')
+          print(json.dumps(r,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr99-s07-private-code-env-source-review
+          path: /tmp/pr99-s07-stage-review/
+          if-no-files-found: error
+          retention-days: 7

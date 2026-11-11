@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "source_commit": "08c7e90cc02de270bd63c4dfc0de9803d6a6a81c",
+  "source_tree": "9945025df7e8d23d822645eddf566b4181e080b5",
+  "phase_b_acceptance": 6209166651,
+  "phase_b_reexecuted": false,
+  "hosted": {
+    "status": "PASS",
+    "tests": 44,
+    "skipped": 0,
+    "python": "3.11.17",
+    "run": 38864763014,
+    "job": 116854934203,
+    "exact_checkout": "08c7e90cc02de270bd63c4dfc0de9803d6a6a81c"
+  },
+  "artifact": {
+    "id": 12030856104,
+    "zip_sha256": "c95fe723429aa294d30bd72df13b5449ec5be8ea523cc65ea3c316982c212be5",
+    "tar_sha256": "a41487dbb26b2ce353ee238e39e14683f3d119cc91dde79f498b0f81beb98e09",
+    "binding_files": 26,
+    "runtime_files": 22,
+    "developer_download_verified": true,
+    "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
+  },
+  "local_reproducibility": "TAR_BYTE_IDENTICAL_TO_ACTUAL_ACTIONS_ARTIFACT",
+  "evidence_origin": "DEVELOPER_READ_OF_ORIGINAL_GITHUB_LOGS_AND_DOWNLOAD_BYTES_NOT_INDEPENDENT_AUDIT",
+  "source_reused_byte_identical_files": 8,
+  "production_runner_job": "SKIPPED_IF_FALSE_UNCHANGED",
+  "other_hosted_workflows": "CONTROL_PLANE_LINT_FEATURE_COMPLIANCE_DEVELOPMENT_ENTRY_SUCCESS",
+  "production_actions": {
+    "sudo_on_production": 0,
+    "service_actions": 0,
+    "nft_loads": 0,
+    "provider_requests": 0,
+    "credentials_read": 0,
+    "business_databases_read_or_exported": 0,
+    "dns_changes": 0,
+    "phase_c_started": false,
+    "tokyo_retired": false
+  },
+  "remaining": {
+    "controller": "ROOT_INSTALL_START_STOP_REVOKE_SINGLE_USE_CONTROLLER_NOT_IMPLEMENTED",
+    "private_bindings": "REAL_SECRETREF_ACCOUNT_SOURCE_COLLECTOR_TRANSFER_WORKER_UID_WINDOW_NOT_BOUND",
+    "root_channel": "EXISTING_NONROOT_RUNNER_HAS_NO_PHASE_C_FIXED_ROOT_EXECUTION_CAPABILITY",
+    "approval": "NEW_PHASE_C_EXACT_EXECUTION_APPROVAL_NOT_ISSUED",
+    "live_confinement": "NOT_EXERCISED",
+    "writer_cutover": "HOLD"
+  }
+}

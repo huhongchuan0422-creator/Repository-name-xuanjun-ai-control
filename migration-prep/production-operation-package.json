@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "task_id": "TOKYO_KOREA_REAL_INFRASTRUCTURE_PREPARATION_6168475895",
+  "candidate": {
+    "commit": "f733cd4eca6be23e41be185f7d6421d0ff9cd522",
+    "tree": "31c262997b3850450cb7c1da2b4d9c472d9cf0ff"
+  },
+  "execution_authorized": false,
+  "privileged_executor_binding": "NONE",
+  "production_migration_release": "HOLD",
+  "blind_retry_allowed": false,
+  "g1_runner_retirement": {
+    "authorized": false,
+    "hosts": [
+      {
+        "host": "iZ6wee8q9z4t03hvqumwfhZ",
+        "runner_agent_id": 4,
+        "runner_name": "xuanjun-tokyo-readonly",
+        "unit": "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service",
+        "working_directory": "/home/githubrunner/actions-runner"
+      },
+      {
+        "host": "iZmj7a5kwr75qc1tul4kf9Z",
+        "runner_agent_id": 3,
+        "runner_name": "xuanjun-korea-binance",
+        "unit": "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-korea-binance.service",
+        "working_directory": "/home/githubrunner/actions-runner"
+      }
+    ],
+    "ordered_phases": [
+      "BASELINE_NO_JOB_AND_GITHUB_ADMIN_RECORD",
+      "SVC_STOP",
+      "SVC_UNINSTALL",
+      "CONFIG_REMOVE_WITH_PROTECTED_SHORT_LIVED_TOKEN",
+      "VERIFY_LOCAL_RESIDUE_ABSENT",
+      "VERIFY_GITHUB_ADMIN_RECORD_ABSENT",
+      "VERIFY_SSH_AND_OPENCLAW_CHANNELS",
+      "VERIFY_PRODUCTION_SERVICES_UNCHANGED"
+    ],
+    "command_templates": [
+      ["<runner_workdir>/svc.sh", "stop"],
+      ["<runner_workdir>/svc.sh", "uninstall"],
+      ["<runner_workdir>/config.sh", "remove", "--token", "<PROTECTED_SHORT_LIVED_REMOVE_TOKEN>"]
+    ],
+    "side_effects": [
+      "runner_listener_stops",
+      "systemd_runner_unit_removed",
+      "github_runner_registration_removed"
+    ],
+    "failure": "HOLD_INSPECT_PHASE_RECEIPT_NO_BLIND_RETRY",
+    "temporary_helper_cleanup": {
+      "authorized": false,
+      "separate_owner_gate_required": true,
+      "targets": [
+        "/usr/local/sbin/xuanjun-migration-inspect-v1",
+        "/etc/sudoers.d/xuanjun-migration-inspect-v1"
+      ],
+      "preconditions": [
+        "BOTH_RUNNERS_REMOVED",
+        "SSH_OPENCLAW_CANARIES_PASS",
+        "GITHUB_ADMIN_RECORDS_ABSENT",
+        "FULL_SUDOERS_SEMANTIC_REVIEW_OR_SCOPED_OWNER_ACCEPTANCE"
+      ]
+    },
+    "current_blocker": "GITHUB_ADMIN_INVENTORY_AND_REMOVE_TOKEN_NOT_AVAILABLE"
+  },
+  "g2_yibi_permanent_retirement": {
+    "authorized": false,
+    "policy": "ARCHIVE_ONLY_NEVER_REENABLE",
+    "services": [
+      "yibi-api.service",
+      "yibi-scheduler.service",
+      "yibi-daily-report.service",
+      "yibi-health-check.service",
+      "yibi-mailbox-reader.service",
+      "yibi-worker.service"
+    ],
+    "timers": [
+      "yibi-daily-report.timer",
+      "yibi-health-check.timer"
+    ],
+    "protected_units": [
+      "xuanjun-novel-factory.service",
+      "postgresql.service",
+      "redis.service"
+    ],
+    "protected_listeners": [
+      "127.0.0.1:5432",
+      "127.0.0.1:6379"
+    ],
+    "ordered_phases": [
+      "VERIFY_EXISTING_ARCHIVE_IDENTITY_WITHOUT_DECRYPT",
+      "FREEZE_ALL_YIBI_TRIGGERS",
+      "STOP_YIBI_SERVICES_ONLY",
+      "DISABLE_ALL_YIBI_UNITS",
+      "MASK_ALL_YIBI_UNITS",
+      "VERIFY_NO_YIBI_PROCESS_LISTENER_TIMER_CRON_OPENCLAW_TRIGGER",
+      "VERIFY_NOVEL_POSTGRES_REDIS_IDENTITIES_UNCHANGED"
+    ],
+    "side_effects": [
+      "loopback_8000_listener_removed",
+      "yibi_scheduler_stopped",
+      "yibi_timers_stopped_and_masked"
+    ],
+    "failure": "KEEP_YIBI_DISABLED_RESTORE_ONLY_CHANGED_SHARED_DEPENDENCY",
+    "forbidden": [
+      "START_YIBI",
+      "ENABLE_YIBI",
+      "UNMASK_YIBI",
+      "STOP_POSTGRESQL",
+      "STOP_REDIS",
+      "STOP_OR_CHANGE_NOVEL"
+    ],
+    "current_blocker": "GATEWAY_GLOBAL_OPENCLAW_AND_PRIVILEGED_USER_CRONTAB_INVENTORY_INCOMPLETE"
+  },
+  "g3_writer_fence": {
+    "authorized": false,
+    "discovery_count": 95,
+    "discovery_sha256": "c80ccec7548264dce4322413d423a9a98869a3cb0f1675d27f91906a64068b65",
+    "path_class_counts": {
+      "FORMAL": 12,
+      "LEGACY": 17,
+      "MANUAL_SCRIPT": 58,
+      "PROTECTION": 8
+    },
+    "required_for_each_path": [
+      "EXACT_SOURCE_HASH",
+      "ACTUAL_ENTRY_OR_IMPORT_CHAIN",
+      "PROCESS_SYSTEMD_CRON_OPENCLAW_REACHABILITY",
+      "CREDENTIAL_ACCESS",
+      "SCHEDULER_ACCESS",
+      "FENCE_CALL_OR_PROVEN_QUARANTINE",
+      "POST_REBOOT_BEHAVIOR"
+    ],
+    "rules": {
+      "formal_direct_writer": "EXTERNAL_EPOCH_FENCE_PLUS_SCOPED_CREDENTIAL",
+      "protection": "FENCE_WHILE_PRESERVING_RISK_EXIT_SEMANTICS",
+      "manual_legacy_offline": "NO_SCHEDULER_NO_CREDENTIAL_QUARANTINE",
+      "unknown": "HOLD"
+    },
+    "current_blocker": "ALL_95_PATHS_NOT_YET_RUNTIME_INTEGRATED_OR_QUARANTINED"
+  },
+  "g4_get_only_and_final_checkpoint": {
+    "authorized": false,
+    "exchange_called_in_preparation": false,
+    "required_credential_role": "BINANCE_ACCOUNT_READONLY",
+    "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+    "method_allowlist": ["GET"],
+    "surfaces": [
+      "server_time",
+      "account",
+      "balances",
+      "position_mode",
+      "positions",
+      "open_orders",
+      "algo_orders",
+      "protective_orders",
+      "recent_orders",
+      "trades"
+    ],
+    "max_exchange_skew_ms": 10000,
+    "max_capture_ms": 30000,
+    "required_local_state": [
+      "positions",
+      "open_orders",
+      "algo_orders",
+      "protective_orders",
+      "recent_orders",
+      "trades",
+      "pending_queue",
+      "recovery_queue",
+      "unknown_execution",
+      "inflight_requests",
+      "guard_state",
+      "watch_state",
+      "ownership_ledger",
+      "scheduler_state"
+    ],
+    "authoritative_database": "/opt/trading-system/database/data/trading.db",
+    "acceptance": [
+      "PAGINATION_COMPLETE",
+      "EXACT_SYMBOL_COVERAGE",
+      "ZERO_UNKNOWN",
+      "ZERO_INFLIGHT",
+      "ZERO_OWNERSHIP_CONFLICT",
+      "ALL_LOCAL_EXCHANGE_DIGESTS_MATCH",
+      "ONE_BOUNDED_FREEZE_WINDOW",
+      "SIGNED_PINNED_FREEZE_RECEIPTS",
+      "INDEPENDENT_AUTHORITY_BINDING"
+    ],
+    "failure": "UNFREEZE_ONLY_AFTER_RECEIPT_AND_KEEP_MIGRATION_HOLD",
+    "current_blockers": [
+      "REAL_NO_LOCAL_MUTATION_ADAPTER_NOT_BOUND",
+      "EXACT_SIDECAR_SOURCE_MAP_NOT_INDEPENDENTLY_REVIEWED",
+      "INDEPENDENT_ED25519_TRUST_ANCHOR_AND_SIGNATURE_NOT_PROVEN"
+    ]
+  },
+  "g5_korea_isolated_deployment": {
+    "authorized": false,
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "dedicated_user": "xuanjun_binance",
+    "directories": {
+      "release_root": "/opt/xuanjun-binance",
+      "state_root": "/var/lib/xuanjun-binance",
+      "config_root": "/etc/xuanjun-binance",
+      "log_root": "/var/log/xuanjun-binance"
+    },
+    "candidate_loopback_ports": [18080, 18081, 19080, 19081],
+    "runtime": {
+      "required_python": "3.11",
+      "available_binary": "/usr/bin/python3.11",
+      "reuse_yibi_venv": false
+    },
+    "isolation_requirements": [
+      "DEDICATED_USER_AND_GROUP",
+      "ROOT_OWNED_RELEASE_AND_CONFIG",
+      "DEDICATED_VENV",
+      "DEDICATED_STATE_LOG_RUNTIME",
+      "DEDICATED_PROTECTED_SECRET_NAMESPACE",
+      "LOOPBACK_ONLY_NON_OVERLAPPING_PORTS",
+      "GET_ONLY_EGRESS_DURING_SHADOW",
+      "NO_TRADE_CREDENTIAL_DURING_ISOLATION_AND_SHADOW",
+      "WRITER_DISABLED",
+      "SCHEDULER_DISABLED",
+      "NOVEL_POSTGRES_REDIS_UNCHANGED"
+    ],
+    "forward_order": [
+      "KOREA_ISOLATED_DEPLOYED",
+      "RUNTIME_VERIFIED",
+      "SHADOW_PASS",
+      "TOKYO_FENCED",
+      "FINAL_CHECKPOINT_VERIFIED",
+      "KOREA_AUTHORITY_GRANTED",
+      "BOUNDED_CANARY_PASS",
+      "OBSERVATION_PASS"
+    ],
+    "rollback_order": [
+      "KOREA_WRITER_LOCKED",
+      "KOREA_CREDENTIAL_REVOKED",
+      "KOREA_IP_REMOVED",
+      "UNKNOWN_OUTCOMES_RECONCILED",
+      "TOKYO_CHECKPOINT_RESTORED",
+      "TOKYO_GET_ONLY_RECONCILED",
+      "TOKYO_NEW_EPOCH_GRANTED"
+    ],
+    "failure": "KOREA_FIRST_FENCE_DOUBLE_WRITER_FORBIDDEN",
+    "current_blockers": [
+      "DEDICATED_USER_AND_DIRECTORIES_ABSENT",
+      "DEPLOYABLE_RUNTIME_ARTIFACT_NOT_BUILT",
+      "PROTECTED_SECRET_NAMESPACE_NOT_DESIGNED",
+      "GET_ONLY_EGRESS_POLICY_NOT_PROVEN",
+      "SHADOW_DURATION_AND_CANARY_THRESHOLDS_NOT_OWNER_APPROVED"
+    ]
+  },
+  "consolidated_future_human_node": {
+    "required": true,
+    "items": [
+      "GITHUB_ADMIN_AND_SHORT_LIVED_RUNNER_REMOVE_TOKENS",
+      "ROOT_AUTHORITY_ON_BOTH_HOSTS_AND_BOUNDED_WINDOW",
+      "GATEWAY_GLOBAL_TRIGGER_AND_PRIVILEGED_CRONTAB_INVENTORY",
+      "INDEPENDENT_ED25519_TRUST_ANCHOR_AND_SIGNATURE",
+      "95_PATH_RUNTIME_COVERAGE_REVIEW",
+      "G4_ADAPTER_SIDECARS_AND_FREEZE_WINDOW_REVIEW",
+      "KOREA_ARTIFACT_EGRESS_SECRET_NAMESPACE_SHADOW_CANARY_REVIEW",
+      "OPTIONAL_SEPARATE_HELPER_SUDOERS_RETIREMENT_AUTHORIZATION"
+    ]
+  }
+}

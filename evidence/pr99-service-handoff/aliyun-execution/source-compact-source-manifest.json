@@ -1,0 +1,16 @@
+{
+  "M99_dynamic": "NOT_RUN",
+  "decompressed_limit": 110000,
+  "files": {
+    ".github/workflows/pr99-source-compact.yml": "e098d18534283ddd7752224d3c5ae13a8c5bda0741a1178cfa3392a99bc809c4",
+    "evidence/pr99-service-handoff/aliyun-execution/source_compact_host.py": "3022b96ee2a421f100b4e6c178fbb16a3e44e194fec6786d5fa1e2dd2090abaf",
+    "evidence/pr99-service-handoff/aliyun-execution/source_compact_inventory.py": "77a185f2313037700cfdc2cd623ef071c87a0103605e13cb7227e5c6a5d5afdf"
+  },
+  "old_invoke_preserved": "t-jpn70exx16tf280",
+  "old_output_status": "SUCCESS_BUT_INCOMPLETE_RECEIPT_NOT_ACCEPTED",
+  "payload_text_limit": 22000,
+  "production_actions": 0,
+  "scheduler_rescan": false,
+  "source_semantics": "UNCHANGED_AST_ONLY_NO_BUSINESS_IMPORTS",
+  "wire_json_limit": 23000
+}

@@ -1,0 +1,653 @@
+{
+  "status": "S08_EXACT_ENDPOINT_METADATA_COLLECTED_NOT_RUNTIME_ACCEPTANCE",
+  "run": 39000291289,
+  "job": 117301596227,
+  "source_commit": "45cb158340ca11e26e9601a816afc06ad3c7c044",
+  "helper_sha256": "ac3225a71c32c597f789a7ff0f096ddffd25cdecd551d845f7d81ae0bb71a50c",
+  "hosts": [
+    {
+      "host": "korea",
+      "instance_id": "09207081a09a466aa0079b07b5e3e7ca",
+      "invocation_status": "Success",
+      "invoke_id": "t-kor709z76wiipz4",
+      "receipt": {
+        "attempt_nonce": "ab31dcc223dc4eb9a1d7ddb407862b25",
+        "business_api_requests": 0,
+        "collected_at_utc": "2026-10-17T03:50:17.465705+00:00",
+        "container_metadata": [],
+        "cron_spool": [
+          {
+            "path": "/var/spool/cron/root",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/admin",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/crontabs/root",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/crontabs/admin",
+            "status": "ABSENT"
+          }
+        ],
+        "database_opened": false,
+        "hostname": "iZmj7a5kwr75qc1tul4kf9Z",
+        "nginx_includes": [],
+        "service_actions": 0,
+        "sources": [],
+        "ssh": [],
+        "status": "S08_EXACT_ENDPOINT_METADATA",
+        "uid": 0
+      },
+      "service_actions": 0,
+      "status": "PASS"
+    },
+    {
+      "host": "domestic",
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+      "invocation_status": "Success",
+      "invoke_id": "t-sh0709z77s3zd34",
+      "receipt": {
+        "attempt_nonce": "c214ed845c0f48d4bcbde141ed6bd335",
+        "business_api_requests": 0,
+        "collected_at_utc": "2026-10-17T03:50:18.012117+00:00",
+        "container_metadata": [],
+        "cron_spool": [
+          {
+            "path": "/var/spool/cron/root",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/admin",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/crontabs/root",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/crontabs/admin",
+            "status": "ABSENT"
+          }
+        ],
+        "database_opened": false,
+        "hostname": "iZvt5t8tlrm8oiZ",
+        "nginx_includes": [
+          {
+            "path": "/etc/nginx/pr122-site-hub/locations.conf",
+            "routes": [
+              {
+                "location": "= /assets/community-preview-session.js"
+              },
+              {
+                "location": "= /assets/ecv-quote-ui.js"
+              },
+              {
+                "location": "= /assets/ecv-quote.js"
+              },
+              {
+                "location": "= /assets/hub-script-dc888cd7b15b4e6f.js"
+              },
+              {
+                "location": "= /assets/xuanjun-demo-integration.css"
+              },
+              {
+                "location": "= /assets/xuanjun-site-integration.css"
+              },
+              {
+                "location": "= /customer/projects"
+              },
+              {
+                "location": "= /customer/projects/"
+              },
+              {
+                "location": "= /customer/projects/acceptance"
+              },
+              {
+                "location": "= /customer/projects/acceptance/"
+              },
+              {
+                "location": "= /customer/projects/acceptance/index.html"
+              },
+              {
+                "location": "= /customer/projects/index.html"
+              },
+              {
+                "location": "= /ecosystem"
+              },
+              {
+                "location": "= /ecosystem/"
+              },
+              {
+                "location": "= /ecosystem/activities"
+              },
+              {
+                "location": "= /ecosystem/activities/"
+              },
+              {
+                "location": "= /ecosystem/activities/index.html"
+              },
+              {
+                "location": "= /ecosystem/co-create"
+              },
+              {
+                "location": "= /ecosystem/co-create/"
+              },
+              {
+                "location": "= /ecosystem/co-create/index.html"
+              },
+              {
+                "location": "= /ecosystem/governance"
+              },
+              {
+                "location": "= /ecosystem/governance/"
+              },
+              {
+                "location": "= /ecosystem/governance/index.html"
+              },
+              {
+                "location": "= /ecosystem/index.html"
+              },
+              {
+                "location": "= /ecosystem/ledger"
+              },
+              {
+                "location": "= /ecosystem/ledger/"
+              },
+              {
+                "location": "= /ecosystem/ledger/index.html"
+              },
+              {
+                "location": "= /ecosystem/profit-sharing"
+              },
+              {
+                "location": "= /ecosystem/profit-sharing/"
+              },
+              {
+                "location": "= /ecosystem/profit-sharing/index.html"
+              },
+              {
+                "location": "= /ecosystem/tiers"
+              },
+              {
+                "location": "= /ecosystem/tiers/"
+              },
+              {
+                "location": "= /ecosystem/tiers/index.html"
+              },
+              {
+                "location": "= /en/customer/projects"
+              },
+              {
+                "location": "= /en/customer/projects/"
+              },
+              {
+                "location": "= /en/customer/projects/acceptance"
+              },
+              {
+                "location": "= /en/customer/projects/acceptance/"
+              },
+              {
+                "location": "= /en/customer/projects/acceptance/index.html"
+              },
+              {
+                "location": "= /en/customer/projects/index.html"
+              },
+              {
+                "location": "= /en/ecosystem"
+              },
+              {
+                "location": "= /en/ecosystem/"
+              },
+              {
+                "location": "= /en/ecosystem/activities"
+              },
+              {
+                "location": "= /en/ecosystem/activities/"
+              },
+              {
+                "location": "= /en/ecosystem/activities/index.html"
+              },
+              {
+                "location": "= /en/ecosystem/co-create"
+              },
+              {
+                "location": "= /en/ecosystem/co-create/"
+              },
+              {
+                "location": "= /en/ecosystem/co-create/index.html"
+              },
+              {
+                "location": "= /en/ecosystem/governance"
+              },
+              {
+                "location": "= /en/ecosystem/governance/"
+              },
+              {
+                "location": "= /en/ecosystem/governance/index.html"
+              },
+              {
+                "location": "= /en/ecosystem/index.html"
+              },
+              {
+                "location": "= /en/ecosystem/ledger"
+              },
+              {
+                "location": "= /en/ecosystem/ledger/"
+              },
+              {
+                "location": "= /en/ecosystem/ledger/index.html"
+              },
+              {
+                "location": "= /en/ecosystem/profit-sharing"
+              },
+              {
+                "location": "= /en/ecosystem/profit-sharing/"
+              },
+              {
+                "location": "= /en/ecosystem/profit-sharing/index.html"
+              },
+              {
+                "location": "= /en/ecosystem/tiers"
+              },
+              {
+                "location": "= /en/ecosystem/tiers/"
+              },
+              {
+                "location": "= /en/ecosystem/tiers/index.html"
+              }
+            ],
+            "sha256": "9d6ed87de3dd9e3c553113dcdee091b9c75ddb20e8eaef4bf5a559993eab66d2"
+          },
+          {
+            "path": "/etc/nginx/pr122-minimal-cutover/apex.locations.conf",
+            "routes": [
+              {
+                "location": "= /yunhui.css"
+              },
+              {
+                "location": "= /yunhui.js"
+              },
+              {
+                "location": "= /search-index.json"
+              },
+              {
+                "location": "= /search"
+              },
+              {
+                "location": "^~ /.well-known/acme-challenge/"
+              },
+              {
+                "location": "/p/"
+              },
+              {
+                "location": "= /submit/douyin"
+              },
+              {
+                "location": "= /submit/tiktok"
+              },
+              {
+                "location": "= /integrations/douyin/oauth/callback"
+              },
+              {
+                "location": "= /integrations/tiktok/oauth/start"
+              },
+              {
+                "location": "= /integrations/tiktok/oauth/callback"
+              },
+              {
+                "location": "= /integrations/tiktok/status"
+              },
+              {
+                "location": "= /integrations/tiktok/disconnect"
+              },
+              {
+                "location": "= /healthz"
+              },
+              {
+                "location": "^~ /telegram-webhook/"
+              },
+              {
+                "location": "= /telegram-canary/status"
+              },
+              {
+                "location": "= /"
+              },
+              {
+                "location": "= /features"
+              },
+              {
+                "location": "= /use-cases"
+              },
+              {
+                "location": "= /integrations"
+              },
+              {
+                "location": "= /integrations/douyin"
+              },
+              {
+                "location": "= /integrations/tiktok"
+              },
+              {
+                "location": "= /capabilities"
+              },
+              {
+                "location": "^~ /custom-ai/"
+              },
+              {
+                "location": "= /guides"
+              },
+              {
+                "location": "^~ /guides/"
+              },
+              {
+                "location": "^~ /about/"
+              },
+              {
+                "location": "= /custom-ai"
+              },
+              {
+                "location": "^~ /capabilities/"
+              },
+              {
+                "location": "= /solutions"
+              },
+              {
+                "location": "^~ /solutions/"
+              },
+              {
+                "location": "= /labs"
+              },
+              {
+                "location": "^~ /labs/"
+              },
+              {
+                "location": "= /contact"
+              },
+              {
+                "location": "= /about"
+              },
+              {
+                "location": "= /privacy"
+              },
+              {
+                "location": "= /privacy/"
+              },
+              {
+                "location": "= /terms"
+              },
+              {
+                "location": "= /terms/"
+              },
+              {
+                "location": "= /tiktok-review"
+              },
+              {
+                "location": "= /tiktok-review/"
+              },
+              {
+                "location": "= /tiktok-review/privacy"
+              },
+              {
+                "location": "= /tiktok-review/privacy/"
+              },
+              {
+                "location": "= /tiktok-review/terms"
+              },
+              {
+                "location": "= /tiktok-review/terms/"
+              },
+              {
+                "location": "= /tiktok-review/callback"
+              },
+              {
+                "location": "= /tiktok-review/callback/"
+              },
+              {
+                "location": "= /tiktok64gtkWxc679WXcGsU11O6ZoKEkzZeCH0.txt"
+              },
+              {
+                "location": "= /tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt"
+              },
+              {
+                "location": "= /tiktokVSWc6dimWZFJAQltpQZXPC6iku7JY0gj.txt"
+              },
+              {
+                "location": "= /tiktokVSWc6dimWZFJAQltpQZXPC6jku7JY0gi.txt"
+              },
+              {
+                "location": "= /terms/tiktokk7gyb4u2Mu1lhdQzJXFzRaIMW357wgBZ.txt"
+              },
+              {
+                "location": "= /styles.css"
+              },
+              {
+                "location": "= /site.js"
+              },
+              {
+                "location": "= /growth-foundation.json"
+              },
+              {
+                "location": "= /robots.txt"
+              },
+              {
+                "location": "= /sitemap.xml"
+              },
+              {
+                "location": "^~ /assets/"
+              },
+              {
+                "location": "= /zh-cn"
+              },
+              {
+                "location": "^~ /zh-cn/"
+              }
+            ],
+            "sha256": "42e9af3573135e6b8ef08905d1a5628051fb5fd2df014be8f8ce914aa353ccd1"
+          }
+        ],
+        "service_actions": 0,
+        "sources": [],
+        "ssh": [],
+        "status": "S08_EXACT_ENDPOINT_METADATA",
+        "uid": 0
+      },
+      "service_actions": 0,
+      "status": "PASS"
+    },
+    {
+      "host": "tokyo",
+      "instance_id": "68985c531add4e90a131aef703a389e6",
+      "invocation_status": "Success",
+      "invoke_id": "t-jpn709z77ieudj4",
+      "receipt": {
+        "attempt_nonce": "0b8fa93330084fbeb5dd457a5702bf56",
+        "business_api_requests": 0,
+        "collected_at_utc": "2026-10-17T03:50:17.937028+00:00",
+        "container_metadata": [
+          {
+            "inspect_returncode": 0,
+            "mounts": [
+              {
+                "destination": "/var/lib/tailscale",
+                "read_write": true,
+                "type": "bind"
+              }
+            ],
+            "name": "xj-tokyo-personal-exit",
+            "network_mode": "xj-ts-jp-net"
+          },
+          {
+            "inspect_returncode": 0,
+            "mounts": [],
+            "name": "objective_turing",
+            "network_mode": "host"
+          },
+          {
+            "inspect_returncode": 0,
+            "mounts": [],
+            "name": "relaxed_jemison",
+            "network_mode": "host"
+          },
+          {
+            "inspect_returncode": 0,
+            "mounts": [],
+            "name": "sharp_bell",
+            "network_mode": "host"
+          }
+        ],
+        "cron_spool": [
+          {
+            "path": "/var/spool/cron/root",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/admin",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/crontabs/root",
+            "status": "ABSENT"
+          },
+          {
+            "path": "/var/spool/cron/crontabs/admin",
+            "status": "ABSENT"
+          }
+        ],
+        "database_opened": false,
+        "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+        "nginx_includes": [],
+        "service_actions": 0,
+        "sources": [
+          {
+            "path": "ai_service/telegram_customer_service_canary.py",
+            "refs": [
+              {
+                "line": 38,
+                "path": "/opt/trading-system/runtime/v8-domestic-operations"
+              }
+            ],
+            "sha256": "83904b6994db02b2702563eaaace50399caaf968864bd7f0ea355b4350462150"
+          },
+          {
+            "path": "ai_service/wecom_customer_service.py",
+            "refs": [
+              {
+                "line": 61,
+                "path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store"
+              },
+              {
+                "line": 64,
+                "path": "/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-service"
+              },
+              {
+                "line": 68,
+                "path": "/opt/trading-system/runtime/v8-domestic-operations/internal-bridge"
+              },
+              {
+                "host": "qyapi.weixin.qq.com",
+                "line": 162,
+                "port": 443,
+                "scheme": "https"
+              }
+            ],
+            "sha256": "aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402"
+          },
+          {
+            "path": "ai_service/wecom_customer_contact_service.py",
+            "refs": [
+              {
+                "line": 38,
+                "path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store"
+              },
+              {
+                "line": 42,
+                "path": "/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-contact"
+              }
+            ],
+            "sha256": "c95ca9ec711d05d64489ed927cae770157954b46661411b5f762f193ba711571"
+          },
+          {
+            "path": "scripts/secure_secrets_portal_server.py",
+            "refs": [
+              {
+                "line": 73,
+                "path": "/opt/trading-system/runtime/secure-secrets-portal"
+              },
+              {
+                "line": 119,
+                "path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store"
+              }
+            ],
+            "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1"
+          }
+        ],
+        "ssh": [
+          {
+            "commands": [
+              {
+                "destination": "47.101.152.210",
+                "forwards": [
+                  {
+                    "binding": "127.0.0.1:19443:127.0.0.1:18443",
+                    "flag": "-L"
+                  }
+                ],
+                "port": 22,
+                "user": "openclaw_ops"
+              }
+            ],
+            "sha256": "c83f148d878be3b448d22455c01250e91bd903904608a3e919c899758e23125e",
+            "unit": "provider-neutral-tokyo-tunnel.service"
+          },
+          {
+            "commands": [
+              {
+                "destination": "47.101.152.210",
+                "forwards": [
+                  {
+                    "binding": "127.0.0.1:19444:127.0.0.1:20443",
+                    "flag": "-R"
+                  }
+                ],
+                "port": 22,
+                "user": "openclaw_ops"
+              }
+            ],
+            "sha256": "b3b73107f768c6b52b160591ec1e12a28b69c9fbea3b99a41249a9212fc71d0d",
+            "unit": "domestic-model-rpc-tunnel.service"
+          },
+          {
+            "commands": [
+              {
+                "destination": "43.108.99.66",
+                "forwards": [
+                  {
+                    "binding": "127.0.0.1:18761:127.0.0.1:18760",
+                    "flag": "-L"
+                  },
+                  {
+                    "binding": "127.0.0.1:19444:127.0.0.1:20443",
+                    "flag": "-R"
+                  }
+                ],
+                "port": 22,
+                "user": "admin"
+              }
+            ],
+            "sha256": "814e49d8f72ef711dedae71b86b26f69972baf4e0dc732df678fb52f2777340d",
+            "unit": "korea-novel-model-rpc-tunnel.service"
+          }
+        ],
+        "status": "S08_EXACT_ENDPOINT_METADATA",
+        "uid": 0
+      },
+      "service_actions": 0,
+      "status": "PASS"
+    }
+  ],
+  "service_actions": 0
+}

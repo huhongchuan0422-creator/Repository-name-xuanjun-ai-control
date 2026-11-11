@@ -1,0 +1,17 @@
+{
+  "checks": [
+    "selective_regular_files_and_exact_sqlite",
+    "excluded_config_env_units_not_restored",
+    "sqlite_integrity_and_source_unchanged",
+    "restored_files_readonly",
+    "traversal_rejected",
+    "symlink_rejected",
+    "duplicate_rejected",
+    "wrong_archive_hash_rejected",
+    "wrong_database_hash_rejected"
+  ],
+  "passed": 9,
+  "server_execution": false,
+  "sha256": "18db4e6b41c548325044b8b30baf7afc39efd4f6b16bc5f73059ccf063f424ec",
+  "bytes": 10069
+}

@@ -1,0 +1,27 @@
+{
+  "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_NOT_DIRECT_HOST_LOGIN_OR_INDEPENDENT_AUDIT",
+  "reported_local_time": "2026-10-17T07:54+08:00",
+  "launch_directory": "/root/pr99-s07-domestic-data-launch.FbAIVIap",
+  "source_commit": "ebfce46c8c67d1e2443566c0c1b3cd4fbe2cb160",
+  "script_sha256": "90b49446307de25820b8190988582a53f05cc093ea97655d567cdf96a275df79",
+  "terminal_receipt": {
+    "active_runtime_replaced": false,
+    "application_imports": 0,
+    "business_api_requests": 0,
+    "bytes": 47099890,
+    "database_integrity": "PASS",
+    "file_hashes": "PASS",
+    "files": 165,
+    "final_cutover_snapshot": false,
+    "production_cutover": false,
+    "protected_state_unchanged": true,
+    "runtime_configuration_complete": false,
+    "service_actions": 0,
+    "services_installed": false,
+    "source_code_79_hashes": "PASS",
+    "status": "DOMESTIC_S07_PRIVATE_MATERIALS_STAGED_PASS",
+    "tar_sha256": "dee6e24933f6a9b14c12ea0b838099093c40e53dda447360080d382793bc8c8c",
+    "tokyo_retirement": "HOLD",
+    "wire_sha256": "7b0c1dbde63482c10d02ff51081fd1cdee0d3f1c17b1fbd75ffe3b111e40ab4f"
+  }
+}

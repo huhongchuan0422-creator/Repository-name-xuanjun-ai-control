@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "production_hold": true,
+  "repository": "huhongchuan0422-creator/Repository-name-xuanjun-ai-control",
+  "branch": "build/tokyo-korea-migration-prep-20261014",
+  "hosts": {
+    "tokyo": {
+      "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+      "ssh_channel": "existing-local-admin-openclaw",
+      "runner": {
+        "agent_id": 4,
+        "name": "xuanjun-tokyo-readonly",
+        "pool_id": 1,
+        "pool_name": "Default",
+        "service": "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service",
+        "service_path": "/etc/systemd/system/actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-tokyo-readonly.service",
+        "user": "githubrunner",
+        "working_directory": "/home/githubrunner/actions-runner",
+        "work_folder": "_work"
+      }
+    },
+    "korea": {
+      "hostname": "iZmj7a5kwr75qc1tul4kf9Z",
+      "ssh_channel": "yibi-dev",
+      "runner": {
+        "agent_id": 3,
+        "name": "xuanjun-korea-binance",
+        "pool_id": 1,
+        "pool_name": "Default",
+        "service": "actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-korea-binance.service",
+        "service_path": "/etc/systemd/system/actions.runner.huhongchuan0422-creator-Repository-name-xuanjun-ai-control.xuanjun-korea-binance.service",
+        "user": "githubrunner",
+        "working_directory": "/home/githubrunner/actions-runner",
+        "work_folder": "xuanjun-korea-binance"
+      }
+    }
+  },
+  "runner_privilege_residue": {
+    "helper": "/usr/local/sbin/xuanjun-migration-inspect-v1",
+    "sudoers_dropin": "/etc/sudoers.d/xuanjun-migration-inspect-v1",
+    "helper_sha256": "61bed97a32e970dd868f2d223c68ab41c012c484d314cb714c768629aac263c2"
+  },
+  "yibi": {
+    "policy": "ARCHIVE_ONLY_NEVER_REENABLE",
+    "services": [
+      "yibi-api.service",
+      "yibi-scheduler.service",
+      "yibi-daily-report.service",
+      "yibi-health-check.service",
+      "yibi-mailbox-reader.service",
+      "yibi-worker.service"
+    ],
+    "timers": [
+      "yibi-daily-report.timer",
+      "yibi-health-check.timer"
+    ],
+    "protected_units": [
+      "xuanjun-novel-factory.service",
+      "postgresql.service",
+      "redis.service",
+      "redis-server.service"
+    ],
+    "system_cron_matches": 0,
+    "openclaw_global_trigger_inventory": "NOT_VERIFIED_RESTRICTED_SCOPE"
+  },
+  "archive_binding_subject": {
+    "artifact_id": "tokyo-recovery-baseline-20261014",
+    "sha256": "ac43ec29186d4901016083387e6235288004abde6232792a2cc46d23f8e01093",
+    "size_bytes": 1320571760,
+    "authenticated_binding": "NOT_YET_SIGNED",
+    "note": "Git-bound subject only; production trust-anchor signature remains required."
+  }
+}

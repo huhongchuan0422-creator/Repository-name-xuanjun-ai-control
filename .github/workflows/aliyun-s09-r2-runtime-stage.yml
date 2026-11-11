@@ -1,0 +1,177 @@
+name: PR99 S09 bridge route source contract
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pr99-s09-r2-runtime-stage-v1
+  cancel-in-progress: false
+jobs:
+  inventory:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.number == 99 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'build/tokyo-korea-migration-prep-20261014') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - name: Bind source effective environment and target runtime contract
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          """Four-host read-only SWAS probe. No command input or automatic dispatch retry."""
+          import base64
+          import concurrent.futures
+          import datetime
+          import hashlib
+          import hmac
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import uuid
+          from pathlib import Path
+          
+          UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+          KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+          CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+          HOSTS = (
+              ('uk', UK, 'eu-west-1', '40dfc6a47d5e4363b9da7d0d6ab01cb1', 'iZd7oeikknn1z21sq6ji6zZ'),
+              ('korea', KR, 'ap-northeast-2', '09207081a09a466aa0079b07b5e3e7ca', 'iZmj7a5kwr75qc1tul4kf9Z'),
+              ('domestic', CN, 'cn-shanghai', '3a22c458934142eea89ec6e3bf481a57', 'iZvt5t8tlrm8oiZ'),
+              ('tokyo', CN, 'ap-northeast-1', '68985c531add4e90a131aef703a389e6', 'iZ6wee8q9z4t03hvqumwfhZ'),
+          )
+          
+          
+          class Hold(Exception):
+              pass
+          
+          
+          def safe(value):
+              return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+          
+          
+          def quote(value):
+              return urllib.parse.quote(str(value), safe='~')
+          
+          
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          
+          
+          def rpc(endpoint, version, action, credentials, **params):
+              # Endpoint and action are fixed by this program, never accepted from a task.
+              if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+                  raise Hold('ENDPOINT_REJECTED')
+              key, secret, token = credentials
+              values = dict(params, Action=action, Version=version, Format='JSON',
+                            AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                            SignatureNonce=uuid.uuid4().hex,
+                            Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+              if token:
+                  values['SecurityToken'] = token
+              canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+              signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+              values['Signature'] = base64.b64encode(signature).decode()
+              request = urllib.request.Request('https://' + endpoint + '/',
+                  data=urllib.parse.urlencode(values).encode(),
+                  headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+              try:
+                  with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+                      raw = response.read(262145)
+              except urllib.error.HTTPError as error:
+                  try:
+                      data = json.loads(error.read(262145))
+                      code = safe(data.get('Code'))
+                  except Exception:
+                      code = 'HTTP_' + str(error.code)
+                  raise Hold(code) from None
+              except Exception:
+                  # Never print a URL/body, key, temporary token, or raw exception.
+                  raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+              if len(raw) > 262144:
+                  raise Hold('RESPONSE_TOO_LARGE')
+              try:
+                  data = json.loads(raw)
+              except Exception:
+                  raise Hold('INVALID_API_RESPONSE') from None
+              if not isinstance(data, dict):
+                  raise Hold('INVALID_API_RESPONSE')
+              if 'Code' in data:
+                  raise Hold(safe(data['Code']))
+              return data
+          
+          
+          PAYLOAD='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'
+          HELPER_SHA='5b3d73850c588bdb0cc95ee5616b351603350dc572dd9959960e06c23119e4b7'
+          def inventory(host, master):
+              name,role,region,instance,expected=host
+              row={'host':name,'instance_id':instance,'status':'HOLD','service_actions':0}
+              try:
+                  c=rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,RoleArn=role,RoleSessionName='s08-readonly-'+uuid.uuid4().hex[:16],DurationSeconds=900)['Credentials']
+                  credentials=(c['AccessKeyId'],c['AccessKeySecret'],c['SecurityToken'])
+                  for v in credentials:
+                      if not isinstance(v,str) or not v or '\n' in v or '\r' in v:raise Hold('CREDENTIAL_RESPONSE_INVALID')
+                      print('::add-mask::'+v,flush=True)
+                  nonce=uuid.uuid4().hex
+                  code="import base64,zlib,hashlib,os; assert os.geteuid()==0 and os.uname().nodename=="+repr(expected)+"; b=zlib.decompress(base64.b64decode("+repr(PAYLOAD)+")); assert hashlib.sha256(b).hexdigest()=="+repr(HELPER_SHA)+"; exec(compile(b,'s08_readonly.py','exec'),{'__name__':'__main__','ATTEMPT_NONCE':"+repr(nonce)+"})"
+                  shell='#!/bin/sh\nset -eu\n/usr/bin/python3.11 -I -B -c '+__import__('shlex').quote(code)+'\n'
+                  if len(shell.encode())>6000:raise Hold('COMMAND_SIZE')
+                  endpoint='swas.'+region+'.aliyuncs.com'
+                  out=rpc(endpoint,'2020-06-01','RunCommand',credentials,CommandContent=shell,RegionId=region,Type='RunShellScript',InstanceId=instance,WorkingUser='root',WorkingDir='/root',Timeout=240,Name='pr99-s09-r2-runtime-stage-v1')
+                  invoke=out.get('InvokeId')
+                  if not isinstance(invoke,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,180}',invoke):raise Hold('DISPATCH_UNKNOWN_NO_RETRY')
+                  row['invoke_id']=invoke
+                  print(json.dumps({'host':name,'invoke_id':invoke,'status':'DISPATCHED'}),flush=True)
+                  deadline=time.monotonic()+300
+                  while time.monotonic()<deadline:
+                      out=rpc(endpoint,'2020-06-01','DescribeInvocationResult',credentials,RegionId=region,InstanceId=instance,InvokeId=invoke)
+                      detail=out.get('InvocationResult',{})
+                      state=detail.get('InvocationStatus')
+                      if state in ('Pending','Running','Stopping'):
+                          time.sleep(5);continue
+                      row['invocation_status']=safe(state)
+                      if detail.get('InstanceId')!=instance or detail.get('InvokeId')!=invoke:raise Hold('INVOCATION_IDENTITY')
+                      if state!='Success' or detail.get('ExitCode')!=0:raise Hold('COMMAND_FAILED_PRESERVE')
+                      output=detail.get('Output')
+                      if not isinstance(output,str) or len(output)>40000:raise Hold('OUTPUT_SIZE')
+                      try:data=json.loads(output)
+                      except Exception:
+                          try:data=json.loads(base64.b64decode(output,validate=True))
+                          except Exception:raise Hold('OUTPUT_JSON') from None
+                      if data.get('hostname')!=expected or data.get('uid')!=0 or data.get('attempt_nonce')!=nonce or data.get('status')!='R2_RUNTIME_CANDIDATE_COPIED_NOT_ACTIVE':raise Hold('RECEIPT_BINDING')
+                      row.update(status='PASS',receipt=data)
+                      print('S09_CONTRACT_RECEIPT='+json.dumps(row,sort_keys=True),flush=True)
+                      return row
+                  raise Hold('RESULT_UNKNOWN_PRESERVE_NO_RETRY')
+              except Hold as e:row['error_code']=safe(str(e))
+              except Exception:row['error_code']='UNEXPECTED_PRESERVE_NO_RETRY'
+              print('S09_CONTRACT_RECEIPT='+json.dumps(row,sort_keys=True),flush=True)
+              return row
+          
+          
+          def main():
+              if os.environ.get('GITHUB_RUN_ATTEMPT')!='1':raise Hold('ATTEMPT_ALREADY_CONSUMED_NO_REPLAY')
+              master=(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''),'')
+              if not all(master[:2]):raise Hold('MISSING_GITHUB_SECRETS')
+              with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+                  rows=list(pool.map(lambda h:inventory(h,master),HOSTS[2:3]))
+              receipt={'status':'S08_READONLY_CLOSURE_COLLECTED' if all(r['status']=='PASS' for r in rows) else 'HOLD','hosts':rows,'helper_sha256':HELPER_SHA,'service_actions':0,'production_cutover':False}
+              Path('s08-readonly-receipt.json').write_text(json.dumps(receipt,sort_keys=True)+'\n')
+              print('S09_CONTRACT_RESULT='+json.dumps({'status':receipt['status'],'hosts':[{k:r[k] for k in ('host','status','invoke_id','error_code') if k in r} for r in rows]}),flush=True)
+              return 0 if receipt['status']!='HOLD' else 2
+          
+          if __name__=='__main__':
+              try:raise SystemExit(main())
+              except Hold as e:
+                  print('S08_HOLD='+safe(str(e)),flush=True)
+                  raise SystemExit(2)
+          PY

@@ -1,0 +1,302 @@
+"""Two-host PR99 writer-descriptor observation. No command input or automatic dispatch retry."""
+import base64
+import concurrent.futures
+import datetime
+import hashlib
+import hmac
+import json
+import os
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+
+UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+HOSTS = (('domestic', CN, 'cn-shanghai', '3a22c458934142eea89ec6e3bf481a57', 'iZvt5t8tlrm8oiZ'),)
+
+
+class Hold(Exception):
+    pass
+
+
+def safe(value):
+    return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+
+
+def quote(value):
+    return urllib.parse.quote(str(value), safe='~')
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def rpc(endpoint, version, action, credentials, **params):
+    # Endpoint and action are fixed by this program, never accepted from a task.
+    if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+        raise Hold('ENDPOINT_REJECTED')
+    key, secret, token = credentials
+    values = dict(params, Action=action, Version=version, Format='JSON',
+                  AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                  SignatureNonce=uuid.uuid4().hex,
+                  Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+    if token:
+        values['SecurityToken'] = token
+    canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+    signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+    values['Signature'] = base64.b64encode(signature).decode()
+    request = urllib.request.Request('https://' + endpoint + '/',
+        data=urllib.parse.urlencode(values).encode(),
+        headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+    try:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+            raw = response.read(262145)
+    except urllib.error.HTTPError as error:
+        try:
+            data = json.loads(error.read(262145))
+            code = safe(data.get('Code'))
+        except Exception:
+            code = 'HTTP_' + str(error.code)
+        raise Hold(code) from None
+    except Exception:
+        # Never print a URL/body, key, temporary token, or raw exception.
+        raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+    if len(raw) > 262144:
+        raise Hold('RESPONSE_TOO_LARGE')
+    try:
+        data = json.loads(raw)
+    except Exception:
+        raise Hold('INVALID_API_RESPONSE') from None
+    if not isinstance(data, dict):
+        raise Hold('INVALID_API_RESPONSE')
+    if 'Code' in data:
+        raise Hold(safe(data['Code']))
+    return data
+
+
+# This recovery does not import, publish or run the M99-R1 repair candidate.
+# Only this exact new read-only scope is authorized. Historical attempts are never replayed.
+import zlib
+
+HOST_PROGRAM = '"""Resolve only two already observed domestic handle owners; no filesystem writes."""\nimport datetime\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\nfrom pathlib import Path\n\nPINS = {90354: 91354061, 188767: 178248493}\nUNITS = (\'provider-neutral-domestic-bridge.service\', \'windows-interaction-http.service\')\nROOT = \'/home/openclaw_ops/v8-domestic-operations\'\n\n\ndef read(path, limit=16384):\n    with Path(path).open(\'rb\') as f:\n        raw = f.read(limit + 1)\n    if len(raw) > limit:\n        raise RuntimeError(\'METADATA_BOUND\')\n    return raw\n\n\ndef start(p):\n    raw = read(p / \'stat\', 4096)\n    return int(raw[raw.rfind(b\')\') + 2:].split()[19])\n\n\ndef category(name):\n    if name.endswith(\'-wal\'): return \'SQLITE_WAL\'\n    if name.endswith(\'-shm\'): return \'SQLITE_SHM\'\n    if name.endswith((\'.db\', \'.sqlite\', \'.sqlite3\')): return \'DATABASE\'\n    if name.endswith(\'.jsonl\'): return \'JSONL\'\n    if name.endswith(\'.log\'): return \'LOG\'\n    if name.endswith(\'.json\'): return \'JSON\'\n    return \'OTHER\'\n\n\ndef observe(expected, nonce):\n    assert os.geteuid() == 0 and os.uname().nodename == expected == \'iZvt5t8tlrm8oiZ\'\n    root = Path(ROOT).stat()\n    assert (root.st_dev, root.st_ino) == (64771, 835411)\n    control = {}\n    units = []\n    for name in UNITS:\n        r = subprocess.run([\'/usr/bin/systemctl\', \'show\', name,\n            \'--property=ControlGroup,MainPID,ActiveState\', \'--no-pager\'],\n            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3,\n            universal_newlines=True, env={\'LANG\': \'C\', \'PATH\': \'/usr/sbin:/usr/bin:/sbin:/bin\'})\n        values = dict(line.split(\'=\', 1) for line in r.stdout.splitlines() if \'=\' in line)\n        assert r.returncode == 0 and values.get(\'MainPID\', \'\').isdigit()\n        control[name] = values.get(\'ControlGroup\', \'\')\n        active = values.get(\'ActiveState\')\n        assert active in (\'active\', \'inactive\', \'failed\', \'activating\', \'deactivating\')\n        units.append({\'unit\': name, \'pid\': int(values[\'MainPID\']), \'active\': active})\n    rows = []\n    for pid, ticks in PINS.items():\n        p = Path(\'/proc\') / str(pid)\n        assert start(p) == ticks\n        cg = read(p / \'cgroup\').decode()\n        paths = [line.split(\':\', 2)[2] for line in cg.splitlines()]\n        groups = [name for name, group in control.items() if group and group in paths]\n        handles = []\n        fds = list((p / \'fd\').iterdir())\n        assert len(fds) <= 4096\n        for fd in fds:\n            try:\n                target = os.readlink(fd)\n                if not target.startswith(ROOT + \'/\'):\n                    continue\n                fs = fd.stat()\n                info = read(p / \'fdinfo\' / fd.name, 4096)\n                flags = [line.partition(b\':\')[2].strip() for line in info.splitlines() if line.startswith(b\'flags:\')]\n                assert len(flags) == 1\n                handles.append({\'fd\': int(fd.name), \'category\': category(target),\n                    \'device\': fs.st_dev, \'inode\': fs.st_ino,\n                    \'writable\': (int(flags[0], 8) & os.O_ACCMODE) in (os.O_WRONLY, os.O_RDWR)})\n            except FileNotFoundError:\n                raise RuntimeError(\'HANDLE_CHANGED_PRESERVE\') from None\n        assert start(p) == ticks and len(handles) <= 256\n        rows.append({\'pid\': pid, \'start_ticks\': ticks, \'matched_units\': groups,\n                     \'handles\': sorted(handles, key=lambda x: x[\'fd\'])})\n    after = Path(ROOT).stat()\n    assert (after.st_dev, after.st_ino) == (root.st_dev, root.st_ino)\n    return {\'hostname\': expected, \'nonce\': nonce, \'observed_at\': datetime.datetime.utcnow().isoformat() + \'Z\',\n            \'scope\': \'EXACT_EXISTING_DOMESTIC_HANDLE_OWNER_METADATA\', \'units\': units, \'processes\': rows,\n            \'service_actions\': 0, \'database_opened\': False, \'business_requests\': 0,\n            \'fence_enforced\': False, \'inflight_drained\': False}\n\n\nif __name__ == \'__main__\':\n    print(json.dumps(observe(EXPECTED, NONCE), sort_keys=True), flush=True)\n'
+ACTIVE = ('Pending','Running','Stopping')
+TERMINAL = frozenset(('Invalid','Aborted','Success','Failed','Error','Timeout','Cancelled','Terminated'))
+ID = re.compile(r'[A-Za-z0-9_-]{1,180}')
+ALLOWED_ACTIONS = {'AssumeRole','DescribeCommandInvocations','RunCommand','DescribeInvocationResult'}
+original_rpc = rpc
+
+
+def bounded_rpc(endpoint, version, action, credentials, **params):
+    if action not in ALLOWED_ACTIONS:
+        raise Hold('RPC_ACTION_REJECTED')
+    return original_rpc(endpoint, version, action, credentials, **params)
+
+
+def project_invocations(data, instance, status):
+    if type(data) is not dict or type(data.get('TotalCount')) is not int or data['TotalCount'] < 0:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    entries = data.get('CommandInvocations')
+    if type(entries) is not list or len(entries) > 50:
+        raise Hold('INVOCATION_LIST_SCHEMA')
+    projected=[]
+    for item in entries:
+        if type(item) is not dict or type(item.get('InvokeId')) is not str or not ID.fullmatch(item['InvokeId']):
+            raise Hold('INVOCATION_ID_REJECTED')
+        peers=item.get('InvokeInstances')
+        if type(peers) is not list:
+            raise Hold('INVOCATION_PEERS_SCHEMA')
+        selected=[p for p in peers if type(p) is dict and p.get('InstanceId') == instance]
+        if len(selected)!=1:
+            raise Hold('INVOCATION_TARGET_NOT_PROVEN')
+        actual=selected[0].get('InvocationStatus')
+        if actual not in ACTIVE and actual not in TERMINAL:
+            raise Hold('INVOCATION_STATUS_UNKNOWN')
+        # Never retain CommandContent, Output, ErrorInfo, Parameters or any other raw fields.
+        projected.append({'invoke_id':item['InvokeId'],'status':actual})
+    return data['TotalCount'],projected
+
+
+def active_invocations(host, credentials, call=bounded_rpc):
+    name,role,region,instance,expected=host
+    endpoint='swas.'+region+'.aliyuncs.com'
+    rows=[]
+    for status in ACTIVE:
+        expected_total=None
+        for page in range(1,6):
+            response=call(endpoint,'2020-06-01','DescribeCommandInvocations',credentials,
+                RegionId=region,InstanceId=instance,InvocationStatus=status,
+                PageNumber=page,PageSize=50)
+            total,items=project_invocations(response,instance,status)
+            if expected_total is not None and total!=expected_total:
+                raise Hold('INVOCATION_LIST_CHANGED_RECHECK_REQUIRED')
+            expected_total=total
+            rows.extend(items)
+            if page*50>=total:break
+            if not items:raise Hold('INVOCATION_PAGINATION_INCOMPLETE')
+        else:
+            raise Hold('INVOCATION_PAGINATION_BOUND_HOLD')
+    # This is an observed API list, not a fence or exclusive Writer assignment.
+    return sorted({r['invoke_id']:r for r in rows}.values(),key=lambda x:x['invoke_id'])
+
+
+def shell_for(expected,nonce):
+    program='EXPECTED='+repr(expected)+'\nNONCE='+repr(nonce)+'\n'+HOST_PROGRAM
+    payload=base64.b64encode(zlib.compress(program.encode(),9)).decode()
+    digest=hashlib.sha256(program.encode()).hexdigest()
+    bootstrap="import base64,zlib,hashlib; b=zlib.decompress(base64.b64decode("+repr(payload)+")); assert hashlib.sha256(b).hexdigest()=="+repr(digest)+"; exec(compile(b,'<pr99-readonly-recovery>','exec'))"
+    shell="#!/bin/sh\nset -eu\n/usr/bin/python3 -I -B - <<'PR99_READONLY'\n"+bootstrap+"\nPR99_READONLY\n"
+    if len(shell.encode())>6000:raise Hold('COMMAND_LENGTH')
+    return shell
+
+
+"""Strict public metadata boundary for the fixed observer, not an admission."""
+def validate_observation(d, expected, nonce):
+    def fields(x, keys):
+        assert type(x) is dict and set(x) == set(keys.split())
+    def integer(x): assert type(x) is int and 0 <= x < 2**64
+    fields(d, 'hostname nonce observed_at scope units processes service_actions database_opened business_requests fence_enforced inflight_drained')
+    assert d['hostname'] == expected and d['nonce'] == nonce
+    assert d['scope'] == 'EXACT_EXISTING_DOMESTIC_HANDLE_OWNER_METADATA'
+    assert type(d['observed_at']) is str and 19 <= len(d['observed_at']) <= 40 and all(c in '0123456789T:.Z-' for c in d['observed_at'])
+    assert d['fence_enforced'] is d['inflight_drained'] is d['database_opened'] is False
+    assert type(d['service_actions']) is type(d['business_requests']) is int and d['service_actions'] == d['business_requests'] == 0
+    names = ('provider-neutral-domestic-bridge.service', 'windows-interaction-http.service')
+    assert type(d['units']) is list and len(d['units']) == 2
+    for row, name in zip(d['units'], names):
+        fields(row, 'unit pid active'); assert row['unit'] == name
+        integer(row['pid']); assert row['active'] in ('active', 'inactive', 'failed', 'activating', 'deactivating')
+    assert type(d['processes']) is list and len(d['processes']) == 2
+    for row, pin in zip(d['processes'], ((90354, 91354061), (188767, 178248493))):
+        fields(row, 'pid start_ticks matched_units handles')
+        integer(row['pid']); integer(row['start_ticks'])
+        assert (row['pid'], row['start_ticks']) == pin
+        assert type(row['matched_units']) is list and len(row['matched_units']) <= 2
+        assert len(set(row['matched_units'])) == len(row['matched_units']) and all(x in names for x in row['matched_units'])
+        assert type(row['handles']) is list and len(row['handles']) <= 256
+        for h in row['handles']:
+            fields(h, 'fd category device inode writable')
+            for key in ('fd', 'device', 'inode'): integer(h[key])
+            assert h['category'] in ('SQLITE_WAL', 'SQLITE_SHM', 'DATABASE', 'JSONL', 'LOG', 'JSON', 'OTHER')
+            assert type(h['writable']) is bool
+    return d
+
+def decode_receipt(output, expected, nonce):
+    if type(output) is not str or len(output) > 120000:
+        raise Hold('WRITER_OUTPUT_BOUND')
+    try:
+        try: data = json.loads(output)
+        except ValueError: data = json.loads(base64.b64decode(output, validate=True))
+        return validate_observation(data, expected, nonce)
+    except Exception:
+        raise Hold('WRITER_OUTPUT_CONTRACT_REJECTED') from None
+
+
+def probe_current(host,master):
+    name,role,region,instance,expected=host
+    row={'host':name,'instance_id':instance,'status':'HOLD','host_commands':0,'run_command_attempted':False,'service_actions':0,
+         'authoritative_writer':'UNKNOWN','enforced_fence':'UNKNOWN'}
+    try:
+        c=bounded_rpc('sts.aliyuncs.com','2015-04-01','AssumeRole',master,
+            RoleArn=role,RoleSessionName='pr99-resume-'+uuid.uuid4().hex[:16],DurationSeconds=900)['Credentials']
+        credentials=(c['AccessKeyId'],c['AccessKeySecret'],c['SecurityToken'])
+        if not all(type(v) is str and v and '\r' not in v and '\n' not in v for v in credentials):
+            raise Hold('CREDENTIAL_RESPONSE_INVALID')
+        for value in credentials:print('::add-mask::'+value,flush=True)
+        row['sts']='PASS_CURRENT'
+        row['nonterminal_invocations']=active_invocations(host,credentials)
+        row['cloud_query']='PASS_CURRENT_OBSERVATION_NOT_FENCE'
+        if any(x['status'] in ACTIVE for x in row['nonterminal_invocations']):
+            raise Hold('EXISTING_INFLIGHT_PRESERVED_NO_NEW_HOST_COMMAND')
+        nonce=uuid.uuid4().hex
+        shell=shell_for(expected,nonce)
+        # Local job claim stops repeat dispatch in this process; no production state is created.
+        # A lost InvokeId remains UNKNOWN. Workflow reruns are rejected before credentials.
+        claim=Path('pr99-writer-owner-'+name+'.once')
+        with claim.open('x') as f:
+            f.write(json.dumps({'host':name,'nonce':nonce,'state':'READONLY_DISPATCH_INTENT'}))
+            f.flush();os.fsync(f.fileno())
+        row.update(run_command_attempted=True,host_commands='UNKNOWN_UNTIL_TERMINAL_RECEIPT')
+        out=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','RunCommand',credentials,
+            RegionId=region,InstanceId=instance,Type='RunShellScript',
+            WorkingUser='root',WorkingDir='/root',Timeout=55,
+            Name='pr99-writer-owner-v1',CommandContent=shell)
+        invoke=out.get('InvokeId')
+        if type(invoke) is not str or not ID.fullmatch(invoke):
+            raise Hold('DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+        row.update(invoke_id=invoke)
+        print('PR99_WRITER_OWNER_INVOKE='+json.dumps({'host':name,'invoke_id':invoke}),flush=True)
+        deadline=time.monotonic()+100
+        while time.monotonic()<deadline:
+            response=bounded_rpc('swas.'+region+'.aliyuncs.com','2020-06-01','DescribeInvocationResult',credentials,
+                RegionId=region,InstanceId=instance,InvokeId=invoke)
+            detail=response.get('InvocationResult')
+            if type(detail) is not dict or detail.get('InstanceId')!=instance or detail.get('InvokeId')!=invoke:
+                raise Hold('RESULT_IDENTITY_UNKNOWN_NO_RETRY')
+            state=detail.get('InvocationStatus')
+            if state in ACTIVE:time.sleep(5);continue
+            row['invocation_status']=safe(state)
+            if state!='Success' or detail.get('ExitCode')!=0:
+                raise Hold('READONLY_COMMAND_FAILED_NO_RETRY')
+            row['receipt']=decode_receipt(detail.get('Output'),expected,nonce)
+            row['host_commands']=1
+            row['status']='WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN'
+            return row
+        raise Hold('READONLY_RESULT_UNKNOWN_NO_RETRY')
+    except Hold as e:row['error_code']=safe(str(e))
+    except Exception:row['error_code']='UNEXPECTED_UNKNOWN_NO_RETRY'
+    return row
+
+
+def self_test():
+    valid = {'hostname': 'test', 'nonce': 'nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn', 'observed_at': '2026-10-18T12:00:00Z', 'scope': 'EXACT_EXISTING_DOMESTIC_HANDLE_OWNER_METADATA', 'units': [{'unit': 'provider-neutral-domestic-bridge.service', 'pid': 90354, 'active': 'active'}, {'unit': 'windows-interaction-http.service', 'pid': 188767, 'active': 'active'}], 'processes': [{'pid': 90354, 'start_ticks': 91354061, 'matched_units': [], 'handles': []}, {'pid': 188767, 'start_ticks': 178248493, 'matched_units': [], 'handles': []}], 'service_actions': 0, 'database_opened': False, 'business_requests': 0, 'fence_enforced': False, 'inflight_drained': False}
+    assert decode_receipt(json.dumps(valid), 'test', 'n'*32) == valid
+    for mutation in (
+        lambda x: x.update(fence_enforced=True),
+        lambda x: x.update(private='SECRET'),
+        lambda x: x['processes'][0].update(start_ticks=1),
+        lambda x: x['processes'][0].update(pid=True),
+        lambda x: x['processes'][0].update(matched_units=['SECRET']),
+        lambda x: x['processes'][0].update(cmdline='SECRET'),
+    ):
+        bad=json.loads(json.dumps(valid));mutation(bad)
+        try: decode_receipt(json.dumps(bad),'test','n'*32)
+        except Hold: pass
+        else: raise AssertionError('INVALID_OWNER_ACCEPTED')
+    n={'__name__':'test'};exec(compile(HOST_PROGRAM,'fixed-owner','exec'),n)
+    assert n['category']('/fixture/a-wal')=='SQLITE_WAL'
+    assert n['category']('/fixture/a.jsonl')=='JSONL'
+    for h in HOSTS: shell_for(h[4],'f'*32)
+    assert len(HOSTS)==1 and HOSTS[0][0]=='domestic'
+    print('PR99_OWNER_BINDING_CONTRACTS_PASS_SIX_REJECTIONS_NO_CLOUD',flush=True)
+
+
+def main():
+    if os.environ.get('PR99_MODE')=='SELF_TEST':
+        self_test();return 0
+    if os.environ.get('GITHUB_RUN_ATTEMPT')!='1':
+        raise Hold('WORKFLOW_RERUN_FORBIDDEN')
+    head=os.environ.get('PR99_HEAD','')
+    if not re.fullmatch('[0-9a-f]{40}',head) or os.environ.get('PR99_LABEL')!='pr99-writer-owner-'+head[:12]:
+        raise Hold('EXACT_WRITER_OBSERVATION_LABEL_REQUIRED')
+    master=(os.environ.get('ALIYUN_ACCESS_KEY_ID',''),os.environ.get('ALIYUN_ACCESS_KEY_SECRET',''),'')
+    if not all(master[:2]):raise Hold('MISSING_ORIGINAL_REPOSITORY_SECRETS')
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        rows=list(pool.map(lambda host:probe_current(host,master),HOSTS))
+    receipt={'status':'WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION','hosts':rows,
+        'production_actions':0,'production_cutover':False,'authoritative_writer':'UNKNOWN',
+        'enforced_fence':'UNKNOWN','migration_started':False}
+    print('PR99_WRITER_OWNER_RECEIPT='+json.dumps(receipt,sort_keys=True),flush=True)
+    return 0 if all(r['status']=='WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN' for r in rows) else 2
+
+
+if __name__=='__main__':
+    try:raise SystemExit(main())
+    except Hold as error:
+        print('PR99_WRITER_OWNER_HOLD='+safe(str(error)),flush=True)
+        raise SystemExit(2)

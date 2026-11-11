@@ -1,0 +1,43 @@
+name: PR99 WAL bytes and lost InvokeId nodes
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'evidence/pr99-service-handoff/wal-memory-vfs/**'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/production_transport.py'
+      - 'evidence/pr99-service-handoff/s09-install-candidate/production_start.py'
+      - '.github/workflows/pr99-wal-reconciliation-validation.yml'
+permissions:
+  contents: read
+jobs:
+  node-tests:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.event.pull_request.number == 99 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'build/tokyo-korea-migration-prep-20261014'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Test only new independent nodes using synthetic data
+        run: python -B -m unittest discover -s evidence/pr99-service-handoff/wal-memory-vfs -p 'test_*.py' -v
+      - name: Bind reproducible source package to exact Commit and Tree
+        run: python -B evidence/pr99-service-handoff/wal-memory-vfs/build_node_artifact.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-wal-reconciliation-${{ matrix.python }}
+          path: |
+            pr99-wal-reconciliation-node.zip
+            pr99-wal-reconciliation-node.receipt.json
+          if-no-files-found: error

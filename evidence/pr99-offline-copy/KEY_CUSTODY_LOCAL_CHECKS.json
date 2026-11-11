@@ -1,0 +1,15 @@
+{
+  "bash_syntax": "PASS",
+  "real_openssl_synthetic_roundtrip": "PASS",
+  "wrong_key_cannot_match_plaintext": "PASS",
+  "server_execution": false,
+  "sha256": "a1f6c18994411b4c9f7526f0d87526a0cbb00466962974f0937e79db8de11820",
+  "bytes": 4122,
+  "owner_source_key_metadata": {
+    "path": "/root/xj-recovery-package.DZWI6n/key.txt",
+    "mode": "600",
+    "bytes": 65,
+    "origin": "OWNER_ROOT_SSH_METADATA_TRANSCRIPT_2026_10_16T19_38"
+  },
+  "scope": "FIXED_BACKUP_KEY_PRIVATE_TRANSPORT_AND_DECRYPT_HASH_ONLY_NO_EXTRACTION_OR_SERVICE_ACTION"
+}

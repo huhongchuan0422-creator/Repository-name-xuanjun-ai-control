@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "approval_comment_id": 6213125007,
+  "approved_source_commit": "e3da4ae2f98c75ab0c1ccb9a372cef3e3692c8e4",
+  "owner_execution_receipt": {
+    "evidence_origin": "OWNER_ROOT_TERMINAL_RECEIPT_NOT_DIRECT_HOST_LOGIN",
+    "reported_local_time": "2026-10-16T18:15:42+08:00",
+    "status": "FIXED_CHANNEL_READY_NO_PHASE_C_EXECUTION",
+    "approval_comment_id": 6213125007,
+    "phase_c_install_called": false,
+    "retry_allowed": false,
+    "service_actions": 0,
+    "staging_directory": "/root/pr99-phase-c-channel-e3da4ae2",
+    "runner_channel_verified": true
+  },
+  "runner_evidence": {
+    "run": 38886245115,
+    "job": 116924571943,
+    "delivery_commit": "484dd835edcb638008a4e5c433ab7f3f417ed14e",
+    "runner": "xuanjun-korea-binance",
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "caller_uid": 1001,
+    "installed_dispatcher_and_wrapper_hashes": "PASS",
+    "fixed_sudo_call": "PASS",
+    "receipt": {
+      "credentials_read": false,
+      "database_read": false,
+      "inputs": {
+        "archive": {
+          "present": false
+        },
+        "authority_public_key": {
+          "present": false
+        },
+        "broker_public_key": {
+          "present": false
+        },
+        "handoff": {
+          "present": false
+        },
+        "install_admission": {
+          "present": false
+        },
+        "plan": {
+          "present": false
+        },
+        "source_public_key": {
+          "present": false
+        }
+      },
+      "install_called": false,
+      "status": "CHANNEL_INSPECTION_COMPLETE"
+    },
+    "private_grant_claim_and_sudoers_bytes": "NOT_DIRECTLY_READ_BY_RUNNER",
+    "other_hosts": "SKIPPED",
+    "repeated": false,
+    "host_receipt_time_utc": "2026-10-16T10:17:33.1137736Z"
+  },
+  "production_migration": "HOLD",
+  "tokyo_retirement": "HOLD",
+  "next_dependencies": [
+    "Three real independent public signing identities and root-private input placement",
+    "Exact stopped Phase-C installation plan and independent single-action approval",
+    "Readonly account permissions, authoritative source schema and private transport binding",
+    "Real fence/PID1 validation, readonly observation, separate Writer cutover approval"
+  ],
+  "note": "Owner-root installation receipt and fixed root inspect via existing nonroot Runner are separate evidence origins; no private grant anchor or sudoers body independently read."
+}

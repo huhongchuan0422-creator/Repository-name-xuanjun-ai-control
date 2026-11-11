@@ -1,0 +1,220 @@
+name: Alibaba Cloud four-host read-only check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: aliyun-four-host-readonly
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      ((github.event_name == 'pull_request' &&
+        github.event.pull_request.number == 99 &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.head_ref == 'build/tokyo-korea-migration-prep-20261014') ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/build/tokyo-korea-migration-prep-20261014'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Verify four fixed hosts through STS and SWAS
+        env:
+          ALIYUN_ACCESS_KEY_ID: ${{ secrets.ALIYUN_ACCESS_KEY_ID }}
+          ALIYUN_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          """Four-host read-only SWAS probe. No command input or automatic dispatch retry."""
+          import base64
+          import concurrent.futures
+          import datetime
+          import hashlib
+          import hmac
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import uuid
+          from pathlib import Path
+          
+          UK = 'acs:ram::1107191612880779:role/xuanjun-ai-esc'
+          KR = 'acs:ram::1691189778575891:role/xuanjun-automation'
+          CN = 'acs:ram::1384884686754410:role/xuanjun-automation'
+          HOSTS = (
+              ('uk', UK, 'eu-west-1', '40dfc6a47d5e4363b9da7d0d6ab01cb1', 'iZd7oeikknn1z21sq6ji6zZ'),
+              ('korea', KR, 'ap-northeast-2', '09207081a09a466aa0079b07b5e3e7ca', 'iZmj7a5kwr75qc1tul4kf9Z'),
+              ('domestic', CN, 'cn-shanghai', '3a22c458934142eea89ec6e3bf481a57', 'iZvt5t8tlrm8oiZ'),
+              ('tokyo', CN, 'ap-northeast-1', '68985c531add4e90a131aef703a389e6', 'iZ6wee8q9z4t03hvqumwfhZ'),
+          )
+          
+          
+          class Hold(Exception):
+              pass
+          
+          
+          def safe(value):
+              return value if isinstance(value, str) and re.fullmatch(r'[A-Za-z0-9_.:-]{1,180}', value) else 'DETAIL_WITHHELD'
+          
+          
+          def quote(value):
+              return urllib.parse.quote(str(value), safe='~')
+          
+          
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          
+          
+          def rpc(endpoint, version, action, credentials, **params):
+              # Endpoint and action are fixed by this program, never accepted from a task.
+              if endpoint not in {'sts.aliyuncs.com'} | {'swas.' + h[2] + '.aliyuncs.com' for h in HOSTS}:
+                  raise Hold('ENDPOINT_REJECTED')
+              key, secret, token = credentials
+              values = dict(params, Action=action, Version=version, Format='JSON',
+                            AccessKeyId=key, SignatureMethod='HMAC-SHA1', SignatureVersion='1.0',
+                            SignatureNonce=uuid.uuid4().hex,
+                            Timestamp=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+              if token:
+                  values['SecurityToken'] = token
+              canonical = '&'.join(quote(k) + '=' + quote(v) for k, v in sorted(values.items()))
+              signature = hmac.new((secret + '&').encode(), ('POST&%2F&' + quote(canonical)).encode(), hashlib.sha1).digest()
+              values['Signature'] = base64.b64encode(signature).decode()
+              request = urllib.request.Request('https://' + endpoint + '/',
+                  data=urllib.parse.urlencode(values).encode(),
+                  headers={'Content-Type': 'application/x-www-form-urlencoded'}, method='POST')
+              try:
+                  with urllib.request.build_opener(NoRedirect()).open(request, timeout=20) as response:
+                      raw = response.read(262145)
+              except urllib.error.HTTPError as error:
+                  try:
+                      data = json.loads(error.read(262145))
+                      code = safe(data.get('Code'))
+                  except Exception:
+                      code = 'HTTP_' + str(error.code)
+                  raise Hold(code) from None
+              except Exception:
+                  # Never print a URL/body, key, temporary token, or raw exception.
+                  raise Hold('TRANSPORT_RESULT_UNKNOWN') from None
+              if len(raw) > 262144:
+                  raise Hold('RESPONSE_TOO_LARGE')
+              try:
+                  data = json.loads(raw)
+              except Exception:
+                  raise Hold('INVALID_API_RESPONSE') from None
+              if not isinstance(data, dict):
+                  raise Hold('INVALID_API_RESPONSE')
+              if 'Code' in data:
+                  raise Hold(safe(data['Code']))
+              return data
+          
+          
+          def command(hostname, nonce):
+              # Compatible with Python 3.6; no application imports or file modifications.
+              code = ('import json,os,sys; '
+                      'print(json.dumps({"hostname":os.uname().nodename,"uid":os.geteuid(),'
+                      '"python":list(sys.version_info[:3]),"nonce":' + repr(nonce) + '}))')
+              return '#!/bin/sh\nset -eu\nPYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -B -c ' + "'" + code.replace("'", "'\\''") + "'\n"
+          
+          
+          def validate_output(output, expected, nonce):
+              if not isinstance(output, str) or len(output) > 8192:
+                  raise Hold('OUTPUT_REJECTED')
+              try:
+                  data = json.loads(output.strip())
+              except Exception:
+                  # Some legacy service responses use base64 despite current plaintext docs.
+                  try:
+                      data = json.loads(base64.b64decode(output.strip(), validate=True))
+                  except Exception:
+                      raise Hold('OUTPUT_NOT_PROBE_JSON') from None
+              if not isinstance(data, dict) or set(data) != {'hostname', 'uid', 'python', 'nonce'}:
+                  raise Hold('PROBE_SCHEMA_MISMATCH')
+              if data['hostname'] != expected or type(data['uid']) is not int or data['uid'] != 0 or data['nonce'] != nonce:
+                  raise Hold('HOST_ROOT_OR_NONCE_MISMATCH')
+              version = data['python']
+              if not isinstance(version, list) or len(version) != 3 or any(type(v) is not int or v < 0 or v > 100 for v in version):
+                  raise Hold('PYTHON_VERSION_INVALID')
+              return {'hostname': expected, 'uid': 0, 'python': version}
+          
+          
+          def probe(host, master):
+              name, role, region, instance, expected = host
+              row = {'host': name, 'instance_id': instance, 'region': region,
+                     'status': 'HOLD', 'stage': 'ASSUME_ROLE', 'production_service_actions': 0}
+              try:
+                  result = rpc('sts.aliyuncs.com', '2015-04-01', 'AssumeRole', master,
+                               RoleArn=role, RoleSessionName='xuanjun-check-' + uuid.uuid4().hex[:16], DurationSeconds=900)
+                  c = result['Credentials']
+                  credentials = (c['AccessKeyId'], c['AccessKeySecret'], c['SecurityToken'])
+                  for value in credentials:
+                      if not isinstance(value, str) or not value or '\n' in value or '\r' in value:
+                          raise Hold('CREDENTIAL_RESPONSE_INVALID')
+                      print('::add-mask::' + value, flush=True)
+                  endpoint = 'swas.' + region + '.aliyuncs.com'
+                  nonce = uuid.uuid4().hex
+                  row['stage'] = 'DISPATCH_ONCE'
+                  result = rpc(endpoint, '2020-06-01', 'RunCommand', credentials,
+                               CommandContent=command(expected, nonce), RegionId=region,
+                               Type='RunShellScript', InstanceId=instance, WorkingUser='root',
+                               WorkingDir='/root', Timeout=30, Name='xuanjun-readonly-identity-check')
+                  invoke = result.get('InvokeId')
+                  if not isinstance(invoke, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,180}', invoke):
+                      raise Hold('DISPATCH_RESULT_UNKNOWN_NO_RETRY')
+                  row['invoke_id'] = invoke
+                  row['stage'] = 'QUERY_RESULT'
+                  print(json.dumps({'host': name, 'invoke_id': invoke, 'status': 'DISPATCHED'}), flush=True)
+                  deadline = time.monotonic() + 180
+                  while time.monotonic() < deadline:
+                      result = rpc(endpoint, '2020-06-01', 'DescribeInvocationResult', credentials,
+                                   RegionId=region, InstanceId=instance, InvokeId=invoke)
+                      detail = result.get('InvocationResult', {})
+                      status = detail.get('InvocationStatus')
+                      if status in ('Pending', 'Running', 'Stopping'):
+                          time.sleep(5)
+                          continue
+                      row['invocation_status'] = safe(status)
+                      if status != 'Success' or detail.get('ExitCode') != 0:
+                          row['api_error_code'] = safe(detail.get('ErrorCode'))
+                          raise Hold('COMMAND_NOT_SUCCESS')
+                      if detail.get('InstanceId') != instance or detail.get('InvokeId') != invoke:
+                          raise Hold('INVOCATION_IDENTITY_MISMATCH')
+                      row.update(validate_output(detail.get('Output'), expected, nonce))
+                      row.update(status='PASS', stage='VERIFIED')
+                      return row
+                  raise Hold('REMOTE_RESULT_UNKNOWN_PRESERVE_NO_RETRY')
+              except Hold as error:
+                  row['error_code'] = safe(str(error))
+              except Exception:
+                  row['error_code'] = 'UNEXPECTED_RESPONSE_PRESERVE_NO_RETRY'
+              return row
+          
+          
+          def main():
+              master = (os.environ.get('ALIYUN_ACCESS_KEY_ID', ''), os.environ.get('ALIYUN_ACCESS_KEY_SECRET', ''), '')
+              if not all(master[:2]):
+                  print('HOLD=MISSING_GITHUB_SECRETS')
+                  return 2
+              with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+                  rows = list(pool.map(lambda host: probe(host, master), HOSTS))
+              receipt = {'schema': 1, 'status': 'PASS' if all(r['status'] == 'PASS' for r in rows) else 'HOLD',
+                         'scope': 'FOUR_HOST_READONLY_ROOT_IDENTITY_ONLY', 'hosts': rows,
+                         'production_service_actions': 0, 'deployment_performed': False}
+              encoded = json.dumps(receipt, indent=2, sort_keys=True)
+              print(encoded, flush=True)
+              Path('aliyun-four-host-receipt.json').write_text(encoded + '\n')
+              summary = os.environ.get('GITHUB_STEP_SUMMARY')
+              if summary:
+                  with open(summary, 'a') as out:
+                      out.write('### Four-host Alibaba Cloud check\n```json\n' + encoded + '\n```\n')
+              return 0 if receipt['status'] == 'PASS' else 2
+          
+          
+          if __name__ == '__main__':
+              raise SystemExit(main())
+          PY

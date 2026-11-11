@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
+  "evidence_time": "2026-10-15T00:00:00Z",
+  "production_state": "HOLD",
+  "persistent_production_launcher": {
+    "status": "NOT_PROVEN_NOT_INSTALLED",
+    "reason": "No active process, systemd unit/timer, user unit, cron entry, transient unit, Gateway job, or exact-head workflow was found to invoke an order Writer.",
+    "code_composition_point": "trading_execution.production_factory.build_production_trading_execution_service",
+    "composition_point_is_launcher": false,
+    "one_shot_smoke_script": "scripts/owner_minimal_live_smoke.py",
+    "smoke_script_is_launcher": false,
+    "phase_d_e_blocked": true
+  },
+  "required_runtime_dependencies_from_code": [
+    "TradingExecutionRepository and AuditRepository on the single authoritative database",
+    "credential verifier and an account-bound credential provider",
+    "account, position and order reconciliation providers",
+    "watchdog and fresh market state",
+    "anomaly and recovery repositories",
+    "ProductionExecutionRiskStateProvider and loss fuse",
+    "ProductionProtectiveStateProvider and protective gate",
+    "FOMC blackout provider and manual-intervention anomaly provider",
+    "complete persisted risk limits",
+    "Owner authorization issuer and independently verified release authority",
+    "UNKNOWN/inflight recovery and reconciliation"
+  ],
+  "candidate_writer_files": {
+    "count": 95,
+    "direct_process_bindings": 0,
+    "direct_systemd_bindings": 0,
+    "direct_cron_bindings": 0,
+    "direct_gateway_bindings": 0,
+    "direct_exact_head_workflow_bindings": 0,
+    "decision": "UNKNOWN_DENY",
+    "note": "Zero observed direct bindings does not prove the files cannot be invoked dynamically. They are not migration input."
+  },
+  "phase_b_c_runtime": {
+    "entrypoint": "python -m korea.migration_shadow_entry",
+    "exchange_methods": ["GET"],
+    "credential": "SecretRef:BINANCE_ACCOUNT_READONLY",
+    "writer_enabled": false,
+    "scheduler_enabled": false,
+    "master_key_allowed": false
+  }
+}

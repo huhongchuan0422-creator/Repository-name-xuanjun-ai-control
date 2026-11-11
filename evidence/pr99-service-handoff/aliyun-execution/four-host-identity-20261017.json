@@ -1,0 +1,81 @@
+{
+  "workflow_commit": "17d86427670671b65280c5d22ee952c0e178a85e",
+  "run_id": 38991455661,
+  "job_id": 117275780078,
+  "verified_at_utc": "2026-10-17T01:40:46Z",
+  "deployment_performed": false,
+  "hosts": [
+    {
+      "host": "uk",
+      "hostname": "iZd7oeikknn1z21sq6ji6zZ",
+      "instance_id": "40dfc6a47d5e4363b9da7d0d6ab01cb1",
+      "invocation_status": "Success",
+      "invoke_id": "t-gbr709nmut4klxc",
+      "production_service_actions": 0,
+      "python": [
+        3,
+        6,
+        8
+      ],
+      "region": "eu-west-1",
+      "stage": "VERIFIED",
+      "status": "PASS",
+      "uid": 0
+    },
+    {
+      "host": "korea",
+      "hostname": "iZmj7a5kwr75qc1tul4kf9Z",
+      "instance_id": "09207081a09a466aa0079b07b5e3e7ca",
+      "invocation_status": "Success",
+      "invoke_id": "t-kor709nmvdegfeo",
+      "production_service_actions": 0,
+      "python": [
+        3,
+        6,
+        8
+      ],
+      "region": "ap-northeast-2",
+      "stage": "VERIFIED",
+      "status": "PASS",
+      "uid": 0
+    },
+    {
+      "host": "domestic",
+      "hostname": "iZvt5t8tlrm8oiZ",
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+      "invocation_status": "Success",
+      "invoke_id": "t-sh0709nmvsf39xc",
+      "production_service_actions": 0,
+      "python": [
+        3,
+        11,
+        6
+      ],
+      "region": "cn-shanghai",
+      "stage": "VERIFIED",
+      "status": "PASS",
+      "uid": 0
+    },
+    {
+      "host": "tokyo",
+      "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+      "instance_id": "68985c531add4e90a131aef703a389e6",
+      "invocation_status": "Success",
+      "invoke_id": "t-jpn709nmv6zxj40",
+      "production_service_actions": 0,
+      "python": [
+        3,
+        11,
+        6
+      ],
+      "region": "ap-northeast-1",
+      "stage": "VERIFIED",
+      "status": "PASS",
+      "uid": 0
+    }
+  ],
+  "production_service_actions": 0,
+  "schema": 1,
+  "scope": "FOUR_HOST_READONLY_ROOT_IDENTITY_ONLY",
+  "status": "PASS"
+}

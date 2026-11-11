@@ -1,0 +1,10 @@
+{
+  "syntax": "PASS",
+  "unaligned_offset_resume_preserves_bytes": "PASS",
+  "source_prefix_mismatch_sends_zero_bytes": "PASS",
+  "sha256": "3ed4c8c928e7d05e31e3d5a4aa5ca72fe8bb75dc093649b66905852510656041",
+  "bytes": 4116,
+  "server_execution": false,
+  "active_writer_guard": "NOT_EXERCISED_LOCAL_PROC_FD_PERMISSION_DENIED",
+  "guard_limitation": "Local container denied other-process and own-process proc fd stat. Guard stopped before mutation, preserving files; Korea full proc visibility not yet verified."
+}

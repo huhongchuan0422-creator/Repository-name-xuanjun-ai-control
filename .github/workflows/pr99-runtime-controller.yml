@@ -1,0 +1,58 @@
+name: PR99 original controller and catalogue candidate
+on:
+  pull_request:
+    types: [synchronize]
+    paths:
+      - 'evidence/pr99-service-handoff/runtime-controller/**'
+      - '.github/workflows/pr99-runtime-controller.yml'
+      - 'evidence/pr99-service-handoff/wal-memory-vfs/node_bindings.py'
+      - 'evidence/pr99-service-handoff/wal-memory-vfs/sqlite_wal_vfs.py'
+      - 'evidence/pr99-service-handoff/wal-memory-vfs/lost_invoke_reconciliation.py'
+permissions:
+  contents: read
+concurrency:
+  group: pr99-runtime-controller-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.event.pull_request.number == 99 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'build/tokyo-korea-migration-prep-20261014'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Ordinary temporary journal tests, no production operations
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTHONPATH: evidence/pr99-service-handoff/runtime-controller:evidence/pr99-service-handoff/s09-install-candidate:evidence/pr99-service-handoff/wal-memory-vfs
+        run: python -B -m unittest discover -s evidence/pr99-service-handoff/runtime-controller -p 'test_*.py' -v
+      - name: Bind exact commit, tree, unchanged dependencies and candidate artifact
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python -B evidence/pr99-service-handoff/runtime-controller/package_candidate.py \
+            "$(git rev-parse HEAD)" "$(git rev-parse 'HEAD^{tree}')" "$GITHUB_RUN_ID" \
+            evidence/pr99-service-handoff/s09-install-candidate runtime-controller.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr99-runtime-controller-${{ matrix.python }}
+          path: |
+            runtime-controller.zip
+            runtime-controller.receipt.json
+          if-no-files-found: error
+          retention-days: 30

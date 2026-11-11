@@ -1,0 +1,338 @@
+{
+  "schema_version": 1,
+  "observed_through": "2026-10-19T00:56:23+08:00",
+  "scope": "PR99_ORIGINAL_DOMESTIC_EXECUTION_NOT_COMPLETED_MIGRATION",
+  "owner_instruction": {
+    "at": "2026-10-19T00:29:13+08:00",
+    "reaffirmed": "2026-10-19T00:49:59+08:00",
+    "mode": "OWNER_DIRECT",
+    "independent_review_wait": false,
+    "formal_migration_permit_wait": false,
+    "technical_integrity_and_actual_platform_refusals_not_waived": true,
+    "scope_uk_p2": false
+  },
+  "identity": {
+    "commit": "18fe5456087472b75182ccf014b1e60ca356e7d7",
+    "run": 39145761696,
+    "job": 117729165434,
+    "receipt": {
+      "authoritative_writer": "UNKNOWN",
+      "enforced_fence": "UNKNOWN",
+      "hosts": [
+        {
+          "authoritative_writer": "UNKNOWN",
+          "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+          "enforced_fence": "UNKNOWN",
+          "host": "domestic",
+          "host_commands": 1,
+          "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+          "invocation_status": "Success",
+          "invoke_id": "t-sh070fg0jfiifpc",
+          "nonterminal_invocations": [],
+          "receipt": {
+            "database_opened": false,
+            "hostname": "iZvt5t8tlrm8oiZ",
+            "identity": {
+              "created": true,
+              "creation_attempted": true,
+              "gid": 991,
+              "home_created": false,
+              "login_shell_disabled": true,
+              "name": "xuanjun-s07",
+              "shared_primary_identity": false,
+              "uid": 992
+            },
+            "migration_started": false,
+            "nonce": "a4ef1b0905384b10949bf2b7b08c9e60",
+            "observed_at": "2026-10-18T16:36:36.849503Z",
+            "production_started": false,
+            "protected_after": {
+              "nginx.service": {
+                "ActiveState": "active",
+                "LoadState": "loaded",
+                "MainPID": 85106,
+                "SubState": "running"
+              },
+              "provider-neutral-domestic-bridge.service": {
+                "ActiveState": "active",
+                "LoadState": "loaded",
+                "MainPID": 188767,
+                "SubState": "running"
+              },
+              "windows-interaction-http.service": {
+                "ActiveState": "active",
+                "LoadState": "loaded",
+                "MainPID": 90354,
+                "SubState": "running"
+              }
+            },
+            "protected_before": {
+              "nginx.service": {
+                "ActiveState": "active",
+                "LoadState": "loaded",
+                "MainPID": 85106,
+                "SubState": "running"
+              },
+              "provider-neutral-domestic-bridge.service": {
+                "ActiveState": "active",
+                "LoadState": "loaded",
+                "MainPID": 188767,
+                "SubState": "running"
+              },
+              "windows-interaction-http.service": {
+                "ActiveState": "active",
+                "LoadState": "loaded",
+                "MainPID": 90354,
+                "SubState": "running"
+              }
+            },
+            "protected_state_unchanged": true,
+            "releases": [
+              {
+                "device": 64771,
+                "directory": true,
+                "exists": true,
+                "gid": 0,
+                "inode": 445053,
+                "mode": 448,
+                "path": "/opt/xuanjun-migration-s07/releases/domestic-r2",
+                "uid": 0
+              },
+              {
+                "device": 64771,
+                "directory": true,
+                "exists": true,
+                "gid": 0,
+                "inode": 445196,
+                "mode": 493,
+                "path": "/opt/xuanjun-migration-s07/releases/domestic-r2/rootfs",
+                "uid": 0
+              },
+              {
+                "exists": false,
+                "path": "/opt/xuanjun-migration-s07/releases/domestic-final-v1"
+              },
+              {
+                "exists": false,
+                "path": "/opt/xuanjun-migration-s07/releases/domestic-final-v1/rootfs"
+              }
+            ],
+            "route_changed": false,
+            "scope": "PR99_OWNER_DOMESTIC_IDENTITY_PREPARATION_ONLY",
+            "service_actions": 0,
+            "target_units": {
+              "xuanjun-pr99-domestic-contact.service": {
+                "ActiveState": "inactive",
+                "LoadState": "not-found",
+                "MainPID": 0,
+                "SubState": "dead"
+              },
+              "xuanjun-pr99-domestic-customer-service.service": {
+                "ActiveState": "inactive",
+                "LoadState": "not-found",
+                "MainPID": 0,
+                "SubState": "dead"
+              },
+              "xuanjun-pr99-domestic-portal.service": {
+                "ActiveState": "inactive",
+                "LoadState": "not-found",
+                "MainPID": 0,
+                "SubState": "dead"
+              }
+            }
+          },
+          "run_command_attempted": true,
+          "service_actions": 0,
+          "status": "DOMESTIC_IDENTITY_PREPARED_NOT_PRODUCTION_STARTED",
+          "sts": "PASS_CURRENT"
+        }
+      ],
+      "migration_started": false,
+      "production_cutover": false,
+      "production_service_actions": 0,
+      "status": "OWNER_IDENTITY_PREPARATION_BATCH_NOT_PRODUCTION_START"
+    }
+  },
+  "stopped_install": {
+    "failed_attempt": {
+      "commit": "a9ec61ecbe2daa00aab493fb0d91e3264318c600",
+      "run": 39146426810,
+      "job": 117731113279,
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "authoritative_writer": "UNKNOWN",
+            "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+            "enforced_fence": "UNKNOWN",
+            "error_code": "STOPPED_INSTALL_FAILED_NO_RETRY",
+            "exit_code": 2,
+            "host": "domestic",
+            "host_commands": "UNKNOWN_UNTIL_TERMINAL_RECEIPT",
+            "host_error_code": "PRIVATE_INPUT_MODE",
+            "host_error_type": "RuntimeError",
+            "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+            "invocation_status": "Failed",
+            "invoke_id": "t-sh070fgsorn44cg",
+            "nonterminal_invocations": [],
+            "run_command_attempted": true,
+            "service_actions": 0,
+            "status": "HOLD",
+            "sts": "PASS_CURRENT"
+          }
+        ],
+        "migration_started": false,
+        "production_cutover": false,
+        "production_service_actions": 0,
+        "status": "OWNER_STOPPED_INSTALL_BATCH_NOT_PRODUCTION"
+      },
+      "failure": "PRIVATE_INPUT_MODE",
+      "failure_preserved": true,
+      "consumed_label_not_reapplied": true
+    },
+    "corrected_attempt": {
+      "commit": "34df49a5375be3a6a2589ea8cf871ec0fc7e7fee",
+      "tree": "c2e1f77c36aa6bd98f2542f5795c6a84d1cf0c14",
+      "run": 39146617633,
+      "job": 117731669674,
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "authoritative_writer": "UNKNOWN",
+            "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+            "enforced_fence": "UNKNOWN",
+            "host": "domestic",
+            "host_commands": 1,
+            "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+            "invocation_status": "Success",
+            "invoke_id": "t-sh070fh0ruuncao",
+            "nonterminal_invocations": [],
+            "receipt": {
+              "acceptance_permission": {
+                "bytes_unchanged": true,
+                "earlier_error": "PRIVATE_INPUT_MODE",
+                "earlier_terminal_invoke_id": "t-sh070fgsorn44cg",
+                "final_mode": 384,
+                "original_install_state_absent_before_correction": true,
+                "permission_tightened": true,
+                "previous_mode": 420
+              },
+              "hostname": "iZvt5t8tlrm8oiZ",
+              "installation": {
+                "created_this_invocation": true,
+                "data_restored": false,
+                "enables": 0,
+                "installed_units": 3,
+                "original_state_reused": true,
+                "route_changed": false,
+                "starts": 0,
+                "status": "QUARANTINE_UNITS_INSTALLED_STOPPED_NOT_PRODUCTION",
+                "unit_sha256": {
+                  "xuanjun-pr99-domestic-contact.service": "a4e5e17eabdee2737b116284daf473a06f2f63972b49e65cbb832e93453b5241",
+                  "xuanjun-pr99-domestic-customer-service.service": "12dc8a46823066972eed534e9dfa99dc21cd5ac9933929cc0819ab9ae1bdfb00",
+                  "xuanjun-pr99-domestic-portal.service": "e65dc05698e92a0f86b3ab813eae0dea258ed26ab57ececced0f666be5005e1e"
+                }
+              },
+              "migration_complete": false,
+              "nonce": "964005b6e58540d98d399e7d4149b404",
+              "observed_at": "2026-10-18T16:47:54.696926Z",
+              "production_started": false,
+              "protected_state_unchanged": true,
+              "scope": "PR99_OWNER_ORIGINAL_STOPPED_INSTALL_ONLY"
+            },
+            "run_command_attempted": true,
+            "service_actions": 0,
+            "status": "OWNER_STOPPED_INSTALL_COMPLETE_NOT_PRODUCTION",
+            "sts": "PASS_CURRENT"
+          }
+        ],
+        "migration_started": false,
+        "production_cutover": false,
+        "production_service_actions": 0,
+        "status": "OWNER_STOPPED_INSTALL_BATCH_NOT_PRODUCTION"
+      },
+      "correction": "Original R2 receipt mode 0644 -> 0600; same bytes/inode; original install state confirmed absent before correction"
+    },
+    "original_state": "/var/lib/xuanjun-pr99-s09-stopped-install-v1",
+    "original_lock_reused": true,
+    "target_unit_creates": 3,
+    "daemon_reload": 1,
+    "starts": 0,
+    "enables": 0,
+    "production_data_restored": false,
+    "route_changed": false,
+    "production_services_installed": false
+  },
+  "owner_start_source": {
+    "helper_commit": "c9af2b0921b7a0ea9d367df58b5d2f593113f418",
+    "code_commit": "370cc24a4b8c07dc0100ff2c89f9dd6e53a0c243",
+    "code_tree": "43b4e036b08276ae37758850bd4b7eca4a37cea7",
+    "path": "evidence/pr99-service-handoff/owner-start/owner_production_start.py",
+    "sha256": "7936650e5911f71216c1dfe1873754bcf09ddac45894df3214018dd5f21ace40",
+    "published_original_production_source_sha256": "d645edc0013af34804626315a6ddce1b47b870c012b6b632131c320ed4c20688",
+    "published_original_stopped_source_sha256": "99225aacc11cae6dc9d190015c95c9883e13d8e2691da864fb026f8afdfee315",
+    "changes": [
+      "Explicit Owner authority replaces reviewer ID, no new permission wait",
+      "Same original production STATE and stopped-install lock; original exact stopped rollback precedes exclusive formal unit creation",
+      "Real final files, dedicated identity, source Fence, checkpoint and canonical Writer assignment still checked",
+      "Native UNKNOWN preserves effects, no compensating replay"
+    ],
+    "hosted_ci": {
+      "run": 39147242803,
+      "python_311_job": 117733460568,
+      "python_312_job": 117733460335,
+      "each_tests": 17,
+      "each_passed": 17,
+      "skipped": 0,
+      "full_logs_read": true,
+      "test_scope": "ORDINARY_TEMPORARY_FILES_AND_MOCK_NATIVE_SERVICE_CALLS_NOT_M99_NOT_PRODUCTION"
+    },
+    "installed_on_host": false,
+    "host_start_inputs_created": false,
+    "executed_on_host": false
+  },
+  "remaining_technical_work": [
+    {
+      "owner": "PR99_EXECUTOR",
+      "item": "Complete actual effective configuration/data inventory and all relevant idle/manual/scheduled/shared write origins",
+      "status": "INCOMPLETE"
+    },
+    {
+      "owner": "PR99_EXECUTOR",
+      "item": "Wire real ingress closure/drain, original controller/held descriptors and actual source Fence/capture/receive/reconciliation",
+      "status": "INCOMPLETE"
+    },
+    {
+      "owner": "PR99_EXECUTOR",
+      "item": "Create actual final checkpoint and canonical target Writer assignment from verified host effects, then run Owner start entry",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "owner": "PR99_EXECUTOR",
+      "item": "Business/auth/upstream acceptance, safe route transition and backup/restore acceptance",
+      "status": "NOT_EXECUTED"
+    }
+  ],
+  "original_restricted_candidate": {
+    "republished": false,
+    "m99_run": false,
+    "original_publish_refusal_raw": "NOT_FOUND",
+    "restriction_release_basis": "NOT_OBTAINED",
+    "new_independent_owner_sources_published": true,
+    "no_claim_of_global_github_release_ban": true
+  },
+  "production": {
+    "complete": false,
+    "migration_started": false,
+    "cutover": false,
+    "final_release_exists_at_latest_observation": false,
+    "source_writer_acquired_by_this_window": false,
+    "fence": "UNKNOWN_NOT_ENFORCED",
+    "background_migration_task": false,
+    "host_command_jobs_terminal": true,
+    "tokyo_domestic_bridge_windows_preserved": true
+  }
+}

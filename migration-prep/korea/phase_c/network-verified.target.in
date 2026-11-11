@@ -1,0 +1,6 @@
+[Unit]
+Description=Phase-C root verified egress admission (not a firewall loader)
+# A target is not proof of enforcement. It must be started by the separately
+# approved root controller only after actual rules and negative probes pass.
+# The runtime additionally requires the signed exact admission/config binding.
+# No dependencies or Install section: never enables itself at boot.

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
+  "account_id": "OWNER-BINANCE-001",
+  "symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+  "business_database": "/var/lib/xuanjun-binance/input/trading-shadow.sqlite",
+  "evidence_root": "/var/lib/xuanjun-binance/evidence",
+  "pinned_ips": ["REPLACE_WITH_ROOT_PINNED_BINANCE_IP"],
+  "credential_role": "BINANCE_ACCOUNT_READONLY",
+  "api_key_file": "/run/credentials/xuanjun-binance-shadow.service/binance_api_key",
+  "api_secret_file": "/run/credentials/xuanjun-binance-shadow.service/binance_api_secret",
+  "verifier_command": "/usr/local/libexec/xuanjun-binance-shadow-verifier",
+  "verifier_sha256": "REPLACE_WITH_INDEPENDENT_VERIFIER_SHA256",
+  "runtime_manifest_sha256": "REPLACE_WITH_EXACT_RUNTIME_MANIFEST_SHA256",
+  "snapshot_handoff_receipt": "/var/lib/xuanjun-binance/input/trading-shadow.handoff.json",
+  "snapshot_refresh_protocol": "XUANJUN_SQLITE_WAL_BACKUP_ATOMIC_HANDOFF_V1",
+  "snapshot_publisher_identity_sha256": "REPLACE_WITH_INDEPENDENT_PUBLISHER_IDENTITY_SHA256",
+  "snapshot_max_age_ms": 30000,
+  "capture_timeout_ms": 30000,
+  "writer_enabled": false,
+  "scheduler_enabled": false
+}

@@ -1,0 +1,883 @@
+{
+  "schema_version": 1,
+  "run": 38904470291,
+  "delivery_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
+  "jobs": {
+    "domestic": 116984492029,
+    "tokyo": 116984492318,
+    "korea": 116984492559
+  },
+  "job_conclusions": {
+    "domestic": "SUCCESS",
+    "tokyo": "SUCCESS",
+    "korea": "SUCCESS"
+  },
+  "receipts": {
+    "tokyo": {
+      "container_contents": "NOT_READ",
+      "credentials_read": false,
+      "database_opened": false,
+      "delivery_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
+      "epoch": 1792155583,
+      "finance_timer_metadata": [
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "Id": "finance-collection-sync.timer",
+            "LoadState": "loaded",
+            "Triggers": "finance-collection-sync.service"
+          },
+          "unit": "finance-collection-sync.timer"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "Id": "owner-commercial-ledger-sync.timer",
+            "LoadState": "loaded",
+            "Triggers": "owner-commercial-ledger-sync.service"
+          },
+          "unit": "owner-commercial-ledger-sync.timer"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "Id": "billing-operations-weekly-settlement.timer",
+            "LoadState": "loaded",
+            "Triggers": "billing-operations-weekly-settlement.service"
+          },
+          "unit": "billing-operations-weekly-settlement.timer"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "Id": "billing-operations-weekly-final-invoice.timer",
+            "LoadState": "loaded",
+            "Triggers": "billing-operations-weekly-final-invoice.service"
+          },
+          "unit": "billing-operations-weekly-final-invoice.timer"
+        }
+      ],
+      "host": "iZ6wee8q9z4t03hvqumwfhZ",
+      "http_requests": 0,
+      "listeners": [
+        {
+          "port": 18761,
+          "scope": "loopback"
+        },
+        {
+          "port": 18781,
+          "scope": "loopback"
+        },
+        {
+          "port": 18780,
+          "scope": "loopback"
+        },
+        {
+          "port": 18770,
+          "scope": "loopback"
+        },
+        {
+          "port": 19443,
+          "scope": "loopback"
+        },
+        {
+          "port": 18080,
+          "scope": "loopback"
+        },
+        {
+          "port": 80,
+          "scope": "wildcard"
+        },
+        {
+          "port": 22,
+          "scope": "wildcard"
+        },
+        {
+          "port": 443,
+          "scope": "wildcard"
+        },
+        {
+          "port": 80,
+          "scope": "wildcard"
+        },
+        {
+          "port": 22,
+          "scope": "wildcard"
+        },
+        {
+          "port": 443,
+          "scope": "wildcard"
+        }
+      ],
+      "process_arguments_read": false,
+      "root_admin_cron": "UNKNOWN_NONROOT_NOT_READ",
+      "schema_version": 1,
+      "service_actions": 0,
+      "side": "tokyo",
+      "ss_exit": 0,
+      "status": "THREE_HOST_SERVICE_DEPENDENCY_METADATA_ONLY_NOT_CUTOVER",
+      "sudo_calls": 0,
+      "uid": 1001,
+      "unit_contents_read": false,
+      "units": [
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "systemd-tmpfiles-setup.service -.mount network-online.target basic.target tmp.mount system.slice systemd-journald.socket sysinit.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/secure-secrets-portal.service",
+            "Group": "admin",
+            "Id": "secure-secrets-portal.service",
+            "LoadState": "loaded",
+            "MainPID": "3082952",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice sysinit.target -.mount",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target tmp.mount",
+            "WorkingDirectory": "/opt/trading-system"
+          },
+          "unit": "secure-secrets-portal.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "-.mount systemd-journald.socket systemd-tmpfiles-setup.service tmp.mount network-online.target sysinit.target tokyo-restricted-model-executor.service basic.target system.slice",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/domestic-model-rpc-tunnel.service",
+            "Group": "admin",
+            "Id": "domestic-model-rpc-tunnel.service",
+            "LoadState": "loaded",
+            "MainPID": "1823162",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "tokyo-restricted-model-executor.service system.slice -.mount sysinit.target",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target tmp.mount",
+            "WorkingDirectory": "/home/admin"
+          },
+          "unit": "domestic-model-rpc-tunnel.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "network-online.target basic.target systemd-journald.socket tokyo-restricted-model-executor.service sysinit.target system.slice",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/korea-novel-model-rpc-tunnel.service",
+            "Group": "admin",
+            "Id": "korea-novel-model-rpc-tunnel.service",
+            "LoadState": "loaded",
+            "MainPID": "2071744",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice sysinit.target",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target",
+            "WorkingDirectory": ""
+          },
+          "unit": "korea-novel-model-rpc-tunnel.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "-.mount basic.target tmp.mount sysinit.target network-online.target systemd-journald.socket systemd-tmpfiles-setup.service system.slice",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/provider-neutral-tokyo-tunnel.service",
+            "Group": "admin",
+            "Id": "provider-neutral-tokyo-tunnel.service",
+            "LoadState": "loaded",
+            "MainPID": "1622804",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "-.mount sysinit.target system.slice",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target tmp.mount",
+            "WorkingDirectory": "/home/admin"
+          },
+          "unit": "provider-neutral-tokyo-tunnel.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "basic.target network-online.target tmp.mount -.mount systemd-journald.socket systemd-tmpfiles-setup.service system.slice sysinit.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/restricted-rpc-openai-shim.service",
+            "Group": "",
+            "Id": "restricted-rpc-openai-shim.service",
+            "LoadState": "loaded",
+            "MainPID": "1222508",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice sysinit.target -.mount",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target tmp.mount",
+            "WorkingDirectory": "/opt/trading-system"
+          },
+          "unit": "restricted-rpc-openai-shim.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "sysinit.target basic.target network-online.target systemd-tmpfiles-setup.service -.mount tmp.mount system.slice systemd-journald.socket",
+            "BindsTo": "",
+            "DropInPaths": "/etc/systemd/system/tokyo-restricted-model-executor.service.d/provider-health-alert.conf",
+            "FragmentPath": "/etc/systemd/system/tokyo-restricted-model-executor.service",
+            "Group": "admin",
+            "Id": "tokyo-restricted-model-executor.service",
+            "LoadState": "loaded",
+            "MainPID": "1823159",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice -.mount sysinit.target",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target tmp.mount",
+            "WorkingDirectory": "/opt/trading-system"
+          },
+          "unit": "tokyo-restricted-model-executor.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "system.slice basic.target docker.service sysinit.target network-online.target systemd-journald.socket",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xj-tokyo-vpn.service",
+            "Group": "",
+            "Id": "xj-tokyo-vpn.service",
+            "LoadState": "loaded",
+            "MainPID": "2075604",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "docker.service system.slice sysinit.target",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "",
+            "Wants": "network-online.target",
+            "WorkingDirectory": ""
+          },
+          "unit": "xj-tokyo-vpn.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "-.mount sysinit.target system.slice tmp.mount network-online.target systemd-journald.socket systemd-tmpfiles-setup.service secure-secrets-portal.service basic.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-contact.service",
+            "Group": "admin",
+            "Id": "xuanjun-wecom-customer-contact.service",
+            "LoadState": "loaded",
+            "MainPID": "1903204",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice sysinit.target -.mount",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "network-online.target tmp.mount",
+            "WorkingDirectory": "/opt/trading-system"
+          },
+          "unit": "xuanjun-wecom-customer-contact.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "provider-neutral-tunnel.service system.slice -.mount systemd-tmpfiles-setup.service systemd-journald.socket basic.target tmp.mount sysinit.target secure-secrets-portal.service network-online.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-customer-service.service",
+            "Group": "admin",
+            "Id": "xuanjun-wecom-customer-service.service",
+            "LoadState": "loaded",
+            "MainPID": "1875349",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice sysinit.target -.mount",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "provider-neutral-tunnel.service tmp.mount network-online.target",
+            "WorkingDirectory": "/opt/trading-system"
+          },
+          "unit": "xuanjun-wecom-customer-service.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "system.slice systemd-journald.socket basic.target tmp.mount sysinit.target -.mount korea-novel-model-rpc-tunnel.service systemd-tmpfiles-setup.service network-online.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-wecom-novel-ingress.service",
+            "Group": "admin",
+            "Id": "xuanjun-wecom-novel-ingress.service",
+            "LoadState": "loaded",
+            "MainPID": "1775967",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice sysinit.target -.mount",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "admin",
+            "Wants": "tmp.mount network-online.target korea-novel-model-rpc-tunnel.service",
+            "WorkingDirectory": "/opt/trading-system"
+          },
+          "unit": "xuanjun-wecom-novel-ingress.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "systemd-tmpfiles-setup.service -.mount sysinit.target systemd-journald.socket nss-lookup.target basic.target system.slice network-online.target tmp.mount remote-fs.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/usr/lib/systemd/system/nginx.service",
+            "Group": "",
+            "Id": "nginx.service",
+            "LoadState": "loaded",
+            "MainPID": "512590",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target system.slice -.mount",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "",
+            "Wants": "network-online.target tmp.mount",
+            "WorkingDirectory": ""
+          },
+          "unit": "nginx.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "firewalld.service containerd.service systemd-journald.socket system.slice sysinit.target network-online.target basic.target docker.socket time-set.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/usr/lib/systemd/system/docker.service",
+            "Group": "",
+            "Id": "docker.service",
+            "LoadState": "loaded",
+            "MainPID": "1078",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice docker.socket sysinit.target",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "",
+            "Wants": "network-online.target containerd.service",
+            "WorkingDirectory": ""
+          },
+          "unit": "docker.service"
+        }
+      ],
+      "user_manager": "NOT_READ"
+    },
+    "korea": {
+      "container_contents": "NOT_READ",
+      "credentials_read": false,
+      "database_opened": false,
+      "delivery_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
+      "epoch": 1792155582,
+      "finance_timer_metadata": [],
+      "host": "iZmj7a5kwr75qc1tul4kf9Z",
+      "http_requests": 0,
+      "listeners": [
+        {
+          "port": 19444,
+          "scope": "loopback"
+        },
+        {
+          "port": 22,
+          "scope": "wildcard"
+        },
+        {
+          "port": 22,
+          "scope": "wildcard"
+        },
+        {
+          "port": 443,
+          "scope": "wildcard"
+        }
+      ],
+      "process_arguments_read": false,
+      "root_admin_cron": "UNKNOWN_NONROOT_NOT_READ",
+      "schema_version": 1,
+      "service_actions": 0,
+      "side": "korea",
+      "ss_exit": 0,
+      "status": "THREE_HOST_SERVICE_DEPENDENCY_METADATA_ONLY_NOT_CUTOVER",
+      "sudo_calls": 0,
+      "uid": 1001,
+      "unit_contents_read": false,
+      "units": [
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "inactive",
+            "After": "systemd-tmpfiles-setup.service -.mount system.slice basic.target tmp.mount systemd-journald.socket sysinit.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-binance-shadow.service",
+            "Group": "xuanjun_binance",
+            "Id": "xuanjun-binance-shadow.service",
+            "LoadState": "loaded",
+            "MainPID": "0",
+            "PartOf": "",
+            "PrivateNetwork": "yes",
+            "Requires": "system.slice -.mount sysinit.target",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "dead",
+            "User": "xuanjun_binance",
+            "Wants": "",
+            "WorkingDirectory": "/opt/xuanjun-binance/current/migration-prep"
+          },
+          "unit": "xuanjun-binance-shadow.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "network-online.target tmp.mount sysinit.target system.slice -.mount basic.target systemd-journald.socket systemd-tmpfiles-setup.service",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/xuanjun-novel-factory.service",
+            "Group": "xuanjun_novel",
+            "Id": "xuanjun-novel-factory.service",
+            "LoadState": "loaded",
+            "MainPID": "1005",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target system.slice -.mount",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "running",
+            "User": "xuanjun_novel",
+            "Wants": "network-online.target",
+            "WorkingDirectory": "/opt/xuanjun-novel-factory/app"
+          },
+          "unit": "xuanjun-novel-factory.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "systemd-journald.socket system.slice sysinit.target basic.target network-online.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/morelogin-socks5-permanent.service",
+            "Group": "",
+            "Id": "morelogin-socks5-permanent.service",
+            "LoadState": "loaded",
+            "MainPID": "996",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target system.slice",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "running",
+            "User": "",
+            "Wants": "network-online.target",
+            "WorkingDirectory": ""
+          },
+          "unit": "morelogin-socks5-permanent.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "sysinit.target basic.target systemd-journald.socket network.target system.slice",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/usr/lib/systemd/system/postgresql.service",
+            "Group": "postgres",
+            "Id": "postgresql.service",
+            "LoadState": "loaded",
+            "MainPID": "686",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target system.slice",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "running",
+            "User": "postgres",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "postgresql.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "basic.target system.slice -.mount sysinit.target network.target systemd-journald.socket",
+            "BindsTo": "",
+            "DropInPaths": "/etc/systemd/system/redis.service.d/limit.conf",
+            "FragmentPath": "/usr/lib/systemd/system/redis.service",
+            "Group": "redis",
+            "Id": "redis.service",
+            "LoadState": "loaded",
+            "MainPID": "668",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target system.slice -.mount",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "running",
+            "User": "redis",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "redis.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "sysinit.target -.mount basic.target systemd-journald.socket postgresql.service system.slice network.target redis.service",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/yibi-api.service",
+            "Group": "yibi",
+            "Id": "yibi-api.service",
+            "LoadState": "loaded",
+            "MainPID": "790",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target redis.service system.slice -.mount postgresql.service",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "running",
+            "User": "yibi",
+            "Wants": "",
+            "WorkingDirectory": "/opt/yibi-automation"
+          },
+          "unit": "yibi-api.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "postgresql.service system.slice systemd-journald.socket -.mount sysinit.target basic.target redis.service",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/yibi-scheduler.service",
+            "Group": "yibi",
+            "Id": "yibi-scheduler.service",
+            "LoadState": "loaded",
+            "MainPID": "788",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target redis.service system.slice postgresql.service -.mount",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "running",
+            "User": "yibi",
+            "Wants": "",
+            "WorkingDirectory": "/opt/yibi-automation"
+          },
+          "unit": "yibi-scheduler.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "system.slice systemd-resolved.service NetworkManager.service basic.target sysinit.target systemd-journald.socket -.mount network-pre.target",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/usr/lib/systemd/system/tailscaled.service",
+            "Group": "",
+            "Id": "tailscaled.service",
+            "LoadState": "loaded",
+            "MainPID": "676",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "system.slice -.mount sysinit.target",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "running",
+            "User": "",
+            "Wants": "network-pre.target",
+            "WorkingDirectory": ""
+          },
+          "unit": "tailscaled.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "inactive",
+            "After": "",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "Id": "nginx.service",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "",
+            "RestrictAddressFamilies": "[unprintable]",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "nginx.service"
+        }
+      ],
+      "user_manager": "NOT_READ"
+    },
+    "domestic": {
+      "container_contents": "NOT_READ",
+      "credentials_read": false,
+      "database_opened": false,
+      "delivery_commit": "e4dfdf03a246fd911a226d911970854d2606328e",
+      "epoch": 1792155584,
+      "finance_timer_metadata": [],
+      "host": "iZvt5t8tlrm8oiZ",
+      "http_requests": 0,
+      "listeners": [
+        {
+          "port": 80,
+          "scope": "wildcard"
+        },
+        {
+          "port": 22,
+          "scope": "wildcard"
+        },
+        {
+          "port": 443,
+          "scope": "wildcard"
+        },
+        {
+          "port": 18443,
+          "scope": "loopback"
+        },
+        {
+          "port": 19444,
+          "scope": "loopback"
+        },
+        {
+          "port": 80,
+          "scope": "wildcard"
+        },
+        {
+          "port": 22,
+          "scope": "wildcard"
+        },
+        {
+          "port": 443,
+          "scope": "wildcard"
+        }
+      ],
+      "process_arguments_read": false,
+      "root_admin_cron": "UNKNOWN_NONROOT_NOT_READ",
+      "schema_version": 1,
+      "service_actions": 0,
+      "side": "domestic",
+      "ss_exit": 0,
+      "status": "THREE_HOST_SERVICE_DEPENDENCY_METADATA_ONLY_NOT_CUTOVER",
+      "sudo_calls": 0,
+      "uid": 1002,
+      "unit_contents_read": false,
+      "units": [
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "systemd-journald.socket basic.target sysinit.target network-online.target tmp.mount system.slice -.mount systemd-tmpfiles-setup.service",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/etc/systemd/system/provider-neutral-domestic-bridge.service",
+            "Group": "openclaw_ops",
+            "Id": "provider-neutral-domestic-bridge.service",
+            "LoadState": "loaded",
+            "MainPID": "188767",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "sysinit.target system.slice -.mount",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "openclaw_ops",
+            "Wants": "tmp.mount network-online.target",
+            "WorkingDirectory": "/home/openclaw_ops/v8-domestic-operations/runtime/internal-bridge"
+          },
+          "unit": "provider-neutral-domestic-bridge.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "active",
+            "After": "-.mount nss-lookup.target remote-fs.target sysinit.target tmp.mount network-online.target basic.target system.slice systemd-tmpfiles-setup.service systemd-journald.socket",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "/usr/lib/systemd/system/nginx.service",
+            "Group": "",
+            "Id": "nginx.service",
+            "LoadState": "loaded",
+            "MainPID": "85106",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "-.mount sysinit.target system.slice",
+            "RestrictAddressFamilies": "~",
+            "SubState": "running",
+            "User": "",
+            "Wants": "tmp.mount network-online.target",
+            "WorkingDirectory": ""
+          },
+          "unit": "nginx.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "inactive",
+            "After": "",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "Id": "secure-secrets-portal.service",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "",
+            "RestrictAddressFamilies": "~",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "secure-secrets-portal.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "inactive",
+            "After": "",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "Id": "xuanjun-wecom-customer-contact.service",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "",
+            "RestrictAddressFamilies": "~",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "xuanjun-wecom-customer-contact.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "inactive",
+            "After": "",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "Id": "xuanjun-wecom-customer-service.service",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "",
+            "RestrictAddressFamilies": "~",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "xuanjun-wecom-customer-service.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "inactive",
+            "After": "",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "Id": "xuanjun-wecom-novel-ingress.service",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "",
+            "RestrictAddressFamilies": "~",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "xuanjun-wecom-novel-ingress.service"
+        },
+        {
+          "exit": 0,
+          "properties": {
+            "ActiveState": "inactive",
+            "After": "",
+            "BindsTo": "",
+            "DropInPaths": "",
+            "FragmentPath": "",
+            "Group": "",
+            "Id": "domestic-model-rpc-tunnel.service",
+            "LoadState": "not-found",
+            "MainPID": "0",
+            "PartOf": "",
+            "PrivateNetwork": "no",
+            "Requires": "",
+            "RestrictAddressFamilies": "~",
+            "SubState": "dead",
+            "User": "",
+            "Wants": "",
+            "WorkingDirectory": ""
+          },
+          "unit": "domestic-model-rpc-tunnel.service"
+        }
+      ],
+      "user_manager": "NOT_READ"
+    }
+  },
+  "collection_scope": "SYSTEM_MANAGER_DEPENDENCY_PROPERTIES_AND_SCOPED_LISTENERS_ONLY",
+  "root_or_private_state": "NOT_READ_NOT_INDEPENDENT_ROOT_ACCEPTANCE",
+  "prior_invalid_workflow": {
+    "commit": "e788db355d33d105268c986769317baed8d02f13",
+    "run": 38904433601,
+    "jobs": 0,
+    "result": "INVALID_YAML_NO_HOST_JOB_STARTED",
+    "correction": "QUOTE_MATRIX_LABEL_IN_FLOW_SEQUENCE"
+  },
+  "production_mutations": 0
+}

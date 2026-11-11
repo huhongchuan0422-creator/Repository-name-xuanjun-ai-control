@@ -1,0 +1,23 @@
+{
+  "api_configuration_deployed": false,
+  "current_final_snapshot": false,
+  "database_sha256": "d0bb23c5cede3a66567373b92221b058aa18e07aa510daf0bc02f8f4770bd0a5",
+  "dependency_manifests": 1,
+  "environment_status": "DEPENDENCY_MANIFESTS_ONLY_NOT_INSTALLED",
+  "epoch": 1792151228,
+  "files": 1374,
+  "host": "iZmj7a5kwr75qc1tul4kf9Z",
+  "private_manifest_sha256": "33826e49503926497f03dc529056ab798de1afedd74493bf3ef164f7aa35c132",
+  "production_deployed": false,
+  "production_module_imported": false,
+  "schema_version": 1,
+  "selected_bytes": 66552325,
+  "service_actions": 0,
+  "source_files": 1373,
+  "status": "SELECTED_HISTORICAL_RECOVERY_PASS",
+  "tokyo_retirement": "HOLD",
+  "workdir": "/root/xuanjun-offline-selected-20261016",
+  "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_RECEIPT_NOT_INDEPENDENT_LOGIN",
+  "script_commit": "8d50a4d1c5695413c7d3e68f16b93d44e4e3a671",
+  "script_sha256": "18db4e6b41c548325044b8b30baf7afc39efd4f6b16bc5f73059ccf063f424ec"
+}

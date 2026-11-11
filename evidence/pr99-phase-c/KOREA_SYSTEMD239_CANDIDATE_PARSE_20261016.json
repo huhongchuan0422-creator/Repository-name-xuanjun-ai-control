@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "origin": "ACTUAL_KOREA_NONROOT_SYSTEMD239_PARSE_LOG",
+  "run": 38874822582,
+  "job": 116887220927,
+  "runtime_manifest_sha256": "dcb5c1810b1ac69d9175ea885dd1816d4f9aa109316db184d96138d8fb296938",
+  "receipt": {
+    "delivery_commit": "d971c17344e3afb00b22fc5125206f3cfda52c2b",
+    "diagnostics": [],
+    "exit": 0,
+    "generators_enabled": false,
+    "host": "iZmj7a5kwr75qc1tul4kf9Z",
+    "root": false,
+    "scope": "CANDIDATE_UNIT_PARSE_ONLY_NOT_PID1_OR_SANDBOX_PROOF",
+    "service_actions": 0,
+    "systemd": "systemd 239 (239-82.0.4.5.al8.5)",
+    "temporary_directory": "/home/githubrunner/actions-runner/xuanjun-korea-binance/_temp/pr99-c-unit-parse-0ugsvv31",
+    "uid": 1001,
+    "unit_count": 4,
+    "unit_sha256": "3e1a492c761b1bb074e21d0e5990ea354ce687e971a7390ff1a4da9a3b064107"
+  },
+  "limits": [
+    "Public candidate files only in private Runner temporary directory",
+    "No generators, root action, PID1 reload or service start",
+    "Duration120 input is a syntax fixture, not approved production observation duration"
+  ]
+}

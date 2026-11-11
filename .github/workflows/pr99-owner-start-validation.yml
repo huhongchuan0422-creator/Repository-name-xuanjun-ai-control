@@ -1,0 +1,39 @@
+name: PR99 Owner direct production entry validation
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'evidence/pr99-service-handoff/owner-start/**'
+      - '.github/workflows/pr99-owner-start-validation.yml'
+permissions:
+  contents: read
+jobs:
+  owner-start-tests:
+    if: >-
+      github.repository == 'huhongchuan0422-creator/Repository-name-xuanjun-ai-control' &&
+      github.event.pull_request.number == 99 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'build/tokyo-korea-migration-prep-20261014'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Test Owner authority and original stopped candidate transition without cloud or native service calls
+        run: python -B -m unittest discover -s evidence/pr99-service-handoff/owner-start -p 'test_*.py' -v
+      - name: Bind actual source to Commit and Tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git rev-parse 'HEAD^{tree}'
+          sha256sum evidence/pr99-service-handoff/owner-start/*.py

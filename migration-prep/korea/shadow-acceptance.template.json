@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "feature_id": "TOKYO_KOREA_BINANCE_MIGRATION_CANONICAL_V1",
+  "window_id": "REPLACE_WITH_OWNER_APPROVED_WINDOW_ID",
+  "owner_approval_id": "REPLACE_WITH_OWNER_APPROVAL_RECORD",
+  "owner_approved": false,
+  "duration_seconds": 86400,
+  "sample_interval_seconds": 300,
+  "minimum_samples": 288,
+  "max_failed_samples": 0,
+  "rss_peak_mib": 512,
+  "mem_available_floor_mib": 512,
+  "swap_growth_mib": 128,
+  "latency_p95_ms": 2000,
+  "latency_p99_ms": 5000,
+  "max_sample_gap_seconds": 600,
+  "max_restart_count": 0
+}

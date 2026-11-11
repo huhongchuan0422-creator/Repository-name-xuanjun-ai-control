@@ -1,0 +1,1434 @@
+{
+  "application_imports": 0,
+  "database_config_key_reads": 0,
+  "evidence_origin": "OWNER_KOREA_ROOT_TERMINAL_TRANSCRIPT_NOT_DIRECT_HOST_LOGIN",
+  "literal_policy": "PATH_CLUES_ONLY_OTHER_LITERALS_REDACTED",
+  "network_requests": 0,
+  "owner_launch_directory": "/root/pr99-s07-storage-contract.UsnfJq2Y",
+  "production_cutover": false,
+  "report": {
+    "ai_service/secure_secrets_portal.py": [
+      {
+        "assigned_names": [
+          "WECOM_KF_ENCODING_AES_KEY_REF"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 48,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "WECOM_CONTACT_ENCODING_AES_KEY_REF"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 52,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "WECOM_NOVEL_ENCODING_AES_KEY_REF"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 58,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DOUYIN_CLIENT_KEY_REF"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 63,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_CLIENT_KEY_REF"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 67,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "PORTAL_READY"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 71,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "PORTAL_BLOCKED"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 72,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "RUNTIME_ROOT"
+        ],
+        "expression": "Path('/opt/trading-system/runtime/v8-domestic-operations')",
+        "line": 76,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "OPERATIONS_SECRET_ROOT"
+        ],
+        "expression": "RUNTIME_ROOT / '<REDACTED_STRING>'",
+        "line": 77,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "OPERATIONS_AUDIT_FILE"
+        ],
+        "expression": "OPERATIONS_SECRET_ROOT / 'audit.jsonl'",
+        "line": 80,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "SUPPORTED_OPERATIONS_FORMS"
+        ],
+        "expression": "{'<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': DEFAULT_PROVIDER, '<REDACTED_STRING>': MODEL_PROVIDER_API_KEY_REF, '<REDACTED_STRING>': DEFAULT_BASE_URL, '<REDACTED_STRING>': DEFAULT_MODEL, '<REDACTED_STRING>': True}, 'wecom': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': 'wecom', '<REDACTED_STRING>': (WECOM_CORP_ID_REF, WECOM_AGENT_ID_REF, WECOM_APP_SECRET_REF), '<REDACTED_STRING>': True, '<REDACTED_STRING>': '<REDACTED_STRING>'}, '<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': 'wecom', '<REDACTED_STRING>': (WECOM_KF_CORP_ID_REF, WECOM_KF_SECRET_REF, WECOM_KF_OPEN_KFID_REF, WECOM_KF_CALLBACK_TOKEN_REF, WECOM_KF_ENCODING_AES_KEY_REF), '<REDACTED_STRING>': True, '<REDACTED_STRING>': '<REDACTED_STRING>'}, '<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': 'wecom', '<REDACTED_STRING>': (WECOM_CONTACT_CORP_ID_REF, WECOM_CONTACT_SECRET_REF, WECOM_CONTACT_CALLBACK_TOKEN_REF, WECOM_CONTACT_ENCODING_AES_KEY_REF, WECOM_CONTACT_MEMBER_USERID_REF), '<REDACTED_STRING>': True, '<REDACTED_STRING>': '<REDACTED_STRING>'}, '<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': 'wecom', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': (WECOM_NOVEL_CORP_ID_REF, WECOM_NOVEL_AGENT_ID_REF, WECOM_NOVEL_SECRET_REF, WECOM_NOVEL_CALLBACK_TOKEN_REF, WECOM_NOVEL_ENCODING_AES_KEY_REF, WECOM_NOVEL_TEST_USER_REF), '<REDACTED_STRING>': True, '<REDACTED_STRING>': '<REDACTED_STRING>'}, '<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_ <TRUNCATED_STATIC_EXPRESSION>",
+        "line": 82,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "CREDENTIAL_FORM_SCHEMAS"
+        ],
+        "expression": "{'<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': ROLE_BINANCE_TRADING, '<REDACTED_STRING>': ('<REDACTED_STRING>', '<REDACTED_STRING>'), '<REDACTED_STRING>': ('<REDACTED_STRING>',), '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': ('<REDACTED_STRING>',)}, '<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': ROLE_BINANCE_ACCOUNT_READONLY, '<REDACTED_STRING>': ('<REDACTED_STRING>', '<REDACTED_STRING>'), '<REDACTED_STRING>': (), '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': ('<REDACTED_STRING>', '<REDACTED_STRING>')}, '<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': ROLE_FINANCE_COLLECTION_READONLY, '<REDACTED_STRING>': ('<REDACTED_STRING>', '<REDACTED_STRING>'), '<REDACTED_STRING>': ('<REDACTED_STRING>',), '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': ('<REDACTED_STRING>', '<REDACTED_STRING>', '<REDACTED_STRING>', '<REDACTED_STRING>')}, '<REDACTED_STRING>': {'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': DEFAULT_PROVIDER, '<REDACTED_STRING>': MODEL_PROVIDER_ <TRUNCATED_STATIC_EXPRESSION>",
+        "line": 204,
+        "scope": ""
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "root"
+        ],
+        "defaults": {
+          "root": "None"
+        },
+        "line": 589,
+        "scope": "OperationsSecretRefStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.root"
+        ],
+        "expression": "Path(root) if root else OPERATIONS_SECRET_ROOT",
+        "line": 590,
+        "scope": "OperationsSecretRefStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.audit_file"
+        ],
+        "expression": "self.root / 'audit.jsonl'",
+        "line": 593,
+        "scope": "OperationsSecretRefStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "value_path"
+        ],
+        "expression": "self.value_dir / (safe + '<REDACTED_STRING>')",
+        "line": 608,
+        "scope": "OperationsSecretRefStore.store_secret"
+      },
+      {
+        "assigned_names": [
+          "metadata_path"
+        ],
+        "expression": "self.metadata_dir / (safe + '.json')",
+        "line": 609,
+        "scope": "OperationsSecretRefStore.store_secret"
+      },
+      {
+        "assigned_names": [
+          "value_path"
+        ],
+        "expression": "self.value_dir / (safe + '<REDACTED_STRING>')",
+        "line": 642,
+        "scope": "OperationsSecretRefStore.read_secret"
+      },
+      {
+        "assigned_names": [
+          "redacted[key]"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 651,
+        "scope": "OperationsSecretRefStore.record_audit"
+      },
+      {
+        "assigned_names": [
+          "metadata_path"
+        ],
+        "expression": "self.metadata_dir / (self._safe_name(ref) + '.json')",
+        "line": 658,
+        "scope": "OperationsSecretRefStore.status"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "root"
+        ],
+        "defaults": {},
+        "line": 671,
+        "scope": "FileBackedSubmissionSessionRepository.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.root"
+        ],
+        "expression": "Path(root)",
+        "line": 672,
+        "scope": "FileBackedSubmissionSessionRepository.__init__"
+      },
+      {
+        "assigned_names": [
+          "session.portal_origin"
+        ],
+        "expression": "payload.get('<REDACTED_STRING>') or session.request_correlation_id",
+        "line": 719,
+        "scope": "FileBackedSubmissionSessionRepository._deserialize"
+      },
+      {
+        "assigned_names": [
+          "path"
+        ],
+        "expression": "self._path(submission_id)",
+        "line": 727,
+        "scope": "FileBackedSubmissionSessionRepository.get"
+      },
+      {
+        "assigned_names": [
+          "lock_path"
+        ],
+        "expression": "self._path(submission_id).with_suffix('<REDACTED_STRING>')",
+        "line": 742,
+        "scope": "FileBackedSubmissionSessionRepository.locked"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "credential_intake",
+          "credential_status_bridge",
+          "operations_store",
+          "session_repository",
+          "ttl_seconds",
+          "max_attempts_per_form"
+        ],
+        "defaults": {
+          "credential_intake": "None",
+          "credential_status_bridge": "None",
+          "max_attempts_per_form": "3",
+          "operations_store": "None",
+          "session_repository": "None",
+          "ttl_seconds": "'<REDACTED_LITERAL>'"
+        },
+        "line": 754,
+        "scope": "SecureSecretsPortalService.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.credential_intake"
+        ],
+        "expression": "credential_intake",
+        "line": 763,
+        "scope": "SecureSecretsPortalService.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.credential_status_bridge"
+        ],
+        "expression": "credential_status_bridge",
+        "line": 764,
+        "scope": "SecureSecretsPortalService.__init__"
+      },
+      {
+        "assigned_names": [
+          "session.portal_origin"
+        ],
+        "expression": "origin",
+        "line": 803,
+        "scope": "SecureSecretsPortalService.create_session"
+      },
+      {
+        "assigned_names": [
+          "form_key"
+        ],
+        "expression": "{ROLE_BINANCE_TRADING: '<REDACTED_STRING>', ROLE_BINANCE_ACCOUNT_READONLY: '<REDACTED_STRING>', ROLE_FINANCE_COLLECTION_READONLY: '<REDACTED_STRING>'}[role]",
+        "line": 860,
+        "scope": "SecureSecretsPortalService.submit_binance_credential"
+      },
+      {
+        "assigned_names": [
+          "session.used_forms[form_key]"
+        ],
+        "expression": "result.get('<REDACTED_STRING>')",
+        "line": 889,
+        "scope": "SecureSecretsPortalService.submit_binance_credential"
+      },
+      {
+        "assigned_names": [
+          "encoding_aes_key"
+        ],
+        "expression": "(payload.get('<REDACTED_STRING>') or '<REDACTED_STRING>').strip()",
+        "line": 1168,
+        "scope": "SecureSecretsPortalService.submit_wecom_novel"
+      },
+      {
+        "assigned_names": [
+          "encoding_aes_key"
+        ],
+        "expression": "(payload.get('<REDACTED_STRING>') or '<REDACTED_STRING>').strip()",
+        "line": 1228,
+        "scope": "SecureSecretsPortalService.submit_wecom_novel_callback"
+      },
+      {
+        "assigned_names": [
+          "form_key"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1385,
+        "scope": "SecureSecretsPortalService._submit_feishu_customer_app_secret_for_session"
+      },
+      {
+        "assigned_names": [
+          "session.used_forms[form_key]"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1414,
+        "scope": "SecureSecretsPortalService._submit_feishu_customer_app_secret_for_session"
+      },
+      {
+        "assigned_names": [
+          "form_key"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1428,
+        "scope": "SecureSecretsPortalService.submit_domestic_gateway_remote_auth"
+      },
+      {
+        "assigned_names": [
+          "session.used_forms[form_key]"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1459,
+        "scope": "SecureSecretsPortalService.submit_domestic_gateway_remote_auth"
+      },
+      {
+        "assigned_names": [
+          "form_key"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1470,
+        "scope": "SecureSecretsPortalService.submit_douyin"
+      },
+      {
+        "assigned_names": [
+          "client_key"
+        ],
+        "expression": "(payload.get('<REDACTED_STRING>') or '<REDACTED_STRING>').strip()",
+        "line": 1477,
+        "scope": "SecureSecretsPortalService.submit_douyin"
+      },
+      {
+        "assigned_names": [
+          "key_fingerprint"
+        ],
+        "expression": "_sha(client_key)[:'<REDACTED_LITERAL>']",
+        "line": 1481,
+        "scope": "SecureSecretsPortalService.submit_douyin"
+      },
+      {
+        "assigned_names": [
+          "session.used_forms[form_key]"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1515,
+        "scope": "SecureSecretsPortalService.submit_douyin"
+      },
+      {
+        "assigned_names": [
+          "form_key"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1530,
+        "scope": "SecureSecretsPortalService.submit_tiktok"
+      },
+      {
+        "assigned_names": [
+          "client_key"
+        ],
+        "expression": "(payload.get('<REDACTED_STRING>') or '<REDACTED_STRING>').strip()",
+        "line": 1537,
+        "scope": "SecureSecretsPortalService.submit_tiktok"
+      },
+      {
+        "assigned_names": [
+          "key_fingerprint"
+        ],
+        "expression": "_sha(client_key)[:'<REDACTED_LITERAL>']",
+        "line": 1541,
+        "scope": "SecureSecretsPortalService.submit_tiktok"
+      },
+      {
+        "assigned_names": [
+          "session.used_forms[form_key]"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1579,
+        "scope": "SecureSecretsPortalService.submit_tiktok"
+      },
+      {
+        "assigned_names": [
+          "credential_status"
+        ],
+        "expression": "None",
+        "line": 1594,
+        "scope": "SecureSecretsPortalService.portal_status"
+      },
+      {
+        "assigned_names": [
+          "credential_status"
+        ],
+        "expression": "self.credential_status_bridge.account_status(customer_id, account_id)",
+        "line": 1596,
+        "scope": "SecureSecretsPortalService.portal_status"
+      },
+      {
+        "assigned_names": [
+          "session.attempts[form_key]"
+        ],
+        "expression": "count",
+        "line": 1685,
+        "scope": "SecureSecretsPortalService._validate_submit_session"
+      }
+    ],
+    "ai_service/wecom_customer_contact_service.py": [
+      {
+        "assigned_names": [
+          "WECOM_CONTACT_ENCODING_AES_KEY_REF"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 26,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_SECRET_ROOT"
+        ],
+        "expression": "Path('/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store')",
+        "line": 37,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_RUNTIME_ROOT"
+        ],
+        "expression": "Path('/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-contact')",
+        "line": 41,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_CALLBACK_PATH"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 45,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "SAFE_STATE"
+        ],
+        "expression": "re.compile('<REDACTED_STRING>')",
+        "line": 46,
+        "scope": ""
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "secret_root",
+          "runtime_root"
+        ],
+        "defaults": {
+          "runtime_root": "DEFAULT_RUNTIME_ROOT",
+          "secret_root": "DEFAULT_SECRET_ROOT"
+        },
+        "line": 54,
+        "scope": "WeComCustomerContactIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.runtime_root"
+        ],
+        "expression": "Path(runtime_root)",
+        "line": 60,
+        "scope": "WeComCustomerContactIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.audit_path"
+        ],
+        "expression": "self.runtime_root / 'audit.jsonl'",
+        "line": 63,
+        "scope": "WeComCustomerContactIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "self._audit_lock"
+        ],
+        "expression": "threading.Lock()",
+        "line": 64,
+        "scope": "WeComCustomerContactIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "states"
+        ],
+        "expression": "{ref: self.store.status(ref) for ref in WECOM_CONTACT_REFS}",
+        "line": 67,
+        "scope": "WeComCustomerContactIngress.readiness"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "str(event.get('<REDACTED_STRING>') or '<REDACTED_STRING>')",
+        "line": 138,
+        "scope": "WeComCustomerContactIngress.accept_callback"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "address",
+          "ingress",
+          "callback_path"
+        ],
+        "defaults": {
+          "callback_path": "DEFAULT_CALLBACK_PATH"
+        },
+        "line": 242,
+        "scope": "Server.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.callback_path"
+        ],
+        "expression": "callback_path",
+        "line": 245,
+        "scope": "Server.__init__"
+      }
+    ],
+    "ai_service/wecom_customer_service.py": [
+      {
+        "assigned_names": [
+          "WECOM_KF_ENCODING_AES_KEY_REF"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 47,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_SECRET_ROOT"
+        ],
+        "expression": "Path('/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store')",
+        "line": 60,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_RUNTIME_ROOT"
+        ],
+        "expression": "Path('/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-service')",
+        "line": 63,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_CALLBACK_PATH"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 66,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_BRIDGE_ROOT"
+        ],
+        "expression": "Path('/opt/trading-system/runtime/v8-domestic-operations/internal-bridge')",
+        "line": 67,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "SAFE_REFERRAL_PATTERN"
+        ],
+        "expression": "re.compile('<REDACTED_STRING>')",
+        "line": 70,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "root"
+        ],
+        "expression": "ET.fromstring(payload)",
+        "line": 91,
+        "scope": "_parse_xml"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "token",
+          "encoding_aes_key",
+          "receive_id"
+        ],
+        "defaults": {},
+        "line": 117,
+        "scope": "WeComCallbackCrypto.__init__"
+      },
+      {
+        "assigned_names": [
+          "key"
+        ],
+        "expression": "base64.b64decode(str(encoding_aes_key) + '<REDACTED_STRING>', validate=True)",
+        "line": 119,
+        "scope": "WeComCallbackCrypto.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.key"
+        ],
+        "expression": "key",
+        "line": 125,
+        "scope": "WeComCallbackCrypto.__init__"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "base_url",
+          "timeout"
+        ],
+        "defaults": {
+          "base_url": "'<REDACTED_STRING>'",
+          "timeout": "'<REDACTED_LITERAL>'"
+        },
+        "line": 162,
+        "scope": "WeComKfApiClient.__init__"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "secret_root",
+          "runtime_root",
+          "api_client",
+          "bridge_client"
+        ],
+        "defaults": {
+          "api_client": "None",
+          "bridge_client": "None",
+          "runtime_root": "DEFAULT_RUNTIME_ROOT",
+          "secret_root": "DEFAULT_SECRET_ROOT"
+        },
+        "line": 218,
+        "scope": "WeComCustomerServiceIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.runtime_root"
+        ],
+        "expression": "Path(runtime_root)",
+        "line": 226,
+        "scope": "WeComCustomerServiceIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.state_path"
+        ],
+        "expression": "self.runtime_root / 'state.json'",
+        "line": 229,
+        "scope": "WeComCustomerServiceIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.audit_path"
+        ],
+        "expression": "self.runtime_root / 'audit.jsonl'",
+        "line": 230,
+        "scope": "WeComCustomerServiceIngress.__init__"
+      },
+      {
+        "assigned_names": [
+          "states"
+        ],
+        "expression": "{ref: self.store.status(ref) for ref in WECOM_KF_REFS}",
+        "line": 247,
+        "scope": "WeComCustomerServiceIngress.readiness"
+      },
+      {
+        "assigned_names": [
+          "states"
+        ],
+        "expression": "{ref: self.store.status(ref) for ref in WECOM_KF_CALLBACK_REFS}",
+        "line": 275,
+        "scope": "WeComCustomerServiceIngress.callback_crypto"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "self._state()",
+        "line": 327,
+        "scope": "WeComCustomerServiceIngress.worker_once"
+      },
+      {
+        "assigned_names": [
+          "state['cursor']"
+        ],
+        "expression": "synced['<REDACTED_STRING>']",
+        "line": 339,
+        "scope": "WeComCustomerServiceIngress.worker_once"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "address",
+          "ingress",
+          "callback_path"
+        ],
+        "defaults": {
+          "callback_path": "DEFAULT_CALLBACK_PATH"
+        },
+        "line": 492,
+        "scope": "Server.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.callback_path"
+        ],
+        "expression": "callback_path",
+        "line": 495,
+        "scope": "Server.__init__"
+      }
+    ],
+    "crm/channel_referral_attribution.py": [
+      {
+        "assigned_names": [
+          "REFERRAL_MODEL"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 24,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "REFERRAL_SOURCE_TELEGRAM"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 25,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "REFERRAL_SOURCE_WECOM"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 26,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "REFERRAL_SOURCE_BINANCE_INVITE"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 27,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "REFERRAL_SOURCE_MANUAL_CAMPAIGN"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 28,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "REFERRAL_SOURCE_OTHER"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 29,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "CODE_CUSTOMER_REFERRAL"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 31,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_REFERRAL_CONFIG_PATHS"
+        ],
+        "expression": "(Path('/home/openclaw_ops/v8-domestic-operations/config/customer-referral/CUSTOMER_REFERRAL_CONFIG.json'), Path('/home/admin/.openclaw/workspace/xuanjun-agent-coordination/CUSTOMER_REFERRAL_CONFIG.json'))",
+        "line": 42,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "configured"
+        ],
+        "expression": "config_path or os.environ.get('<REDACTED_STRING>')",
+        "line": 51,
+        "scope": "load_authoritative_binance_registration"
+      },
+      {
+        "assigned_names": [
+          "referral"
+        ],
+        "expression": "payload.get('<REDACTED_STRING>') or {}",
+        "line": 58,
+        "scope": "load_authoritative_binance_registration"
+      },
+      {
+        "assigned_names": [
+          "SAFE_REFERRAL_PATTERN"
+        ],
+        "expression": "re.compile('<REDACTED_STRING>')",
+        "line": 75,
+        "scope": ""
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "repository",
+          "customer_repository",
+          "audit_repository",
+          "clock",
+          "telegram_bot_username",
+          "wecom_entry_base",
+          "referral_config_path"
+        ],
+        "defaults": {
+          "audit_repository": "None",
+          "clock": "utc_now",
+          "customer_repository": "None",
+          "referral_config_path": "None",
+          "repository": "None",
+          "telegram_bot_username": "None",
+          "wecom_entry_base": "None"
+        },
+        "line": 85,
+        "scope": "ChannelReferralAttributionService.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.audit_repository"
+        ],
+        "expression": "audit_repository or AuditRepository(self.repository.session_factory)",
+        "line": 101,
+        "scope": "ChannelReferralAttributionService.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.referral_config_path"
+        ],
+        "expression": "referral_config_path",
+        "line": 108,
+        "scope": "ChannelReferralAttributionService.__init__"
+      },
+      {
+        "assigned_names": [
+          "referral_code"
+        ],
+        "expression": "metadata.get('<REDACTED_STRING>')",
+        "line": 327,
+        "scope": "ChannelReferralAttributionService.record_provider_neutral_entry"
+      }
+    ],
+    "database/connection.py": [
+      {
+        "assigned_names": [
+          "PROJECT_ROOT"
+        ],
+        "expression": "Path(__file__).resolve().parents[1]",
+        "line": 9,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_DATABASE_URL"
+        ],
+        "expression": "'<REDACTED_STRING>' + str(PROJECT_ROOT / '<REDACTED_STRING>' / 'data' / 'trading.db')",
+        "line": 10,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DATABASE_URL"
+        ],
+        "expression": "os.getenv('<REDACTED_STRING>', DEFAULT_DATABASE_URL)",
+        "line": 14,
+        "scope": ""
+      }
+    ],
+    "douyin/open_api_foundation.py": [
+      {
+        "assigned_names": [
+          "TOKEN_STATE_VERSION"
+        ],
+        "expression": "1",
+        "line": 43,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "STATE_TTL_SECONDS"
+        ],
+        "expression": "'<REDACTED_LITERAL>'",
+        "line": 44,
+        "scope": ""
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "root"
+        ],
+        "defaults": {},
+        "line": 129,
+        "scope": "DouyinOAuthStateStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.root"
+        ],
+        "expression": "Path(root)",
+        "line": 130,
+        "scope": "DouyinOAuthStateStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "secrets.token_urlsafe('<REDACTED_LITERAL>')",
+        "line": 146,
+        "scope": "DouyinOAuthStateStore.create_state"
+      },
+      {
+        "assigned_names": [
+          "path"
+        ],
+        "expression": "self._path(state)",
+        "line": 168,
+        "scope": "DouyinOAuthStateStore.consume_state"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "root"
+        ],
+        "defaults": {},
+        "line": 263,
+        "scope": "DouyinTokenLifecycleStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.root"
+        ],
+        "expression": "Path(root)",
+        "line": 264,
+        "scope": "DouyinTokenLifecycleStore.__init__"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "timeout_seconds"
+        ],
+        "defaults": {
+          "timeout_seconds": "'<REDACTED_LITERAL>'"
+        },
+        "line": 287,
+        "scope": "DouyinOpenApiClient.__init__"
+      }
+    ],
+    "knowledge/service.py": [
+      {
+        "assigned_names": [
+          "DEFAULT_KNOWLEDGE_PATH"
+        ],
+        "expression": "Path(__file__).resolve().parent / 'data' / 'production_knowledge_v1.json'",
+        "line": 6,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "REAL_KNOWLEDGE_BACKEND"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 11,
+        "scope": ""
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "source_path",
+          "articles"
+        ],
+        "defaults": {
+          "articles": "None",
+          "source_path": "None"
+        },
+        "line": 17,
+        "scope": "KnowledgeService.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.source_path"
+        ],
+        "expression": "None",
+        "line": 24,
+        "scope": "KnowledgeService.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.source_path"
+        ],
+        "expression": "Path(source_path or os.getenv('<REDACTED_STRING>') or DEFAULT_KNOWLEDGE_PATH)",
+        "line": 37,
+        "scope": "KnowledgeService.__init__"
+      },
+      {
+        "assigned_names": [
+          "config"
+        ],
+        "expression": "load_customer_referral_config()",
+        "line": 85,
+        "scope": "KnowledgeService._apply_customer_referral_config"
+      },
+      {
+        "assigned_names": [
+          "referral"
+        ],
+        "expression": "config.get('<REDACTED_STRING>', {})",
+        "line": 86,
+        "scope": "KnowledgeService._apply_customer_referral_config"
+      },
+      {
+        "assigned_names": [
+          "service_paths"
+        ],
+        "expression": "config.get('<REDACTED_STRING>', {})",
+        "line": 90,
+        "scope": "KnowledgeService._apply_customer_referral_config"
+      },
+      {
+        "assigned_names": [
+          "config_source"
+        ],
+        "expression": "config.get('<REDACTED_STRING>')",
+        "line": 102,
+        "scope": "KnowledgeService._apply_customer_referral_config"
+      },
+      {
+        "assigned_names": [
+          "paths"
+        ],
+        "expression": "service_paths.get('<REDACTED_STRING>', {})",
+        "line": 139,
+        "scope": "KnowledgeService._apply_customer_referral_config"
+      },
+      {
+        "assigned_names": [
+          "self.topics['customer_service_paths']['answer']"
+        ],
+        "expression": "'<REDACTED_STRING>' + str(direct.get('<REDACTED_STRING>') or '<REDACTED_STRING>') + '<REDACTED_STRING>' + ('<REDACTED_STRING>' if self_directed.get('<REDACTED_STRING>') == '<REDACTED_STRING>' else '<REDACTED_STRING>') + '<REDACTED_STRING>'",
+        "line": 142,
+        "scope": "KnowledgeService._apply_customer_referral_config"
+      },
+      {
+        "assigned_names": [
+          "self.topics['customer_service_paths']['source']"
+        ],
+        "expression": "config_source",
+        "line": 153,
+        "scope": "KnowledgeService._apply_customer_referral_config"
+      },
+      {
+        "assigned_names": [
+          "keyword_text"
+        ],
+        "expression": "str(keyword)",
+        "line": 276,
+        "scope": "KnowledgeService._match_topic"
+      }
+    ],
+    "scripts/secure_secrets_portal_server.py": [
+      {
+        "assigned_names": [
+          "ROOT"
+        ],
+        "expression": "Path(__file__).resolve().parents[1]",
+        "line": 17,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_STATE_ROOT"
+        ],
+        "expression": "Path('/opt/trading-system/runtime/secure-secrets-portal')",
+        "line": 73,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_CREDENTIAL_ENV_FILE"
+        ],
+        "expression": "DEFAULT_STATE_ROOT / 'credential-store.env'",
+        "line": 74,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_HOST"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 75,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DEFAULT_PORT"
+        ],
+        "expression": "'<REDACTED_LITERAL>'",
+        "line": 76,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "DOUYIN_REDIRECT_PATH"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 77,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_REDIRECT_PATH"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 78,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_OAUTH_START_PATH"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 79,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_STATUS_PATH"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 80,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_DISCONNECT_PATH"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 81,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_URL_PROPERTY_VERIFICATION_FILENAME"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 82,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_URL_PROPERTY_VERIFICATION_FILES"
+        ],
+        "expression": "{TIKTOK_URL_PROPERTY_VERIFICATION_FILENAME: TIKTOK_URL_PROPERTY_VERIFICATION_BODY, '<REDACTED_STRING>': '<REDACTED_STRING>'}",
+        "line": 86,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "TIKTOK_APP_ICON_PATH"
+        ],
+        "expression": "DEFAULT_STATE_ROOT / '<REDACTED_STRING>' / '<REDACTED_STRING>'",
+        "line": 92,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "(key, value)"
+        ],
+        "expression": "line.split('<REDACTED_STRING>', 1)",
+        "line": 107,
+        "scope": "load_local_credential_env"
+      },
+      {
+        "assigned_names": [
+          "os.environ[key]"
+        ],
+        "expression": "value",
+        "line": 109,
+        "scope": "load_local_credential_env"
+      },
+      {
+        "assigned_names": [
+          "state_root"
+        ],
+        "expression": "ensure_private_dir(Path(state_root))",
+        "line": 115,
+        "scope": "build_service"
+      },
+      {
+        "assigned_names": [
+          "credential_repository"
+        ],
+        "expression": "CredentialRepository()",
+        "line": 117,
+        "scope": "build_service"
+      },
+      {
+        "assigned_names": [
+          "credential_intake"
+        ],
+        "expression": "None",
+        "line": 121,
+        "scope": "build_service"
+      },
+      {
+        "assigned_names": [
+          "credential_intake"
+        ],
+        "expression": "SecureCredentialIntakeService(credential_store=CredentialStore(repository=credential_repository), session_repository=FileBackedSubmissionSessionRepository(state_root / '<REDACTED_STRING>'), audit_sink=CredentialIntakeAuditSink(SensitiveValueRedactor()), token_ttl_seconds='<REDACTED_LITERAL>')",
+        "line": 123,
+        "scope": "build_service"
+      },
+      {
+        "assigned_names": [
+          "credential_intake"
+        ],
+        "expression": "None",
+        "line": 135,
+        "scope": "build_service"
+      },
+      {
+        "assigned_names": [
+          "form_key"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 585,
+        "scope": "render_feishu_customer_app_secret_page"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "(query.get('state') or ['<REDACTED_STRING>'])[0]",
+        "line": 871,
+        "scope": "handle_douyin_oauth_callback"
+      },
+      {
+        "assigned_names": [
+          "client_key"
+        ],
+        "expression": "service.operations_store.read_secret(DOUYIN_CLIENT_KEY_REF)",
+        "line": 898,
+        "scope": "handle_douyin_oauth_callback"
+      },
+      {
+        "assigned_names": [
+          "client_key"
+        ],
+        "expression": "service.operations_store.read_secret(TIKTOK_CLIENT_KEY_REF)",
+        "line": 1019,
+        "scope": "handle_tiktok_oauth_start"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "TikTokOAuthStateStore(DEFAULT_STATE_ROOT / '<REDACTED_STRING>').create_state(redirect_uri=redirect_uri, scopes=TIKTOK_MINIMUM_READONLY_SCOPES, client_key_fingerprint=tiktok_fingerprint(client_key))",
+        "line": 1027,
+        "scope": "handle_tiktok_oauth_start"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "(query.get('state') or ['<REDACTED_STRING>'])[0]",
+        "line": 1056,
+        "scope": "handle_tiktok_oauth_callback"
+      },
+      {
+        "assigned_names": [
+          "client_key"
+        ],
+        "expression": "service.operations_store.read_secret(TIKTOK_CLIENT_KEY_REF)",
+        "line": 1081,
+        "scope": "handle_tiktok_oauth_callback"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "TikTokTokenLifecycleStore(DEFAULT_STATE_ROOT / '<REDACTED_STRING>').load_status()",
+        "line": 1176,
+        "scope": "tiktok_connection_status"
+      },
+      {
+        "assigned_names": [
+          "path"
+        ],
+        "expression": "urllib.parse.urlsplit(self.path).path",
+        "line": 1206,
+        "scope": "PortalHandler.log_message"
+      },
+      {
+        "assigned_names": [
+          "path"
+        ],
+        "expression": "'<REDACTED_STRING>'",
+        "line": 1208,
+        "scope": "PortalHandler.log_message"
+      },
+      {
+        "assigned_names": [
+          "server.portal_service"
+        ],
+        "expression": "build_service(args.state_root)",
+        "line": 1675,
+        "scope": "serve"
+      }
+    ],
+    "tiktok/open_api_foundation.py": [
+      {
+        "assigned_names": [
+          "TOKEN_STATE_VERSION"
+        ],
+        "expression": "1",
+        "line": 41,
+        "scope": ""
+      },
+      {
+        "assigned_names": [
+          "STATE_TTL_SECONDS"
+        ],
+        "expression": "'<REDACTED_LITERAL>'",
+        "line": 42,
+        "scope": ""
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "root"
+        ],
+        "defaults": {},
+        "line": 126,
+        "scope": "TikTokOAuthStateStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.root"
+        ],
+        "expression": "Path(root)",
+        "line": 127,
+        "scope": "TikTokOAuthStateStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "state"
+        ],
+        "expression": "secrets.token_urlsafe('<REDACTED_LITERAL>')",
+        "line": 143,
+        "scope": "TikTokOAuthStateStore.create_state"
+      },
+      {
+        "assigned_names": [
+          "path"
+        ],
+        "expression": "self._path(state)",
+        "line": 165,
+        "scope": "TikTokOAuthStateStore.consume_state"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "root"
+        ],
+        "defaults": {},
+        "line": 247,
+        "scope": "TikTokTokenLifecycleStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "self.root"
+        ],
+        "expression": "Path(root)",
+        "line": 248,
+        "scope": "TikTokTokenLifecycleStore.__init__"
+      },
+      {
+        "assigned_names": [
+          "token_state"
+        ],
+        "expression": "{'<REDACTED_STRING>': '<REDACTED_STRING>', '<REDACTED_STRING>': True}",
+        "line": 281,
+        "scope": "TikTokTokenLifecycleStore.load_status"
+      },
+      {
+        "assigned_names": [
+          "token_state"
+        ],
+        "expression": "json.loads(self.state_path.read_text(encoding='<REDACTED_STRING>'))",
+        "line": 283,
+        "scope": "TikTokTokenLifecycleStore.load_status"
+      },
+      {
+        "assigned_names": [
+          "token_state"
+        ],
+        "expression": "{'<REDACTED_STRING>': '<REDACTED_STRING>', **token_state}",
+        "line": 284,
+        "scope": "TikTokTokenLifecycleStore.load_status"
+      },
+      {
+        "constructor_parameter_names": [
+          "self",
+          "timeout_seconds"
+        ],
+        "defaults": {
+          "timeout_seconds": "'<REDACTED_LITERAL>'"
+        },
+        "line": 303,
+        "scope": "TikTokOpenApiClient.__init__"
+      }
+    ]
+  },
+  "scope": "SYNTAX_NOT_RUNTIME_CLOSURE_OR_CURRENT_TOKYO_STATE",
+  "script_sha256": "cc27913ca76e1cae58008c8c7c5997bba04ceee7950ff3dacec30bcb9f9a78eb",
+  "service_actions": 0,
+  "source_commit": "d25e5a562acea75e793c18a31d8f536fc7f52d35",
+  "source_files": 79,
+  "status": "S07_STORAGE_WIRING_STATIC_PROJECTION"
+}

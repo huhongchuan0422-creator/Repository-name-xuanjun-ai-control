@@ -1,0 +1,75 @@
+# C7 evidence gaps and unchanged production gates
+
+`STATUS=READONLY_EVIDENCE_PARTIAL_REAL_EXECUTION_PACKAGE_READY_PRODUCTION_HOLD`
+
+Current C7 read-only evidence and the exact remaining authority split are recorded in
+`c7-current-evidence.json`, `C7_CURRENT_EVIDENCE.md` and
+`c7-real-machine-execution-package.json`.
+
+## 95 Writer paths
+
+- Public manifest: 95 stable path IDs, source/path hashes and `DENY`; all remain
+  `UNKNOWN` because this batch has no administrator-wide process, cron, systemd,
+  OpenClaw trigger, dynamic-import, credential-reachability or manual-launch proof.
+- Private original map remains outside the public repository. Its currently bound
+  file SHA-256 is `551187ebb68295a4693427ba6b39018bf6c678926d8d97dd30df9da03af718d1`
+  and mapping digest is
+  `8f5ad7df2c63dd1b541ec4d21ab315b9cf0c23f00f77e326b59c82d92053f65b`.
+- An independent reviewer still needs an approved private evidence channel to obtain
+  the raw map, recompute both digests, match all 95 IDs to live trigger/runtime and
+  credential evidence, and prove each actual fence or isolation action.
+- This batch did recompute the raw private-file SHA-256 and internal mapping digest and
+  matched every `WP001..WP095` ID/source hash/class to the public all-DENY manifest.
+  The public record also preserves separate scheduler, dynamic-import, manual-launch
+  and credential states for every path. Therefore private artifact integrity/ID
+  alignment now has direct evidence; runtime and scheduler/credential closure and
+  installed-fence coverage remain `UNKNOWN/HOLD`.
+- A source tarball hash proves artifact bytes only; it does not prove private-map
+  content, live Writer reachability or installed fence state.
+
+## Unfinished production gates
+
+1. GitHub administrative Runner admission, assignment, short-lived removal authority,
+   retirement and residue-cleanup evidence.
+2. Bounded root read-only cron/systemd/sudoers/source evidence and semantic closure.
+   The repaired collector now fails closed and records every outcome, but it remains
+   uninstalled and has not run as root on either host.
+3. Gateway-global OpenClaw automation/trigger inventory.
+4. Exact production-dependency closure: classify each Tokyo service, timer, process,
+   Gateway trigger, credential path and data object as `PRODUCTION_REQUIRED`,
+   `CONDITIONAL_DEPENDENCY`, `DEVELOPMENT_OR_TEMPORARY` or `HISTORICAL_ONLY`.
+   Only evidence-proven required objects enter the Korea artifact. No active Writer
+   observation is not yet proof of no Writer because global triggers remain incomplete.
+5. Independent production Ed25519 trust anchor, signed exact policy/manifest and
+   Authority record; test keys are simulation evidence only. The actual result verifier
+   file/path/owner/mode/hash, live loader and independent post-state authority also
+   remain unmeasured; a claimed signed hash is insufficient.
+6. Live authenticated Binance GET-only receipts, exact account/symbol/snapshot/time
+   binding, stable SQLite/WAL/SHM or bounded freeze evidence, final consistency and
+   authoritative comparison. Fixture evidence is not live evidence.
+7. Korea dedicated identity/directories/runtime/SecretRefs, installed unique transport,
+   root default-deny egress, pinned DNS/TLS evidence and bypass audit.
+8. Real Korea minimal-load resource acceptance and Shadow/restart evidence, bounded
+   canary, Korea-first rollback,
+   unknown-outcome reconciliation and Owner threshold/window approval.
+9. Credential/IP revocation and durable single-Writer epoch proof before any cutover.
+10. Independent Auditor and Owner Release Gate decision bound to the exact final
+    commit/tree/artifact. PR99 remains Draft and migration remains HOLD.
+11. After Binance migration acceptance only: revalidate the existing Yibi archive,
+    enumerate exact Yibi units/timers/processes/ports, prove Novel/PostgreSQL/Redis
+    ownership boundaries, then stop/disable/mask Yibi only under a separate Gate.
+    Current Yibi 8000/18765 listeners do not conflict with the identified 443 owner.
+
+Korea expansion is not a prerequisite. The host is 2 CPU / about 1.83 GiB RAM with
+about 1.23 GiB currently available and about 1.90 GiB swap free. Capacity PASS/FAIL
+is derived from the installed minimal Binance production load and Shadow evidence,
+not Tokyo OpenClaw development-load memory. A capacity failure remains HOLD and is
+reported as measured evidence; it does not silently authorize expansion or scope
+growth.
+
+The following non-mutating portions were executed in C7 preparation: private-map
+integrity/ID validation, Tokyo/Korea fixed-helper baseline, caller-scope Gateway
+automation inventory, caller crontab digest/counts, protected-store metadata check,
+and Korea pre-install baseline. GitHub-admin, root-global, Gateway-admin, independent
+Authority and installed Korea isolation evidence remain unavailable or intentionally
+not executed. No mutating production gate was executed.

@@ -1,0 +1,10 @@
+{
+  "action": "PR99_S06_PRIVATE_RUNTIME_CONTRACT_V1",
+  "files": {
+    "README.md": "7e450d82712f980cde428f3bb863a78b0e621becc09cbc886dad859b95cad209",
+    "runtime_contract.py": "9ca936d3935732c0b4161f7599286ed63a022a142cb1e6cac69601f64bfb9eca",
+    "test_runtime_contract.py": "19adb9c915e35d5d4fc88c7a4c22d3e280bb36ea8f89ead5f8a4e7113117292f"
+  },
+  "production_executed": false,
+  "schema_version": 1
+}

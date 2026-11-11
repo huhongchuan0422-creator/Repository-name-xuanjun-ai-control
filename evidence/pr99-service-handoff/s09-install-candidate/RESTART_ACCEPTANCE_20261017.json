@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "run": 39003075282,
+  "job": 117309891067,
+  "source_commit": "b9d8b3739e66f77602a1ec0c7bc9908b10dcdb51",
+  "helper_sha256": "af7de47e76511cd4ca2dc9fc6570878a248a60dbb9265ec1cfcec5db9fc781de",
+  "hosts": [
+    {
+      "host": "domestic",
+      "instance_id": "3a22c458934142eea89ec6e3bf481a57",
+      "invocation_status": "Success",
+      "invoke_id": "t-sh070a35kmwvu2o",
+      "receipt": {
+        "application_processes_stopped": true,
+        "attempt_nonce": "e04ff32064964dfab01ff1a34aac6b5e",
+        "business_api_requests": 0,
+        "final_cutover_snapshot": false,
+        "hostname": "iZvt5t8tlrm8oiZ",
+        "invalid_auth_results_are_observations_not_full_auth_acceptance": true,
+        "production_cutover": false,
+        "protected_state_unchanged": true,
+        "restart_health_pass": true,
+        "rounds": [
+          {
+            "all_processes_stopped": true,
+            "listeners_removed": true,
+            "roles": {
+              "contact": {
+                "alive": true,
+                "health": 200,
+                "invalid_auth_status": 404
+              },
+              "customer_service": {
+                "alive": true,
+                "health": 200,
+                "invalid_auth_status": 404
+              },
+              "portal": {
+                "alive": true,
+                "health": 200,
+                "invalid_auth_status": null
+              }
+            },
+            "round": 1
+          },
+          {
+            "all_processes_stopped": true,
+            "listeners_removed": true,
+            "roles": {
+              "contact": {
+                "alive": true,
+                "health": 200,
+                "invalid_auth_status": 404
+              },
+              "customer_service": {
+                "alive": true,
+                "health": 200,
+                "invalid_auth_status": 404
+              },
+              "portal": {
+                "alive": true,
+                "health": 200,
+                "invalid_auth_status": null
+              }
+            },
+            "round": 2
+          }
+        ],
+        "service_actions": 0,
+        "services_installed": false,
+        "status": "COPIED_RELEASE_RESTART_CLEANUP_PASS_NOT_PRODUCTION",
+        "uid": 0
+      },
+      "service_actions": 0,
+      "status": "PASS"
+    }
+  ],
+  "production_acceptance": false,
+  "auth_acceptance": "NOT_PROVEN_404_ONLY",
+  "attempt_consumed_no_replay": true
+}

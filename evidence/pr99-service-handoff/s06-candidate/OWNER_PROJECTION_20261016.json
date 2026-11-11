@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "evidence_origin": "SELECTED_FIELDS_TRANSCRIBED_FROM_OWNER_KOREA_SUDO_ROOT_STDOUT_NOT_ASSISTANT_HOST_READ",
+  "reported_local_time": "2026-10-16T23:28:27+08:00 (message context only)",
+  "script_commit": "fbbfc6a7f336fa2c43aa89eee00bb87e76a63e9a",
+  "script_sha256": "4ad3d8cfa5b889632fda2129c9ff92c476a26a8561ba7a185fe39099ae3a7ec5",
+  "launch_path": "/root/pr99-contract-plan.KULiMTLo/plan.py",
+  "status": "RECEIVED_CONTRACT_PLANNING_PROJECTION_PASS",
+  "archive_sha256": "ec11ca6f579beb681adfd739bfeca5b836a22812676fd86a298340913c5243fd",
+  "dropin_sha256": "b50ce68686918575e6e2ad1d805cd0b268b9260a7b032e52025600cf31892f14",
+  "generic_tunnel_load_state": "not-found",
+  "all_ten_units_reported_active_running": true,
+  "all_ten_environment_files_configured": false,
+  "unit_source_hashes": {
+    "secure-secrets-portal.service": "3023bd5152e1bc26f35cea3ee1cf8196a67c69a736faad7ecf53887882dad0a7",
+    "xuanjun-wecom-customer-contact.service": "f855698347cc734112d6abd102773eb1a39444a332a90a503f8a4f746ecec5aa",
+    "xuanjun-wecom-customer-service.service": "53669b3e6e5646f22b512df5e9dd14feef0796fcd0ac4cb336161c83aa876791",
+    "xuanjun-wecom-novel-ingress.service": "0474dc967087e0ef0eeea2dd7b0b00a51caedec443dd0c6534f8b83aabe68b91",
+    "domestic-model-rpc-tunnel.service": "b3b73107f768c6b52b160591ec1e12a28b69c9fbea3b99a41249a9212fc71d0d",
+    "korea-novel-model-rpc-tunnel.service": "814e49d8f72ef711dedae71b86b26f69972baf4e0dc732df678fb52f2777340d",
+    "provider-neutral-tokyo-tunnel.service": "c83f148d878be3b448d22455c01250e91bd903904608a3e919c899758e23125e",
+    "restricted-rpc-openai-shim.service": "1500671e8059d87053f9bedc749d579c357339278fe8cac3e0d3241130841cac",
+    "tokyo-restricted-model-executor.service": "dcd0bb3cb454322dca7385f82fa4152819523b4e08db73e6a9bd26e571a87a81",
+    "xj-tokyo-vpn.service": "662323e718b3559a03533c634662b75d3c8a8e1f7619d023a92b6e7c17848ba6"
+  },
+  "recognized_python_entries": {
+    "secure-secrets-portal.service": "/opt/trading-system/scripts/secure_secrets_portal_server.py",
+    "restricted-rpc-openai-shim.service": "/opt/trading-system/deploy/bin/run_restricted_rpc_openai_shim_candidate.py",
+    "tokyo-restricted-model-executor.service": "/opt/trading-system/ai_service/internal_provider_neutral_bridge.py"
+  },
+  "unresolved_python_entries": ["xuanjun-wecom-customer-contact.service", "xuanjun-wecom-customer-service.service", "xuanjun-wecom-novel-ingress.service"],
+  "unresolved_reason": "FIRST_PROJECTOR_DOES_NOT_RECOGNIZE_PYTHON_M_OR_COMPLEX_LAUNCH_FORMS_NOT_PROOF_OF_BROKEN_SERVICE",
+  "tokyo_listener_unit_map": {
+    "18080": "secure-secrets-portal.service",
+    "18761": "korea-novel-model-rpc-tunnel.service",
+    "18770": "xuanjun-wecom-novel-ingress.service",
+    "18780": "xuanjun-wecom-customer-service.service",
+    "18781": "xuanjun-wecom-customer-contact.service",
+    "19443": "provider-neutral-tokyo-tunnel.service",
+    "443": "PIDS_OBSERVED_NO_MATCH_TO_FIXED_UNIT_ALLOWLIST_NOT_UNOWNED"
+  },
+  "source_relationships": {
+    "customer_service_wants_generic_tunnel": true,
+    "generic_tunnel_is_not_found": true,
+    "novel_ingress_wants_korea_tunnel": true,
+    "domestic_tunnel_requires_tokyo_executor": true,
+    "vpn_requires_docker": true
+  },
+  "service_actions": 0,
+  "network_requests": 0,
+  "files_written": 0,
+  "database_opened": false,
+  "environment_files_opened": false,
+  "key_files_opened": false,
+  "configuration_complete": false,
+  "production_deployed": false,
+  "independent_source_or_host_acceptance_claimed": false
+}

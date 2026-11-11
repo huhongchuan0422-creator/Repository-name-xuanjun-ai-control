@@ -1,0 +1,13 @@
+{
+  "M99_candidate": "UNCHANGED_NOT_EXECUTED",
+  "M99_dynamic": "NOT_RUN",
+  "files": {
+    "writer_observation.py": "e4ebe1e7416b4b3dfc78d6e50ad33a762e075caea0a5a9a1a85feb33eb80af00",
+    "writer_observation_host.py": "2f85fa80fdff2ec013150946718c519f5904de2d6aed7fbe65881fcfb439ce62",
+    "writer_receipt_contract.py": "5d9fd76d8693e7985863044887163f34157caae5450fa69110f559c5e52e75e1"
+  },
+  "nonempty_WAL": "HOLD",
+  "schema": 1,
+  "scope": "FIXED_READ_ONLY_METADATA_NOT_FENCE_OR_DRAIN_OR_MIGRATION",
+  "workflow_sha256": "3368caec7bf2ce9b6678affb7897538cf2bc9ef14f4e12b4e66459eee5d39678"
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "source_commit": "32801fc886824447aaf51f4afd4a22d7c7b0ce1f",
+  "source_tree": "447bb8a3484f2fb4792c8834e13c3c55b24f3b52",
+  "phase_b_acceptance": 6209166651,
+  "phase_b_reexecuted": false,
+  "hosted": {
+    "status": "PASS",
+    "tests": 77,
+    "skipped": 0,
+    "python": "3.11.17",
+    "run": 38868898561,
+    "job": 116868059787,
+    "exact_checkout": "32801fc886824447aaf51f4afd4a22d7c7b0ce1f"
+  },
+  "artifact": {
+    "id": 12032422528,
+    "zip_sha256": "8d256daf7b90cf5f565d4587cec1236b9887b5895a08211bbb3e843ac1c699f7",
+    "tar_sha256": "8200ccb5d86f09cb1d03a449921eddba4ab421e73cee6736a7ce9d951339bacd",
+    "tar_bytes": 82181,
+    "binding_files": 33,
+    "runtime_files": 25,
+    "developer_download_verified": true,
+    "independent_review": "NOT_REQUESTED_PENDING_COMPLETE_C_EXECUTION_PACKAGE"
+  },
+  "archive_entries": 34,
+  "local_reproducibility": "BYTE_IDENTICAL_TO_ACTUAL_ACTIONS_TAR",
+  "evidence_origin": "DEVELOPER_READ_OF_ORIGINAL_LOGS_AND_ACTUAL_DOWNLOAD_NOT_INDEPENDENT_AUDIT",
+  "source_contract_metadata": {
+    "delivery_commit": "55ef5b94ef66ec9286b9aae9a165b019499a69a7",
+    "run": 38867192724,
+    "job": 116862631607,
+    "host": "iZ6wee8q9z4t03hvqumwfhZ",
+    "uid": 1001,
+    "source_files": 4,
+    "probe_sha256": "0b4c7804c3f786fdadc57548c85d48c683530fc1a76bf9d47fe72727a10cb545",
+    "database_opened": false,
+    "credentials_read": false,
+    "actual_secretref_permission": "NOT_PROVEN"
+  },
+  "production_effects": {
+    "korea_root_calls": 0,
+    "installed_accounts": 0,
+    "installed_units": 0,
+    "reloads": 0,
+    "service_starts": 0,
+    "nft_changes": 0,
+    "credentials_read": 0,
+    "business_database_reads": 0,
+    "provider_requests": 0,
+    "dns_changes": 0,
+    "tokyo_retired": false
+  },
+  "scope": {
+    "installer": "NEW_STOPPED_C_CANDIDATE_ONLY",
+    "installer_executed": false,
+    "installer_independent_permission": "NOT_ISSUED_NOT_REQUESTED",
+    "live_control": "NOT_IMPLEMENTED_PENDING_PRIVATE_BINDINGS",
+    "live_shadow": "NOT_AUTHORIZED_NOT_STARTED",
+    "writer": "HOLD",
+    "tokyo_retirement": "HOLD"
+  }
+}

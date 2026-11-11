@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "approval_comment_id": 6216441589,
+  "approval_body_sha256": "390e8e7fdeec17b001162e0c2f4b0ce7c6ad0f2a6a7257a7cf5693e7af4ce306",
+  "source_commit": "c6ba6ac88d9d1eab1e2731a7fe9b3aa10afe320d",
+  "archive_sha256": "41f3c224cbed1d864104bc206d92a32339372a9d0ecfa9108a2da0123803db70",
+  "binding_sha256": "1785c311ab9eb0b5e88c43dbb2bb3da8dce3a519635d6ca7b0e2ad9a68161fa1",
+  "decision": "PASS_WITH_EXACT_PRECONDITIONS",
+  "issued_at": 1792156935,
+  "expires_at": 1792200135,
+  "api_record_read_back": true,
+  "approved_coordinator_verify_approval": "PASS_WITH_REAL_RECORD",
+  "production_executed": false,
+  "preparation_delivery_helper": "ONLY_STAGE_EXACT_APPROVED_SIX_FILES_NO_COORDINATOR_CALL",
+  "local_delivery_checks": [
+    "exact tar binding extraction PASS",
+    "exact existing staging verified without executing PASS",
+    "changed staging preserved and rejected PASS",
+    "tampered archive rejected PASS"
+  ],
+  "preparer_sha256": "1b3e0ddfba52889a37441fa8fe048f010bdeb5b345d76115ff920749fe3c55c7"
+}

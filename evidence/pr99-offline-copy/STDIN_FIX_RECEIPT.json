@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "owner_last_result": "ROOT_PASSWORD_PROMPT_THEN_RETURN_NO_COPY_RECEIPT",
+  "copy_status": "NOT_PROVEN_NOT_PASS",
+  "cause": "FIRST_SSH_MISSING_NULL_STDIN_CAN_CONSUME_OUTER_BASH_HEREDOC",
+  "local_reproducer": {
+    "without_null_stdin": "FOLLOWING_COMMAND_SWALLOWED_EXIT0",
+    "with_null_stdin": "FOLLOWING_COMMAND_EXECUTED_EXIT0"
+  },
+  "fix": "PRECHECK_AND_EXIT_CONTROL_SSH_USE_MINUS_N; COPY_SSH_RETAINS_EXPLICIT_HEREDOC",
+  "shell_syntax": "PASS",
+  "script_sha256": "6ffd726e3103180cbd07303b8cbfe04e4e9a1cd1525e8615d0e12468b82514b2",
+  "server_execution": false,
+  "new_grants_or_service_changes": false
+}

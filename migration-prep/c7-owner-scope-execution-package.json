@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "task_id": "TOKYO_KOREA_C7_F1_F2_REMEDIATION_6170516474",
+  "owner_scope_correction_date": "2026-10-15",
+  "production_execution_authorized": false,
+  "production_hold": true,
+  "blind_retry_allowed": false,
+  "secrets_embedded": false,
+  "migration_subject": "TOKYO_BINANCE_PRODUCTION_AND_EVIDENCE_PROVEN_REQUIRED_DEPENDENCIES_ONLY",
+  "excluded_from_korea_artifact": [
+    "OPENCLAW_GATEWAY_AND_DEVELOPMENT_STATE",
+    "DEVELOPMENT_TASKS_TESTS_CACHES_AND_BUILD_AGENTS",
+    "TEMPORARY_AGENTS_AND_CHILD_PROCESSES",
+    "WEBSITE_CUSTOMER_WECOM_MODEL_RPC_SELF_MEDIA_AND_UNRELATED_FINANCE_CRM",
+    "NOVEL_YIBI_AND_THEIR_DATABASES",
+    "HISTORICAL_ARCHIVES_BACKUPS_AND_RELEASES"
+  ],
+  "required_classification": [
+    "PRODUCTION_REQUIRED",
+    "CONDITIONAL_DEPENDENCY",
+    "DEVELOPMENT_OR_TEMPORARY",
+    "HISTORICAL_ONLY"
+  ],
+  "korea_capacity_policy": {
+    "expansion_is_prerequisite": false,
+    "tokyo_openclaw_memory_is_comparator": false,
+    "observed_cpu_count": 2,
+    "observed_mem_total_kb": 1915884,
+    "observed_mem_available_kb": 1290508,
+    "observed_swap_free_kb": 1987376,
+    "decision_source": "MINIMAL_BINANCE_RUNTIME_COLD_START_RECONCILIATION_RESTART_AND_SHADOW_MEASUREMENT"
+  },
+  "korea_existing_boundaries": {
+    "port_443_owner": "morelogin-socks5-permanent.service",
+    "port_443_process": "gost",
+    "yibi_ports_observed": [8000, 18765],
+    "novel_service_process_active": true,
+    "novel_business_launch_proven": false,
+    "novel_action_authorized": false
+  },
+  "phases": [
+    {
+      "phase": "A_EXACT_PRODUCTION_DEPENDENCY_CLOSURE",
+      "mutates_production": false,
+      "acceptance": ["every service/process/timer/trigger/data/credential classified", "global trigger and Writer reachability complete", "excluded workloads absent from artifact"]
+    },
+    {
+      "phase": "B_MINIMAL_KOREA_INSTALL_AND_ISOLATED_RESTORE",
+      "mutates_production": true,
+      "requires_new_exact_release_gate": true,
+      "writer_enabled": false,
+      "reuse": ["accepted code", "existing verified backup", "existing rollback evidence"],
+      "forbidden": ["repeat backup or decrypt", "OpenClaw whole-host migration", "Novel/Yibi mutation", "capacity expansion assumption"]
+    },
+    {
+      "phase": "C_RESOURCE_DEPENDENCY_RESTART_AND_GET_ONLY_SHADOW_ACCEPTANCE",
+      "mutates_production": true,
+      "external_effect": "GET_ONLY",
+      "acceptance": ["no OOM or unexpected restart", "resource headroom PASS", "all required dependencies PASS", "BTC/ETH/SOL full reconciliation", "zero Writer effects", "restart recovery PASS"]
+    },
+    {
+      "phase": "D_TOKYO_WRITER_FENCE_FINAL_SNAPSHOT_AND_SINGLE_WRITER_CUTOVER",
+      "mutates_production": true,
+      "requires_new_exact_release_gate": true,
+      "order": ["fence every Tokyo Binance write path", "reconcile inflight and unknown", "capture one bounded WAL-aware final snapshot", "restore and verify Korea", "grant exactly one Korea Writer epoch", "run bounded Canary"]
+    },
+    {
+      "phase": "E_INDEPENDENT_BINANCE_ACCEPTANCE",
+      "mutates_production": false,
+      "acceptance": ["Exchange authoritative state", "single Writer/consumer/scheduler", "risk/protection equivalence", "resource and restart recovery", "rollback drill", "no production dependency left unassigned"]
+    },
+    {
+      "phase": "F_POST_ACCEPTANCE_YIBI_RETIREMENT",
+      "mutates_production": true,
+      "requires": ["phase E PASS", "archive identity revalidated", "exact Yibi object inventory", "separate Owner Release Gate"],
+      "order": ["close exact Yibi triggers", "stop exact Yibi units", "disable and mask exact Yibi units", "prove no Yibi listener/process/trigger", "prove Novel/PostgreSQL/Redis unchanged"],
+      "failure_policy": "DO_NOT_REENABLE_YIBI_AND_DO_NOT_TOUCH_SHARED_NOVEL_DATA"
+    },
+    {
+      "phase": "G_TOKYO_RETIREMENT_PRECHECK",
+      "mutates_production": false,
+      "acceptance": ["all Binance production dependencies moved", "development tasks have a recorded separate destination", "temporary agents stopped naturally or excluded", "historical files retained or disposed under separate policy", "new Owner retirement Gate required"]
+    }
+  ],
+  "unknown_outcome_policy": ["STOP", "CAPTURE_PROCESS_TRANSACTION_SESSION_STATE", "MEASURE_SIDE_EFFECTS_INDEPENDENTLY", "RECONCILE", "NO_BLIND_RETRY", "NO_EFFECT_REPLAY"],
+  "rollback_order": ["KOREA_WRITER_LOCKED", "KOREA_WRITE_CREDENTIAL_IP_AND_EPOCH_REVOKED", "UNKNOWN_OUTCOMES_RECONCILED", "YIBI_AND_NOVEL_UNCHANGED", "TOKYO_CHECKPOINT_EVALUATED", "TOKYO_GET_ONLY_RECONCILED", "NEW_TOKYO_EPOCH_ONLY_AFTER_INDEPENDENT_APPROVAL"]
+}

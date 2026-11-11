@@ -1,0 +1,57 @@
+{
+  "background_executor_installed": false,
+  "owner_manual_commands_required": false,
+  "production_authorization": false,
+  "remaining_gates": {
+    "client_effective_bridge_endpoint_and_env": "PENDING: source defaults are not effective runtime config; no new secret values needed",
+    "cloudflare_and_vpn_ownership": "PENDING: three host-network cloudflared containers and tailscale exit must be resolved",
+    "exact_install_cutover_independent_permission": "PENDING: existing RAM access is transport authorization",
+    "final_snapshot_and_single_writer": "PENDING: preliminary165 copy is not canonical",
+    "finance_timers": "PRESERVE: four active Tokyo timers until explicit successor/retirement decision",
+    "model_executor_destination": "PENDING: domestic/Korea reverse19444 still lead to Tokyo20443; UK/P2 original writer owns replacement",
+    "persistent_runtime_identity_and_bind_mounts": "PENDING: templates do not establish uid/mount compatibility or complete write-set",
+    "real_auth_restart_rollback_acceptance": "PENDING: health200 alone insufficient",
+    "tokyo_retirement": "HOLD until every retained responsibility accepted or explicitly cancelled"
+  },
+  "rollback": [
+    "before traffic/writer handoff: stop only newly introduced exact units, verify cgroups and listeners gone, preserve candidate and journal",
+    "after routing but before accepted target writes: restore only saved exact route fragments after hash compare and nginx syntax check; revalidate original upstream",
+    "after target writes: fence target first, reconcile committed target state through canonical recovery; never restore stale preliminary DB or blindly restart old writer",
+    "restore previous unit bytes/modes only if prestate recorded and current bytes match this transaction; unknown changes HOLD",
+    "never delete root-private source archives, v4 attempts, shared bridge, PR122 current, UK masks or Finance timers"
+  ],
+  "schema": 1,
+  "services_installed": false,
+  "source_evidence": {
+    "endpoint_run": 39000291289,
+    "endpoints_sha256": "3288791bcd2e737fa126f3ddf1d6498cf9a785710955f0112605d3e476f6028d",
+    "runtime_run": 38999602793,
+    "runtime_sha256": "c47b596173e8e4996548eb68cb8a438c2273dd98afe4ee83708cecccab145b0d"
+  },
+  "status": "REVIEW_CANDIDATE_NOT_INSTALLABLE",
+  "target": {
+    "hostname": "iZvt5t8tlrm8oiZ",
+    "instance": "3a22c458934142eea89ec6e3bf481a57",
+    "ports": {
+      "contact": 18781,
+      "customer_service": 18780,
+      "portal": 18080
+    },
+    "release": "/opt/xuanjun-migration-s07/releases/domestic-r1",
+    "uid_gid": "65534:65534"
+  },
+  "templates": "NO_INSTALL_SECTION_NO_ENABLE_NO_DEPLOY_ENTRY; dependency/env/bind mounts require final contract before activation",
+  "transaction_order": [
+    "verify exact independent approval and expiry, host, actor and one-use attempt",
+    "recheck original canonical ownership; reject any concurrent/unknown migration execution",
+    "capture protected units, bridge, PR122 site/current, winctl and ports before changing anything",
+    "verify 124 source pins against current Tokyo; verify staged preliminary materials without treating them as final",
+    "stage new versioned root and private data with no writes into shared /opt/trading-system",
+    "resolve client bridge URL and authentic pin/HMAC to domestic existing bridge; no auth bypass",
+    "prove non-mutating private-network auth-denial, restart and rollback on copied data",
+    "obtain exact final source writer fence, one WAL-aware checkpoint and canonical target writer assignment",
+    "install exact reviewed units only after final inputs; no automatic enable/start in preparation",
+    "activate under one-use approval, test exact private health/auth routes, switch only approved upstream locations",
+    "record before/after protected identity, all InvokeIds, health and writer reconciliation; then independent acceptance"
+  ]
+}

@@ -1,0 +1,2828 @@
+{
+  "schema": 1,
+  "status": "STORAGE_PATH_REFERENCES_OBSERVED_EFFECTIVE_AUTHORITY_AND_WRITER_FENCE_HOLD",
+  "latest_code_commit": "f17d79836d51e75d9ad1428756629ee2218b7cc1",
+  "latest_code_tree": "50266966ec254b2c61794b83adbfac57345ab3c3",
+  "latest_observed_at": "2026-10-18T14:07:31.191723Z",
+  "progress": [
+    {
+      "code_commit": "dd84570be1f9502bd9ab48a432315f6a6ee7b150",
+      "tree": "b16493319f2292000be737114745f93caee30c17",
+      "validation_run": 39133422979,
+      "validation_job": 117693036912,
+      "host_run": 39133483528,
+      "host_job": 117693235818,
+      "result": "HOST_SUCCESS_DATABASE_URL_UNRESOLVED",
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "authoritative_writer": "UNKNOWN",
+            "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+            "enforced_fence": "UNKNOWN",
+            "host": "tokyo",
+            "host_commands": 1,
+            "instance_id": "68985c531add4e90a131aef703a389e6",
+            "invocation_status": "Success",
+            "invoke_id": "t-jpn70f1f5xrkzk0",
+            "nonterminal_invocations": [],
+            "receipt": {
+              "authoritative_writer": "UNKNOWN",
+              "business_requests": 0,
+              "business_source_imports": 0,
+              "contexts": [
+                {
+                  "factories": [
+                    {
+                      "data": [],
+                      "line": 22,
+                      "status": "UNRESOLVED"
+                    }
+                  ],
+                  "pid": 3082952,
+                  "role": "portal",
+                  "start_ticks": 248360883,
+                  "status": "SOURCE_DEFAULT_CANDIDATES_OBSERVED"
+                },
+                {
+                  "factories": [
+                    {
+                      "data": [],
+                      "line": 22,
+                      "status": "UNRESOLVED"
+                    }
+                  ],
+                  "pid": 1903204,
+                  "role": "contact",
+                  "start_ticks": 179522510,
+                  "status": "SOURCE_DEFAULT_CANDIDATES_OBSERVED"
+                },
+                {
+                  "factories": [
+                    {
+                      "data": [],
+                      "line": 22,
+                      "status": "UNRESOLVED"
+                    }
+                  ],
+                  "pid": 1875349,
+                  "role": "customer_service",
+                  "start_ticks": 178615731,
+                  "status": "SOURCE_DEFAULT_CANDIDATES_OBSERVED"
+                }
+              ],
+              "database_opened": false,
+              "enforced_fence": "UNKNOWN",
+              "factory_expressions": [
+                {
+                  "expression": {
+                    "children": [
+                      {
+                        "kind": "Load"
+                      }
+                    ],
+                    "kind": "Name",
+                    "name": "database_url"
+                  },
+                  "line": 22
+                }
+              ],
+              "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+              "imports": [
+                "contextlib",
+                "os",
+                "pathlib",
+                "sqlalchemy",
+                "sqlalchemy.orm"
+              ],
+              "limitations": [
+                "SOURCE_DEFAULT_NOT_EFFECTIVE_RUNTIME_CONFIG",
+                "ENV_ABSENCE_ASSUMED_ONLY_TO_CALCULATE_DEFAULT_NOT_CURRENT_ENV_PROOF",
+                "ANCESTOR_BINDING_NOT_PRODUCTION_PATHGUARD",
+                "ALL_WRITERS_AND_FENCE_NOT_PROVEN"
+              ],
+              "nonce": "36fdab9482de4ea89f03f110ad2bd12a",
+              "observed_at": "2026-10-18T13:53:00.688722Z",
+              "private_values_disclosed": false,
+              "scope": "PR99_PINNED_SOURCE_DEFAULT_DATABASE_CANDIDATES_NOT_EFFECTIVE_CONFIG",
+              "service_actions": 0,
+              "source_sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+            },
+            "run_command_attempted": true,
+            "service_actions": 0,
+            "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+            "sts": "PASS_CURRENT"
+          }
+        ],
+        "migration_started": false,
+        "production_actions": 0,
+        "production_cutover": false,
+        "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION"
+      }
+    },
+    {
+      "code_commit": "55e13ab336bd2213b84fc01c27c548e9ba19df7c",
+      "tree": "97216c784a80239b6b122f691bb562bf7a70c306",
+      "validation_run": 39133671326,
+      "validation_job": 117693752919,
+      "host_run": 39133710438,
+      "host_job": 117693883274,
+      "result": "HOST_SUCCESS_DATABASE_URL_UNRESOLVED_PRESERVED",
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "authoritative_writer": "UNKNOWN",
+            "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+            "enforced_fence": "UNKNOWN",
+            "host": "tokyo",
+            "host_commands": 1,
+            "instance_id": "68985c531add4e90a131aef703a389e6",
+            "invocation_status": "Success",
+            "invoke_id": "t-jpn70f1p4i6d2ww",
+            "nonterminal_invocations": [],
+            "receipt": {
+              "authoritative_writer": "UNKNOWN",
+              "business_requests": 0,
+              "business_source_imports": 0,
+              "contexts": [
+                {
+                  "factories": [
+                    {
+                      "data": [],
+                      "line": 22,
+                      "status": "UNRESOLVED"
+                    }
+                  ],
+                  "pid": 3082952,
+                  "role": "portal",
+                  "start_ticks": 248360883,
+                  "status": "SOURCE_DEFAULT_CANDIDATES_OBSERVED"
+                },
+                {
+                  "factories": [
+                    {
+                      "data": [],
+                      "line": 22,
+                      "status": "UNRESOLVED"
+                    }
+                  ],
+                  "pid": 1903204,
+                  "role": "contact",
+                  "start_ticks": 179522510,
+                  "status": "SOURCE_DEFAULT_CANDIDATES_OBSERVED"
+                },
+                {
+                  "factories": [
+                    {
+                      "data": [],
+                      "line": 22,
+                      "status": "UNRESOLVED"
+                    }
+                  ],
+                  "pid": 1875349,
+                  "role": "customer_service",
+                  "start_ticks": 178615731,
+                  "status": "SOURCE_DEFAULT_CANDIDATES_OBSERVED"
+                }
+              ],
+              "database_opened": false,
+              "enforced_fence": "UNKNOWN",
+              "factory_expressions": [
+                {
+                  "expression": {
+                    "children": [
+                      {
+                        "kind": "Load"
+                      }
+                    ],
+                    "kind": "Name",
+                    "name": "database_url"
+                  },
+                  "line": 22
+                }
+              ],
+              "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+              "imports": [
+                "contextlib",
+                "os",
+                "pathlib",
+                "sqlalchemy",
+                "sqlalchemy.orm"
+              ],
+              "limitations": [
+                "SOURCE_DEFAULT_NOT_EFFECTIVE_RUNTIME_CONFIG",
+                "ENV_ABSENCE_ASSUMED_ONLY_TO_CALCULATE_DEFAULT_NOT_CURRENT_ENV_PROOF",
+                "ANCESTOR_BINDING_NOT_PRODUCTION_PATHGUARD",
+                "ALL_WRITERS_AND_FENCE_NOT_PROVEN"
+              ],
+              "nonce": "65e7fc7478104256afd7da591b9f8eef",
+              "observed_at": "2026-10-18T13:56:06.719492Z",
+              "private_values_disclosed": false,
+              "resolution_nodes": [
+                {
+                  "expression": {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "kind": "Load"
+                          }
+                        ],
+                        "kind": "Name",
+                        "name": "engine"
+                      }
+                    ],
+                    "kind": "Return"
+                  },
+                  "line": 27
+                },
+                {
+                  "expression": {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "children": [
+                              {
+                                "kind": "Load"
+                              }
+                            ],
+                            "kind": "Name",
+                            "name": "sessionmaker"
+                          },
+                          {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Load"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "db_engine"
+                              }
+                            ],
+                            "kind": "keyword"
+                          },
+                          {
+                            "children": [
+                              {
+                                "kind": "Constant",
+                                "literal_type": "bool"
+                              }
+                            ],
+                            "kind": "keyword"
+                          },
+                          {
+                            "children": [
+                              {
+                                "kind": "Constant",
+                                "literal_type": "bool"
+                              }
+                            ],
+                            "kind": "keyword"
+                          }
+                        ],
+                        "kind": "Call"
+                      }
+                    ],
+                    "kind": "Return"
+                  },
+                  "line": 48
+                }
+              ],
+              "scope": "PR99_PINNED_SOURCE_DEFAULT_DATABASE_CANDIDATES_NOT_EFFECTIVE_CONFIG",
+              "service_actions": 0,
+              "source_sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+            },
+            "run_command_attempted": true,
+            "service_actions": 0,
+            "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+            "sts": "PASS_CURRENT"
+          }
+        ],
+        "migration_started": false,
+        "production_actions": 0,
+        "production_cutover": false,
+        "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION"
+      }
+    },
+    {
+      "code_commit": "5b65f8e3bc2400dc0e9ae9103a5e873c783987b0",
+      "tree": "a6943197f7c21c64651a58a3595ddc96158a79e9",
+      "validation_run": 39134049933,
+      "validation_job": 117694853284,
+      "host_run": 39134112999,
+      "host_job": 117695045265,
+      "result": "FIXED_CALLER_TRACE_ACCEPTED_NOT_COMPLETE_DATAFLOW",
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "authoritative_writer": "UNKNOWN",
+            "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+            "enforced_fence": "UNKNOWN",
+            "host": "tokyo",
+            "host_commands": 1,
+            "instance_id": "68985c531add4e90a131aef703a389e6",
+            "invocation_status": "Success",
+            "invoke_id": "t-jpn70f26m8rbhfk",
+            "nonterminal_invocations": [],
+            "receipt": {
+              "authoritative_writer": "UNKNOWN",
+              "business_requests": 0,
+              "business_source_imports": 0,
+              "database_opened": false,
+              "enforced_fence": "UNKNOWN",
+              "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+              "limitations": [
+                "FIXED_FIVE_SOURCE_CALLER_TRACE_NOT_COMPLETE_IMPORT_GRAPH",
+                "ONLY_SOURCE_DEFAULTS_ENV_AND_RUNTIME_OVERRIDES_NOT_PROVEN",
+                "RELATIVE_PATHS_ASSUME_PROJECT_WORKDIR_NOT_ADMISSION",
+                "NO_WRITER_FENCE_DRAIN_OR_STOP"
+              ],
+              "nonce": "61d7e219530b40a2b97a9eeac0918750",
+              "observed_at": "2026-10-18T14:01:33.617084Z",
+              "private_values_disclosed": false,
+              "scope": "PR99_FIXED_CALLER_DATABASE_CONFIGURATION_TRACE_NOT_AUTHORITY",
+              "service_actions": 0,
+              "sources": [
+                {
+                  "call_sites": [
+                    {
+                      "argument": "POSITIONAL_0",
+                      "constructor": "sqlalchemy.create_engine",
+                      "data": [],
+                      "default_status": "UNRESOLVED",
+                      "expression": {
+                        "children": [
+                          {
+                            "kind": "Load"
+                          }
+                        ],
+                        "kind": "Name",
+                        "name": "database_url"
+                      },
+                      "line": 22
+                    }
+                  ],
+                  "connection_imports": [],
+                  "definition_shapes": [
+                    {
+                      "arguments": [
+                        "database_url"
+                      ],
+                      "body": [
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "engine"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "create_engine"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "database_url"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "bool"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 22
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Load"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "engine"
+                              }
+                            ],
+                            "kind": "Return"
+                          },
+                          "line": 27
+                        }
+                      ],
+                      "line": 20,
+                      "name": "create_db_engine"
+                    },
+                    {
+                      "arguments": [
+                        "database_url"
+                      ],
+                      "body": [
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "db_engine"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "create_db_engine"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Or"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "database_url"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "DATABASE_URL"
+                                      }
+                                    ],
+                                    "kind": "BoolOp"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 43
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "sessionmaker"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "db_engine"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "bool"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "bool"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Return"
+                          },
+                          "line": 48
+                        }
+                      ],
+                      "line": 41,
+                      "name": "create_session_factory"
+                    },
+                    {
+                      "arguments": [
+                        "session_factory"
+                      ],
+                      "body": [
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "factory"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Or"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "session_factory"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "SessionLocal"
+                                  }
+                                ],
+                                "kind": "BoolOp"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 58
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "session"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "factory"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 63
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "session"
+                                      }
+                                    ],
+                                    "kind": "Yield"
+                                  }
+                                ],
+                                "kind": "Expr"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "session"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "commit"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Expr"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "Exception"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Name",
+                                                "name": "session"
+                                              },
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Attribute",
+                                            "name": "rollback"
+                                          }
+                                        ],
+                                        "kind": "Call"
+                                      }
+                                    ],
+                                    "kind": "Expr"
+                                  },
+                                  {
+                                    "kind": "Raise"
+                                  }
+                                ],
+                                "kind": "ExceptHandler"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "session"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "close"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Expr"
+                              }
+                            ],
+                            "kind": "Try"
+                          },
+                          "line": 65
+                        }
+                      ],
+                      "line": 56,
+                      "name": "session_scope"
+                    }
+                  ],
+                  "environment_mutation_or_loader_sites": 0,
+                  "path": "database/connection.py",
+                  "sha256": "58d9705addf7b997a7c2405a2f53d2414495a72e5be72d91d6c550ac2bd83ece"
+                },
+                {
+                  "call_sites": [
+                    {
+                      "argument": "POSITIONAL_0",
+                      "constructor": "sqlalchemy.create_engine",
+                      "data": [],
+                      "default_status": "UNRESOLVED",
+                      "expression": {
+                        "children": [
+                          {
+                            "kind": "Load"
+                          }
+                        ],
+                        "kind": "Name",
+                        "name": "database_url"
+                      },
+                      "line": 63
+                    },
+                    {
+                      "argument": "POSITIONAL_0",
+                      "constructor": "sqlalchemy.create_engine",
+                      "data": [],
+                      "default_status": "UNRESOLVED",
+                      "expression": {
+                        "children": [
+                          {
+                            "kind": "Load"
+                          }
+                        ],
+                        "kind": "Name",
+                        "name": "database_url"
+                      },
+                      "line": 182
+                    }
+                  ],
+                  "connection_imports": [],
+                  "definition_shapes": [
+                    {
+                      "arguments": [
+                        "database_url",
+                        "knowledge_source_path"
+                      ],
+                      "body": [
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "database_url"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Or"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "database_url"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "os"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "getenv"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "BoolOp"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 59
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Not"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "database_url"
+                                  }
+                                ],
+                                "kind": "UnaryOp"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "ValueError"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Raise"
+                              }
+                            ],
+                            "kind": "If"
+                          },
+                          "line": 60
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "_ensure_sqlite_parent"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "database_url"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Expr"
+                          },
+                          "line": 62
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "engine"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "create_engine"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "database_url"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "bool"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 63
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Name",
+                                                "name": "Base"
+                                              },
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Attribute",
+                                            "name": "metadata"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "create_all"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "engine"
+                                          }
+                                        ],
+                                        "kind": "keyword"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Expr"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "Session"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "sessionmaker"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "engine"
+                                          }
+                                        ],
+                                        "kind": "keyword"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Constant",
+                                            "literal_type": "bool"
+                                          }
+                                        ],
+                                        "kind": "keyword"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Constant",
+                                            "literal_type": "bool"
+                                          }
+                                        ],
+                                        "kind": "keyword"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "missing"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "_missing_tables"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "engine"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "db_result"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "_exercise_customer_runtime"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "Session"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "persistence"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "_prove_persistence"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "database_url"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "db_result"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "knowledge_result"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "_exercise_knowledge"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "knowledge_source_path"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      },
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "str"
+                                      }
+                                    ],
+                                    "kind": "Dict"
+                                  }
+                                ],
+                                "kind": "Return"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "engine"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "dispose"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Expr"
+                              }
+                            ],
+                            "kind": "Try"
+                          },
+                          "line": 64
+                        }
+                      ],
+                      "line": 54,
+                      "name": "run_database_and_knowledge_preflight"
+                    },
+                    {
+                      "arguments": [
+                        "database_url",
+                        "db_result"
+                      ],
+                      "body": [
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "engine"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "create_engine"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "database_url"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "bool"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 182
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "Session"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "sessionmaker"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "engine"
+                                          }
+                                        ],
+                                        "kind": "keyword"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Constant",
+                                            "literal_type": "bool"
+                                          }
+                                        ],
+                                        "kind": "keyword"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Constant",
+                                            "literal_type": "bool"
+                                          }
+                                        ],
+                                        "kind": "keyword"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "conversations"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "ConversationStateRepository"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "Session"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Store"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "latest"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "conversations"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "latest_for_customer"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "db_result"
+                                          },
+                                          {
+                                            "kind": "Constant",
+                                            "literal_type": "str"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Subscript"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Assign"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "any"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  },
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  },
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Subscript"
+                                              },
+                                              {
+                                                "kind": "Eq"
+                                              },
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  },
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  },
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Subscript"
+                                              }
+                                            ],
+                                            "kind": "Compare"
+                                          },
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Name",
+                                                "name": "item"
+                                              },
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Name",
+                                                "name": "latest"
+                                              }
+                                            ],
+                                            "kind": "comprehension"
+                                          }
+                                        ],
+                                        "kind": "GeneratorExp"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Return"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "engine"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "dispose"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "Expr"
+                              }
+                            ],
+                            "kind": "Try"
+                          },
+                          "line": 183
+                        }
+                      ],
+                      "line": 177,
+                      "name": "_prove_persistence"
+                    },
+                    {
+                      "arguments": [
+                        "database_url"
+                      ],
+                      "body": [
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "prefix"
+                              },
+                              {
+                                "kind": "Constant",
+                                "literal_type": "str"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 231
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Not"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "database_url"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "startswith"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "prefix"
+                                      }
+                                    ],
+                                    "kind": "Call"
+                                  }
+                                ],
+                                "kind": "UnaryOp"
+                              },
+                              {
+                                "kind": "Return"
+                              }
+                            ],
+                            "kind": "If"
+                          },
+                          "line": 232
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "kind": "Store"
+                                  }
+                                ],
+                                "kind": "Name",
+                                "name": "db_path"
+                              },
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Name",
+                                    "name": "Path"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Name",
+                                        "name": "database_url"
+                                      },
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Name",
+                                                "name": "len"
+                                              },
+                                              {
+                                                "children": [
+                                                  {
+                                                    "kind": "DEPTH_BOUND"
+                                                  }
+                                                ],
+                                                "kind": "Name",
+                                                "name": "prefix"
+                                              }
+                                            ],
+                                            "kind": "Call"
+                                          }
+                                        ],
+                                        "kind": "Slice"
+                                      },
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Subscript"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Assign"
+                          },
+                          "line": 234
+                        },
+                        {
+                          "expression": {
+                            "children": [
+                              {
+                                "children": [
+                                  {
+                                    "children": [
+                                      {
+                                        "children": [
+                                          {
+                                            "children": [
+                                              {
+                                                "kind": "Load"
+                                              }
+                                            ],
+                                            "kind": "Name",
+                                            "name": "db_path"
+                                          },
+                                          {
+                                            "kind": "Load"
+                                          }
+                                        ],
+                                        "kind": "Attribute",
+                                        "name": "parent"
+                                      },
+                                      {
+                                        "kind": "Load"
+                                      }
+                                    ],
+                                    "kind": "Attribute",
+                                    "name": "mkdir"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "bool"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  },
+                                  {
+                                    "children": [
+                                      {
+                                        "kind": "Constant",
+                                        "literal_type": "bool"
+                                      }
+                                    ],
+                                    "kind": "keyword"
+                                  }
+                                ],
+                                "kind": "Call"
+                              }
+                            ],
+                            "kind": "Expr"
+                          },
+                          "line": 235
+                        }
+                      ],
+                      "line": 227,
+                      "name": "_ensure_sqlite_parent"
+                    }
+                  ],
+                  "environment_mutation_or_loader_sites": 0,
+                  "path": "ai_service/domestic_runtime_closure.py",
+                  "sha256": "8ab3cb974fb826bcd785dcbc344259205867304b88396a7a2862e53406334ea2"
+                },
+                {
+                  "call_sites": [],
+                  "connection_imports": [],
+                  "definition_shapes": [],
+                  "environment_mutation_or_loader_sites": 1,
+                  "path": "scripts/secure_secrets_portal_server.py",
+                  "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1"
+                },
+                {
+                  "call_sites": [],
+                  "connection_imports": [],
+                  "definition_shapes": [],
+                  "environment_mutation_or_loader_sites": 0,
+                  "path": "ai_service/wecom_customer_contact_service.py",
+                  "sha256": "c95ca9ec711d05d64489ed927cae770157954b46661411b5f762f193ba711571"
+                },
+                {
+                  "call_sites": [],
+                  "connection_imports": [],
+                  "definition_shapes": [],
+                  "environment_mutation_or_loader_sites": 0,
+                  "path": "ai_service/wecom_customer_service.py",
+                  "sha256": "aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402"
+                }
+              ]
+            },
+            "run_command_attempted": true,
+            "service_actions": 0,
+            "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+            "sts": "PASS_CURRENT"
+          }
+        ],
+        "migration_started": false,
+        "production_actions": 0,
+        "production_cutover": false,
+        "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION"
+      }
+    },
+    {
+      "code_commit": "f17d79836d51e75d9ad1428756629ee2218b7cc1",
+      "tree": "50266966ec254b2c61794b83adbfac57345ab3c3",
+      "validation_run": 39134466847,
+      "validation_job": 117696053242,
+      "host_run": 39134555244,
+      "host_job": 117696334458,
+      "result": "SOURCE_STORAGE_MAP_METADATA_ACCEPTED_NOT_EFFECTIVE_CONFIG",
+      "receipt": {
+        "authoritative_writer": "UNKNOWN",
+        "enforced_fence": "UNKNOWN",
+        "hosts": [
+          {
+            "authoritative_writer": "UNKNOWN",
+            "cloud_query": "PASS_CURRENT_OBSERVATION_NOT_FENCE",
+            "enforced_fence": "UNKNOWN",
+            "host": "tokyo",
+            "host_commands": 1,
+            "instance_id": "68985c531add4e90a131aef703a389e6",
+            "invocation_status": "Success",
+            "invoke_id": "t-jpn70f2pr9vi6tc",
+            "nonterminal_invocations": [],
+            "receipt": {
+              "authoritative_writer": "UNKNOWN",
+              "business_requests": 0,
+              "business_source_imports": 0,
+              "database_opened": false,
+              "enforced_fence": "UNKNOWN",
+              "hostname": "iZ6wee8q9z4t03hvqumwfhZ",
+              "limitations": [
+                "SOURCE_LITERAL_PATHS_NOT_EFFECTIVE_RUNTIME_CONFIG",
+                "MAX_16_SELECTED_STORAGE_MODULES_NOT_FULL_IMPORT_GRAPH",
+                "METADATA_ONLY_NO_DATA_CONTENT_OR_SQLITE_FORMAT_PROOF",
+                "NO_WRITER_FENCE_DRAIN_OR_STOP"
+              ],
+              "locations": [
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713243,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 0,
+                  "source_literal_path": "/opt/trading-system/runtime/secure-secrets-portal"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713240,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 1,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store"
+                },
+                {
+                  "metadata": {
+                    "bytes": 75,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1717541,
+                    "mode": 384,
+                    "state": "REGULAR",
+                    "uid": 1000
+                  },
+                  "slot": 2,
+                  "source_literal_path": "/opt/trading-system/runtime/secure-secrets-portal/credential-store.env"
+                },
+                {
+                  "metadata": {
+                    "bytes": 6486,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1842719,
+                    "mode": 420,
+                    "state": "REGULAR",
+                    "uid": 1000
+                  },
+                  "slot": 3,
+                  "source_literal_path": "/opt/trading-system/runtime/secure-secrets-portal/public/xuanjun-tiktok-icon.png"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 2093068,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 4,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-contact"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1967301,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 5,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/wecom-customer-service"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713354,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 6,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/internal-bridge"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1709766,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 7,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713241,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 8,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store/values"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713242,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 9,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store/metadata"
+                },
+                {
+                  "metadata": {
+                    "bytes": 60350,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713273,
+                    "mode": 384,
+                    "state": "REGULAR",
+                    "uid": 1000
+                  },
+                  "slot": 10,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/operations-secretref-store/audit.jsonl"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713373,
+                    "mode": 493,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 11,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/telegram-customer-service-canary"
+                },
+                {
+                  "metadata": {
+                    "bytes": 19731,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1701166,
+                    "mode": 384,
+                    "state": "REGULAR",
+                    "uid": 1000
+                  },
+                  "slot": 12,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/telegram-customer-service-canary/state.json"
+                },
+                {
+                  "metadata": {
+                    "bytes": 43,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713393,
+                    "mode": 384,
+                    "state": "REGULAR",
+                    "uid": 1000
+                  },
+                  "slot": 13,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/telegram-customer-service-canary/webhook_secret_token"
+                },
+                {
+                  "metadata": {
+                    "bytes": 61,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713394,
+                    "mode": 384,
+                    "state": "REGULAR",
+                    "uid": 1000
+                  },
+                  "slot": 14,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/telegram-customer-service-canary/webhook_path"
+                },
+                {
+                  "metadata": {
+                    "bytes": 4096,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713369,
+                    "mode": 448,
+                    "state": "DIRECTORY",
+                    "uid": 1000
+                  },
+                  "slot": 15,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/internal-bridge/secrets"
+                },
+                {
+                  "metadata": {
+                    "bytes": 65,
+                    "device": 64771,
+                    "gid": 1000,
+                    "inode": 1713360,
+                    "mode": 384,
+                    "state": "REGULAR",
+                    "uid": 1000
+                  },
+                  "slot": 16,
+                  "source_literal_path": "/opt/trading-system/runtime/v8-domestic-operations/internal-bridge/domestic_bridge_cert.sha256"
+                }
+              ],
+              "missing_source_paths": [
+                "database/repositories.py"
+              ],
+              "nonce": "d27f37995ed643d3a634e52117557191",
+              "observed_at": "2026-10-18T14:07:31.191723Z",
+              "omitted_candidates": 0,
+              "private_values_disclosed": false,
+              "scope": "PR99_FIXED_APP_STORAGE_IMPORT_AND_RUNTIME_PATH_MAP_NOT_AUTHORITY",
+              "service_actions": 0,
+              "sources": [
+                {
+                  "path": "scripts/secure_secrets_portal_server.py",
+                  "project_imports": [
+                    "trading_execution.secure_credential_intake.CredentialIntakeAuditSink",
+                    "database.repositories.CredentialRepository",
+                    "ai_service.secure_secrets_portal.DEFAULT_BASE_URL",
+                    "ai_service.secure_secrets_portal.DEFAULT_MODEL",
+                    "ai_service.secure_secrets_portal.DOMESTIC_GATEWAY_REMOTE_AUTH_REF",
+                    "ai_service.secure_secrets_portal.DOUYIN_ACCESS_TOKEN_REF",
+                    "ai_service.secure_secrets_portal.DOUYIN_CLIENT_KEY_REF",
+                    "ai_service.secure_secrets_portal.DOUYIN_CLIENT_SECRET_REF",
+                    "ai_service.secure_secrets_portal.DOUYIN_REFRESH_TOKEN_REF",
+                    "ai_service.secure_secrets_portal.FEISHU_CUSTOMER_APP_SECRET_REF",
+                    "ai_service.secure_secrets_portal.FileBackedSubmissionSessionRepository",
+                    "ai_service.secure_secrets_portal.OperationsSecretRefStore",
+                    "trading_execution.dual_api_readiness.ROLE_FINANCE_COLLECTION_READONLY",
+                    "trading_execution.secure_credential_intake.SecureCredentialIntakeService",
+                    "ai_service.secure_secrets_portal.SecureSecretsPortalService",
+                    "trading_execution.secure_credential_intake.SensitiveValueRedactor",
+                    "trading_execution.secure_credential_intake.StatusOnlyOperationsBridge",
+                    "ai_service.secure_secrets_portal.TIKTOK_ACCESS_TOKEN_REF",
+                    "ai_service.secure_secrets_portal.TIKTOK_CLIENT_KEY_REF",
+                    "ai_service.secure_secrets_portal.TIKTOK_CLIENT_SECRET_REF",
+                    "ai_service.secure_secrets_portal.TIKTOK_REFRESH_TOKEN_REF",
+                    "ai_service.telegram_customer_service_canary.TelegramCustomerServiceCanary",
+                    "ai_service.secure_secrets_portal.secure_headers"
+                  ],
+                  "runtime_references": [
+                    {
+                      "line": 73,
+                      "slot": 0,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 119,
+                      "slot": 1,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 0,
+                      "symbol": "DEFAULT_STATE_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 2,
+                      "symbol": "DEFAULT_CREDENTIAL_ENV_FILE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 3,
+                      "symbol": "TIKTOK_APP_ICON_PATH"
+                    }
+                  ],
+                  "sha256": "57e38fc9c37d2811010b3170f672c4ba7b4877f2e27575b564131ed12adee1a1",
+                  "storage_constructors": [
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "state_root"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 116,
+                      "name": "ai_service.secure_secrets_portal.FileBackedSubmissionSessionRepository"
+                    },
+                    {
+                      "arguments": [],
+                      "line": 117,
+                      "name": "database.repositories.CredentialRepository"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "Path"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "Call"
+                        }
+                      ],
+                      "line": 118,
+                      "name": "ai_service.secure_secrets_portal.OperationsSecretRefStore"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "DEFAULT_STATE_ROOT"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 1129,
+                      "name": "tiktok.open_api_foundation.TikTokTokenLifecycleStore"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "DEFAULT_STATE_ROOT"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 877,
+                      "name": "douyin.open_api_foundation.DouyinOAuthStateStore"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "DEFAULT_STATE_ROOT"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 942,
+                      "name": "douyin.open_api_foundation.DouyinTokenLifecycleStore"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "DEFAULT_STATE_ROOT"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 1027,
+                      "name": "tiktok.open_api_foundation.TikTokOAuthStateStore"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "DEFAULT_STATE_ROOT"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 1063,
+                      "name": "tiktok.open_api_foundation.TikTokOAuthStateStore"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "DEFAULT_STATE_ROOT"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 1176,
+                      "name": "tiktok.open_api_foundation.TikTokTokenLifecycleStore"
+                    },
+                    {
+                      "arguments": [],
+                      "line": 124,
+                      "name": "accounts.credential_store.CredentialStore"
+                    },
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "state_root"
+                            },
+                            {
+                              "kind": "Div"
+                            },
+                            {
+                              "kind": "Constant",
+                              "literal_type": "str"
+                            }
+                          ],
+                          "kind": "BinOp"
+                        }
+                      ],
+                      "line": 125,
+                      "name": "ai_service.secure_secrets_portal.FileBackedSubmissionSessionRepository"
+                    }
+                  ]
+                },
+                {
+                  "path": "ai_service/wecom_customer_contact_service.py",
+                  "project_imports": [
+                    "ai_service.secure_secrets_portal.OperationsSecretRefStore",
+                    "ai_service.wecom_customer_service.WeComCallbackCrypto",
+                    "ai_service.wecom_customer_service._parse_xml"
+                  ],
+                  "runtime_references": [
+                    {
+                      "line": 38,
+                      "slot": 1,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 42,
+                      "slot": 4,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 1,
+                      "symbol": "DEFAULT_SECRET_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 4,
+                      "symbol": "DEFAULT_RUNTIME_ROOT"
+                    }
+                  ],
+                  "sha256": "c95ca9ec711d05d64489ed927cae770157954b46661411b5f762f193ba711571",
+                  "storage_constructors": [
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "Path"
+                            },
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "secret_root"
+                            }
+                          ],
+                          "kind": "Call"
+                        }
+                      ],
+                      "line": 59,
+                      "name": "ai_service.secure_secrets_portal.OperationsSecretRefStore"
+                    }
+                  ]
+                },
+                {
+                  "path": "ai_service/wecom_customer_service.py",
+                  "project_imports": [],
+                  "runtime_references": [
+                    {
+                      "line": 61,
+                      "slot": 1,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 64,
+                      "slot": 5,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 68,
+                      "slot": 6,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 1,
+                      "symbol": "DEFAULT_SECRET_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 5,
+                      "symbol": "DEFAULT_RUNTIME_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 6,
+                      "symbol": "DEFAULT_BRIDGE_ROOT"
+                    }
+                  ],
+                  "sha256": "aa50fff75f53646bac75a30adbeccb98104e25d58bf099929bfea93e5810a402",
+                  "storage_constructors": [
+                    {
+                      "arguments": [
+                        {
+                          "children": [
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "Path"
+                            },
+                            {
+                              "children": [
+                                {
+                                  "kind": "Load"
+                                }
+                              ],
+                              "kind": "Name",
+                              "name": "secret_root"
+                            }
+                          ],
+                          "kind": "Call"
+                        }
+                      ],
+                      "line": 225,
+                      "name": "secure_secrets_portal.OperationsSecretRefStore"
+                    }
+                  ]
+                },
+                {
+                  "path": "ai_service/secure_secrets_portal.py",
+                  "project_imports": [
+                    "trading_execution.secure_credential_intake.CredentialSubmissionSession",
+                    "trading_execution.secure_credential_intake.InMemorySubmissionSessionRepository",
+                    "trading_execution.dual_api_readiness.ROLE_BINANCE_ACCOUNT_READONLY",
+                    "trading_execution.dual_api_readiness.ROLE_BINANCE_TRADING",
+                    "trading_execution.dual_api_readiness.ROLE_FINANCE_COLLECTION_READONLY",
+                    "trading_execution.secure_credential_intake.STATUS_PENDING",
+                    "trading_execution.secure_credential_intake.SecureCredentialIntakeService",
+                    "trading_execution.secure_credential_intake.StatusOnlyOperationsBridge"
+                  ],
+                  "runtime_references": [
+                    {
+                      "line": 76,
+                      "slot": 7,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 7,
+                      "symbol": "RUNTIME_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 1,
+                      "symbol": "OPERATIONS_SECRET_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 8,
+                      "symbol": "OPERATIONS_SECRET_VALUE_DIR"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 9,
+                      "symbol": "OPERATIONS_SECRETREF_DIR"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 10,
+                      "symbol": "OPERATIONS_AUDIT_FILE"
+                    }
+                  ],
+                  "sha256": "3804d540281c0e07480e5c95ef98f800b498fd09e2f14966d9d3737830157ba7",
+                  "storage_constructors": [
+                    {
+                      "arguments": [],
+                      "line": 765,
+                      "name": "OperationsSecretRefStore"
+                    },
+                    {
+                      "arguments": [],
+                      "line": 766,
+                      "name": "trading_execution.secure_credential_intake.InMemorySubmissionSessionRepository"
+                    }
+                  ]
+                },
+                {
+                  "path": "ai_service/telegram_customer_service_canary.py",
+                  "project_imports": [],
+                  "runtime_references": [
+                    {
+                      "line": 38,
+                      "slot": 7,
+                      "symbol": "LITERAL_RUNTIME_REFERENCE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 7,
+                      "symbol": "RUNTIME_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 11,
+                      "symbol": "CANARY_ROOT"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 12,
+                      "symbol": "CANARY_STATE_FILE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 13,
+                      "symbol": "CANARY_SECRET_FILE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 14,
+                      "symbol": "CANARY_PATH_FILE"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 15,
+                      "symbol": "BRIDGE_SECRET_DIR"
+                    },
+                    {
+                      "line": 0,
+                      "slot": 16,
+                      "symbol": "BRIDGE_CERT_PIN_FILE"
+                    }
+                  ],
+                  "sha256": "83904b6994db02b2702563eaaace50399caaf968864bd7f0ea355b4350462150",
+                  "storage_constructors": []
+                },
+                {
+                  "path": "trading_execution/secure_credential_intake.py",
+                  "project_imports": [],
+                  "runtime_references": [],
+                  "sha256": "0b602d99d50816cb1ff85c54823433e49a32413228f87c5e7ddc9278a2b20980",
+                  "storage_constructors": [
+                    {
+                      "arguments": [],
+                      "line": 337,
+                      "name": "accounts.credential_store.CredentialStore"
+                    },
+                    {
+                      "arguments": [],
+                      "line": 338,
+                      "name": "InMemorySubmissionSessionRepository"
+                    }
+                  ]
+                }
+              ]
+            },
+            "run_command_attempted": true,
+            "service_actions": 0,
+            "status": "WRITER_METADATA_OBSERVED_NOT_FENCE_OR_DRAIN",
+            "sts": "PASS_CURRENT"
+          }
+        ],
+        "migration_started": false,
+        "production_actions": 0,
+        "production_cutover": false,
+        "status": "WRITER_METADATA_BATCH_COMPLETE_NOT_PRODUCTION_ADMISSION"
+      }
+    }
+  ],
+  "readonly_host_commands": 4,
+  "all_this_increment_host_invocations_terminal": true,
+  "private_values_disclosed": false,
+  "business_contents_read": false,
+  "database_opened": false,
+  "production_service_actions": 0,
+  "production_installation": false,
+  "production_migration_started": false,
+  "production_cutover": false,
+  "writer_acquired": false,
+  "remaining_major_nodes": 6,
+  "source_default_candidates_are_not_effective_config": true,
+  "open_implementation_gaps": [
+    "Resolve database.repositories package export instead of missing database/repositories.py",
+    "Complete accounts CredentialStore and Douyin/TikTok store dependencies/keyword path binding",
+    "Bind source defaults to actual CLI/config/runtime state and complete authoritative data catalogue",
+    "Cover all writers and schedules; implement enforceable fence/drain and original durable controller host binding"
+  ],
+  "external_admission": {
+    "original_40_candidate_release": "ORIGINAL_REFUSAL_RAW_AND_NORMAL_RELEASE_BASIS_STILL_UNKNOWN_NOT_RETRIED",
+    "M99_dynamic": "NOT_RUN_NO_RESTRICTED_ENTRY_RETRY",
+    "independent_review": "INCREMENT_REQUESTED_NOT_PASS",
+    "migration_permit": "NOT_ISSUED"
+  }
+}

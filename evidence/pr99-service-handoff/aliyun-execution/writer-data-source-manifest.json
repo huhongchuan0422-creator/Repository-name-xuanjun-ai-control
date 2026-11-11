@@ -1,0 +1,11 @@
+{
+  "M99_dynamic": "NOT_RUN",
+  "files": {
+    ".github/workflows/pr99-writer-data-inventory.yml": "ad91adb717621e317efc7b80d3f70dd7d43726a81a380452f12dd4c3abf423d8",
+    "evidence/pr99-service-handoff/aliyun-execution/writer_data_contract.py": "719d2016ca8e935343e7f8602f51255bcc68fe7678392585e58875fb0790f668",
+    "evidence/pr99-service-handoff/aliyun-execution/writer_data_host.py": "5f87489fc76a588945e1f9d291d6ffcb53d28306ecde749c69dcf49d4f45ea43",
+    "evidence/pr99-service-handoff/aliyun-execution/writer_data_inventory.py": "1f022000e7591eaa32a3413e9631064740420a0540a59b4b205abe4db4b16ca0"
+  },
+  "production_entry": false,
+  "scope": "NEW_TOKYO_READONLY_STATIC_CANDIDATES_NOT_PRODUCTION_FENCE"
+}

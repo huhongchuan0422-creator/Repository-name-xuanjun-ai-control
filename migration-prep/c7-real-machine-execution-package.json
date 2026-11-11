@@ -1,0 +1,87 @@
+{
+  "schema_version": 3,
+  "owner_scope_correction": "c7-owner-scope-execution-package.json",
+  "owner_scope_correction_precedence": "SUPERSEDES_PHASE_ORDER_AND_MIGRATION_OBJECT_SCOPE_IN_THIS_LEGACY_PACKAGE",
+  "task_id": "TOKYO_KOREA_C7_F1_F2_REMEDIATION_6170516474",
+  "audit_comment": "6170516474",
+  "base_commit": "5f330b722eadfd887aa3228db68ee71d05ec74ca",
+  "base_tree": "fbeac46edf04b5e788c80b8405c04fde92c6e11c",
+  "production_execution_authorized": false,
+  "blind_retry_allowed": false,
+  "secrets_embedded": false,
+  "all_placeholders_require_signed_exact_binding_before_execution": true,
+  "read_only_artifacts": [
+    {
+      "object": "private-writer-original-bytes",
+      "interface": "c7_acceptance.load_private_writer_evidence",
+      "required_bindings": ["owner_uid", "canonical_non_symlink_path", "file_identity", "raw_file_sha256", "public_manifest_sha256"],
+      "output": "redacted hash/count/four-surface receipt",
+      "runtime_isolation_proven": false
+    },
+    {
+      "object": "root-inventory-collector",
+      "interface": "c7_root_inventory.py",
+      "argv": ["/usr/bin/python3", "@ROOT_OWNED_VERIFIED_COLLECTOR_PATH@"],
+      "arguments_allowed": 0,
+      "required_bindings": ["candidate_commit", "candidate_tree", "artifact_sha256", "collector_sha256", "host", "owner_uid=0", "mode_no_group_other_write"],
+      "success": "exit=0 AND status=PASS_COMPLETE AND incomplete_count=0",
+      "otherwise": "HOLD_INCOMPLETE"
+    },
+    {
+      "object": "authenticated-admission-policy",
+      "interface": "c7_acceptance.load_verified_admission_policy",
+      "required_bindings": ["root_or_owner_controlled_policy_path", "detached_signature_path", "trust_anchor_path", "candidate_commit", "candidate_tree", "epoch", "expiry", "six_gate_authorities"],
+      "unsigned_or_uninstalled_behavior": "FORMAL_RECEIPT_SHAPE_ONLY_ALL_HOLD"
+    }
+  ],
+  "phases": [
+    {
+      "phase": "A_LOCAL_AND_EXISTING_READONLY_EVIDENCE",
+      "self_executable_now": true,
+      "mutates_production": false,
+      "operations": ["recompute private Writer raw bytes and public binding", "run existing fixed no-argument host helper", "capture existing Korea pre-install state"],
+      "outputs": ["95-path redacted receipt", "Tokyo/Korea fixed-helper receipt", "pre-install baseline"],
+      "acceptance_limit": "does not prove global trigger, credential or runtime isolation"
+    },
+    {
+      "phase": "B_CONSOLIDATED_ADMIN_READONLY_EVIDENCE",
+      "self_executable_now": false,
+      "mutates_production": false,
+      "operations": ["GitHub admin complete Runner export", "Tokyo/Korea root collector once per host", "Gateway admin global trigger export", "existing Authority read", "Korea root environment read", "installed verifier measurement"],
+      "outputs": ["original bytes", "source-generated object identities", "collection epoch", "evidence SHA-256", "complete pagination/coverage markers"],
+      "failure_policy": "any permission/read/pagination/link/drift/incomplete result remains HOLD"
+    },
+    {
+      "phase": "C_CREATE_TRUST_AND_INSTALL_VERIFIER",
+      "self_executable_now": false,
+      "mutates_production": true,
+      "requires": ["independent audit", "named Authority custodian", "exact Owner Release Gate", "signed exact paths and hashes"],
+      "objects": ["Ed25519 trust anchor", "detached policy signature", "root-owned verifier file", "service loader binding"],
+      "post_state": ["independent file/path/owner/mode/hash measurement", "live loader identity", "independent post-state source"],
+      "rollback": ["disable new policy admission", "remove new loader reference", "retain evidence", "do not delete unknown active material"]
+    },
+    {
+      "phase": "D_KOREA_RUNTIME_EGRESS_SECRETREF_AND_SHADOW",
+      "self_executable_now": false,
+      "mutates_production": true,
+      "requires": ["phase C verified", "exact Owner Release Gate", "approved maintenance window", "approved Shadow thresholds"],
+      "objects": ["dedicated runtime user/directories", "Python runtime", "systemd unit", "root default-deny egress", "pinned destination policy", "read-only SecretRefs"],
+      "proposed_shadow_duration": "24h",
+      "shadow_executed": false,
+      "post_state": ["zero Writer effects", "BTC/ETH/SOL complete pages", "zero unknown/inflight/ownership conflicts", "restart recovery PASS", "independent GET-only reconciliation"],
+      "rollback": ["keep Korea Writer locked", "stop only newly installed runtime", "revoke only newly installed SecretRefs/IP", "preserve original Yibi/Novel/PostgreSQL/Redis"]
+    },
+    {
+      "phase": "E_RUNNER_YIBI_RETIRE_FREEZE_CANARY_WRITER_TRANSFER",
+      "self_executable_now": false,
+      "mutates_production": true,
+      "requires": ["separate exact action approvals", "protected short-lived remove tokens", "approved Canary limits/duration", "fresh reconciliation", "single-use Writer epoch"],
+      "objects": ["Runner IDs 4 and 3", "Yibi API/scheduler units", "production SQLite checkpoint", "Binance read-only transport", "Korea Writer epoch", "Tokyo previous epoch"],
+      "post_state": ["Runner residue absent", "Yibi trigger closure", "consistent frozen checkpoint", "live GET reconciliation", "Canary within approved bound", "exactly one Writer epoch"],
+      "rollback": ["lock Korea Writer first", "revoke Korea credential/IP", "reconcile unknown outcomes", "do not restart failed Yibi", "only then evaluate Tokyo checkpoint/read-only recovery", "grant a new Tokyo epoch only after independent reconciliation"]
+    }
+  ],
+  "unknown_outcome_policy": ["STOP", "CAPTURE_PROCESS_TRANSACTION_SESSION_STATE", "MEASURE_SIDE_EFFECTS_INDEPENDENTLY", "RECONCILE", "NO_BLIND_RETRY", "NO_EFFECT_REPLAY"],
+  "owner_values_still_required": ["Canary maximum notional/order count", "Canary duration", "Canary stop threshold", "Korea-first rollback deadline", "maintenance window", "evidence root", "independent Authority custodian"],
+  "rollback_order": ["KOREA_WRITER_LOCKED", "KOREA_CREDENTIAL_REVOKED", "KOREA_IP_REMOVED", "UNKNOWN_OUTCOMES_RECONCILED", "TOKYO_CHECKPOINT_EVALUATED", "TOKYO_GET_ONLY_RECONCILED", "TOKYO_NEW_EPOCH_MAY_BE_GRANTED"]
+}
