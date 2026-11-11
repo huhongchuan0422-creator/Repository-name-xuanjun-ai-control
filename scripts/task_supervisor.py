@@ -452,6 +452,11 @@ class Supervisor(object):
                 self.db.execute('UPDATE tasks SET started_at=? WHERE task_id=?',
                                 (observed_at, task_id))
             elif kind == 'PROGRESS':
+                if payload.get('phase') in ('REVIEW_FAILED_REPAIR_REQUIRED', 'REVIEW_PASSED_TEST_REQUIRED'):
+                    if (payload.get('review_task_id') != task_id
+                            or payload.get('review_spec_sha256') != task['spec_sha256']
+                            or payload.get('review_checkpoint_sha256') != task['checkpoint_sha256']):
+                        raise ValueError('REVIEW_CANONICAL_BINDING_MISMATCH')
                 if (state not in ('STARTED', 'RUNNING')
                         or evidence_kind not in REAL_PROGRESS
                         or not isinstance(evidence_ref, str)
@@ -483,6 +488,15 @@ class Supervisor(object):
                          'new_entry': payload.get('new_entry'),
                          'lease_id': task['lease_id'], 'fence': task['fence'],
                          'epoch': task['epoch']}
+                requested = self.db.execute('''SELECT payload_json FROM events
+                  WHERE task_id=? AND attempt_id=? AND kind='HANDOFF_REQUESTED'
+                  ORDER BY observed_at DESC,rowid DESC LIMIT 1''',
+                  (task_id,attempt_id)).fetchone()
+                expected_receiver = (json.loads(requested['payload_json'])
+                                     if requested is not None else {})
+                if (expected_receiver.get('next_owner') != payload.get('new_owner')
+                        or expected_receiver.get('next_entry') != payload.get('new_entry')):
+                    raise ValueError('HANDOFF_RECEIVER_BINDING_MISMATCH')
                 if (state != 'HANDOFF_PENDING' or payload != exact
                         or not isinstance(payload.get('new_owner'), str)
                         or not payload['new_owner'].strip()
