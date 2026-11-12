@@ -145,3 +145,22 @@ test('internal review states never clear unknown submission, before or after coo
   }
  }
 });
+
+// Regression: diagnostic takes precedence over the empty-response fallback.
+test('OCR wait preserves server error bucket and correlation without retaining private fields',()=>{
+ const page=loadPage();page.updateOcrView=()=>{};
+ page.waitForOcr({ocrDiagnostic:{version:1,diagnostic_id:'b'.repeat(32),stage:'QUEUE',reason:'UNEXPECTED_FAILURE',retryable:false,request_retained:false,private_field:'DO_NOT_RETAIN'}});
+ const event=page.chainTelemetry.snapshot().at(-1);
+ assert.equal(event.bucket,'internal');assert.equal(event.correlation,'b'.repeat(16));
+ assert.ok(!JSON.stringify(event).includes('DO_NOT_RETAIN'));
+});
+test('OCR empty response fallback applies only without a server diagnostic',()=>{
+ const page=loadPage();page.updateOcrView=()=>{};page.waitForOcr({ocrCode:'OCR_EMPTY_RESPONSE'});
+ assert.equal(page.chainTelemetry.snapshot().at(-1).bucket,'empty_response');
+});
+
+test('unified visible editor forwards ordinary non-review fields unchanged',()=>{
+ const page=loadPage();let actual;page.inputUnifiedField=e=>{actual=e;};
+ const event={currentTarget:{dataset:{path:'contact_info.mobile_phone'}},detail:{value:'SYNTHETIC'}};
+ page.editStepOcrReview(event);assert.equal(actual,event);
+});

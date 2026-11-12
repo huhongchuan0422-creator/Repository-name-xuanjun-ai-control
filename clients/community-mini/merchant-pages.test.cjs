@@ -315,7 +315,7 @@ test('confirmed UI shows field values before editing and collapses without clear
  f.page.toggleMaterialEdit({currentTarget:{dataset:{group:group.id}}});assert.equal(f.page.data.editMaterialGroup,'');
  assert.equal(form.get(f.page.profile,'contact_info.mobile_phone'),'13800138000');
  f.page.setData({canEditWechat:false});f.page.toggleMaterialEdit({currentTarget:{dataset:{group:group.id}}});assert.equal(f.page.data.editMaterialGroup,'');
- const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(markup,/confirmed-field-list/);assert.match(markup,/bindinput="inputUnifiedField"/);
+ const markup=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');assert.match(markup,/confirmed-field-list/);assert.match(markup,/bindinput="editStepOcrReview"/);
 });
 test('only confirmed bound license reuses name/address into blank store fields; manual changes remain',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
@@ -794,7 +794,7 @@ test('AppID field remains editable rather than promising automatic runtime reuse
  const wxml=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8');
  assert.equal(wxml.includes('无需商家手填 AppID'),false);
  assert.equal(wxml.includes('wx:elif="{{item.path===\'business_info.sales_info.mini_program_info.mini_program_appid\'}}"'),false);
- assert.ok(wxml.includes('bindinput="inputUnifiedField"'));
+ assert.ok(wxml.includes('bindinput="editStepOcrReview"'));
 });
 
 test('live mini declaration is explicit, persists through original save/read, and does not submit',async()=>{

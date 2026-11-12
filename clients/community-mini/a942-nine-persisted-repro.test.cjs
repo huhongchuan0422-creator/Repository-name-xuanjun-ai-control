@@ -55,3 +55,49 @@ test('superseded and hidden render callbacks never revive owner approval',async(
 test('saved value wins old OCR and only displayed confirmed keys are cleared',async()=>{const f=nine();await f.page.load('synthetic-app');await drains(f);form.put(f.page.profile,paths.business_license,'SYNTHETIC SAVED LATEST');f.page.ocrDrafts={...f.page.ocrDrafts,business_license:{fields:{company_name:'SYNTHETIC OLD OCR'}},bank_card:{fields:{account_number:'SYNTHETIC HIDDEN'}}};await f.session.merchant(f.page.scene,'onboarding',{operation:'wechat_save',params:{profile:f.page.profile,ocr_drafts:f.page.ocrDrafts}});await f.page.load('synthetic-app');await drains(f);f.page.refresh();f.flush();assert.equal(f.page.data.stepOcrReview.find(g=>g.kind==='business_license').fields.find(x=>x.key==='company_name').value,'SYNTHETIC SAVED LATEST');await f.page.reviewAndNext();assert.equal(form.get(f.page.profile,paths.business_license),'SYNTHETIC SAVED LATEST');const confirmed=f.calls.filter(x=>x.action==='recover_confirm');assert.ok(confirmed.length,f.page.data.status);assert.equal(confirmed[0].params.fields.company_name,'SYNTHETIC SAVED LATEST');assert.ok(confirmed.every(x=>!Object.hasOwn(x.params.fields,'account_number')));assert.equal(f.page.ocrDrafts.bank_card.fields.account_number,'SYNTHETIC HIDDEN');assert.equal(f.page.ocrDrafts.business_license?.fields.company_name,undefined);await f.page.load('synthetic-app');assert.equal(form.get(f.page.profile,paths.business_license),'SYNTHETIC SAVED LATEST');assert.equal(f.page.ocrDrafts.bank_card.fields.account_number,'SYNTHETIC HIDDEN');});
 
 test('rapid consecutive owner input is not lost while render approval is pending',async()=>{const f=nine();await f.page.load('synthetic-app');await drains(f);f.flush();const edit=value=>f.page.editStepOcrReview({currentTarget:{dataset:{path:paths.business_license}},detail:{value}});edit('SYNTHETIC A');edit('SYNTHETIC AB');assert.equal(f.page.stepOcrReviewIntent,null);f.flush();assert.equal(f.page.data.stepOcrReview[0].fields.find(x=>x.key==='company_name').value,'SYNTHETIC AB');await f.page.reviewAndNext();assert.equal(form.get(f.page.profile,paths.business_license),'SYNTHETIC AB');});
+
+test('inline OCR review renders nine values once, including blank and edited fields',async()=>{
+ const f=nine();await f.page.load('synthetic-app');await drains(f);f.flush();
+ const w=fs.readFileSync(path.join(ROOT,'pages/merchant-join/index.wxml'),'utf8');
+ assert.ok(w.includes('(item.ocrInReview||!item.ocrResultPresent||editMaterialGroup===group.id)'));
+ const footer=w.slice(w.indexOf('<view wx:if="{{stepOcrReview.length}}"'));
+ assert.ok(!footer.slice(0,footer.indexOf('save-feedback')).includes('<input'),'footer must not render duplicate editors');
+ for(const document of f.page.data.stepOcrReview)for(const field of document.fields){
+  const item=f.page.data.materialGroups.flatMap(g=>g.fields).find(x=>x.path===field.path);
+  assert.ok(item&&item.ocrInReview,field.path);assert.equal(item.value,field.value);
+  assert.equal(!!(item.ocrResultPresent&&!item.ocrInReview),false);
+ }
+ const target=paths.id_front;f.page.editStepOcrReview({currentTarget:{dataset:{path:target}},detail:{value:''}});f.flush();
+ const item=f.page.data.materialGroups.flatMap(g=>g.fields).find(x=>x.path===target);
+ assert.equal(item.value,'');assert.equal(item.ocrInReview,true);
+});
+
+test('clearing saved value with older OCR draft never confirms the older value',async()=>{
+ const f=nine();await f.page.load('synthetic-app');await drains(f);f.flush();
+ form.put(f.page.profile,paths.business_license,'SYNTHETIC SAVED LATEST');f.page.ocrDrafts={...f.page.ocrDrafts,business_license:{fields:{company_name:'SYNTHETIC OLD OCR'}}};f.page.refresh();f.flush();
+ f.page.editStepOcrReview({currentTarget:{dataset:{path:paths.business_license}},detail:{value:''}});f.flush();
+ const inline=f.page.data.materialGroups.flatMap(g=>g.fields).find(x=>x.path===paths.business_license);
+ assert.equal(inline.value,'');assert.equal(f.page.stepOcrReviewIntent.rows[0].fields.find(x=>x.path===paths.business_license).value,'');
+ const before=f.calls.length;await f.page.reviewAndNext();
+ assert.equal(f.calls.length,before);assert.equal(form.get(f.page.profile,paths.business_license),'');
+ assert.equal(f.page.data.step,0);assert.match(f.page.data.status,/必填内容为空/);
+});
+
+test('explicit empty pending OCR survives draft save and reload without reviving old value',async()=>{
+ const f=nine();await f.page.load('synthetic-app');await drains(f);f.flush();
+ form.put(f.page.profile,paths.business_license,'SYNTHETIC SAVED');
+ await f.session.merchant(f.page.scene,'onboarding',{operation:'wechat_save',params:{profile:f.page.profile,ocr_drafts:{business_license:{fields:{company_name:'SYNTHETIC OLD'}}}}});
+ await f.page.load('synthetic-app');await drains(f);f.flush();
+ f.page.editStepOcrReview({currentTarget:{dataset:{path:paths.business_license}},detail:{value:''}});f.flush();
+ await f.page.saveDraft();await drains(f);f.flush();
+ assert.equal(form.get(f.page.profile,paths.business_license),'');
+ assert.equal(f.page.ocrDrafts.business_license.fields.company_name,'');
+ const field=f.page.data.materialGroups.flatMap(g=>g.fields).find(x=>x.path===paths.business_license);assert.equal(field.value,'');
+ const before=f.calls.length;await f.page.reviewAndNext();assert.equal(f.calls.length,before);assert.equal(f.page.data.step,0);
+ f.page.presentStepOcrReview();f.flush();
+ for(const value of ['SYNTHETIC N','SYNTHETIC NEW'])f.page.editStepOcrReview({currentTarget:{dataset:{path:paths.business_license}},detail:{value}});
+ f.flush();
+ assert.equal(f.page.ocrDrafts.business_license.fields.company_name,'SYNTHETIC NEW');
+ assert.equal(f.page.data.materialGroups.flatMap(g=>g.fields).find(x=>x.path===paths.business_license).value,'SYNTHETIC NEW');
+ assert.equal(f.page.stepOcrReviewIntent.rows[0].fields.find(x=>x.path===paths.business_license).value,'SYNTHETIC NEW');
+});
