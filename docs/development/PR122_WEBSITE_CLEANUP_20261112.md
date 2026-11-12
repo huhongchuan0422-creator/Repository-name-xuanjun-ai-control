@@ -38,3 +38,13 @@ scripts/pr122_website_content_cleanup.py 固定七个取回文件的SHA；漂移
 2. 源文件SHA漂移时核后继，禁止删断言或以旧文件覆盖现场。
 3. 动态导航任务记录仅为提案；须页面同版交付后，经原导航manage put及expected revision登记，不能直接写catalog.json。
 4. 国内域名备份/回执在私有 /root/pr122-domain-xuanjunai-20261112-01，未含私钥取件；现场UNKNOWN先核，不盲重放本轮操作。
+
+## 2026-11-12 Owner授权切换后的实际回执（取代上文候选状态）
+
+- Owner明确“官网做切换”。原生发布器 prepare=PREPARED、activate=ACTIVATED、check=PASS。发布ID：pr122-website-cleanup-20261112-01。current现指向同名release；旧版保留。
+- 实测原1349清单全部未漂移；额外9件为原已交校园制品，逐件绑定其原MANIFEST，组成真实1358基线。新制品1359文件：1351未变、7修改、1新增、0删除。未泛接受未知文件。
+- PACKAGE_MANIFEST SHA256：fc808c33451b4ce90f1b11abced48730bbe60a4d345d42febf60e68bf44f2b89。source.tar.gz SHA256：1c68436ede1a342a96c79144a512848a08b0e3e1669e5b87dd85215f5738ba48。
+- 原生发布器不替换；CSP原字节一致。新增task-center精确路由复用原static-security.conf。
+- 原导航受控manage接口revision 1→2，顺序为首页、任务调度中心、其余原栏目；全部7个项目保留。浏览器实际打开新域任务页；任务页和原校园页HTTPS均200。
+- 本版仅流程概览，不声称真实任务调度后台、身份或评论接通。其余二级页去重仍继续原任务。8项定向测试再次通过；未以此冒Hosted CI或全站业务验收。
+- 完整候选、原生回执、CSP/路由/导航备份均在国内私有工作目录 /root/pr122-website-cleanup-20261112-01/。不得重跑activate；续接先读原transactions与current。

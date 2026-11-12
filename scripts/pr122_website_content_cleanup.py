@@ -178,6 +178,7 @@ def build(root, output):
               'unmodified_scope': ['login', 'identity', 'project_permissions',
                                    'comments', 'CSP', 'dynamic_catalog', 'task_state'],
               'task_navigation_change': {'expected_revision': 1, 'id': 'task-dispatch',
+                                         'insert_after_id': 'home',
                                          'href': '/task-center/', 'label': '任务调度中心',
                                          'visible': True, 'state': 'PROPOSED_NOT_APPLIED'},
               'pending': ['owner_preview', 'native_publisher_composition',
