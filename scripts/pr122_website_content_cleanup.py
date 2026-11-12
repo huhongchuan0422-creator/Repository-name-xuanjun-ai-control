@@ -37,6 +37,8 @@ CSS = '''
 .primary-nav .nav-panel a{line-height:1.5;padding-top:12px;padding-bottom:12px}
 .merged-reference{scroll-margin-top:110px;margin-top:40px}
 .merged-reference>h2{margin-bottom:18px}
+.hero h1,.page-hero h1{text-wrap:balance}
+section>h2+.card-grid{margin-top:24px}
 @media(max-width:780px){
  .actions,.hero-actions,.visual-actions{gap:10px}
  .hero>div:has(>.btn){gap:10px}
@@ -46,7 +48,7 @@ CSS = '''
 '''
 
 TASK_OVERVIEW = '''<section class="page-hero"><p class="eyebrow">任务调度中心</p>
-<h1>从需求到交付，让每一步有记录。</h1>
+<h1>让每项任务，有序推进。</h1>
 <p>把需求、分工、开发、审核与交付串联起来。这里介绍工作流程；真实任务进度与操作仍沿原任务中心及其权限入口。</p></section>
 <section><h2>围绕一项工作，协同推进</h2><div class="card-grid">
 <article class="card"><h3>明确需求</h3><p>先确认目标、范围、输入资料与验收要求。</p></article>
