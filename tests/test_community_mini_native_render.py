@@ -103,7 +103,8 @@ class NativeSourceRender(unittest.TestCase):
             page.evaluate('window.fixtureOcrSuggestions()')
             for path in ('subject_info.business_license_info.period_begin','subject_info.business_license_info.period_end','subject_info.business_license_info.license_number'):
                 expect(page.locator('input[data-path="'+path+'"]')).to_be_visible()
-            expect(page.locator('input[data-path="subject_info.business_license_info.merchant_name"]')).to_have_count(0)
+            expect(page.locator('input[data-path="subject_info.business_license_info.merchant_name"]')).to_have_count(1)
+            expect(page.locator('#step-ocr-review input')).to_have_count(0)
             # Every existing material-group edit entrance is a real, sized button.
             for edit in page.locator('[data-handler="toggleMaterialEdit"]').all():
                 self.assertEqual(edit.evaluate('(e)=>e.tagName'),'BUTTON')
