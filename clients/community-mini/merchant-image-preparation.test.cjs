@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const script=fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8');
-const context={require:path=>{if(path==='../../session')return {};if(path==='../../customer-auth')return {};throw Error('unused dependency');},Page(){}};
+const context={require:path=>{if(path==='../../session')return {};if(path==='../../customer-auth')return {};if(path==='../../chain-telemetry')return require('./chain-telemetry');throw Error('unused dependency');},Page(){}};
 vm.createContext(context);vm.runInContext(script,context);
 const prepare=context.prepareMerchantImage;
 function fixture(options={}){

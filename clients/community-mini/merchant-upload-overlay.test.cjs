@@ -6,7 +6,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
 function fixture({compress=false}={}){
  let page,choose,compression;const upload=deferred(),sync=deferred(),ocr=deferred();const calls=[];
  const wx={chooseMedia(o){choose=o;calls.push('choose');},getImageInfo(o){o.success({width:4000,height:3000});},compressImage(o){compression=o;},getFileSystemManager(){return {stat(o){o.success({stats:{size:compress&&o.path==='original'?2000000:3}});},readFile(o){o.success({data:'YWJj'});}};}};
- const ctx={wx,Page(v){page=v;},require(p){if(p==='../../session')return {customerError:e=>e.message};if(p==='../../customer-auth')return {};throw Error('unused');}};vm.createContext(ctx);vm.runInContext(script,ctx);
+ const ctx={wx,Page(v){page=v;},require(p){if(p==='../../session')return {customerError:e=>e.message};if(p==='../../customer-auth')return {};if(p==='../../chain-telemetry')return require('./chain-telemetry');throw Error('unused');}};vm.createContext(ctx);vm.runInContext(script,ctx);
  page.data=JSON.parse(JSON.stringify(page.data));page.data.application={application:'a',revision:1};page.profile={preserved:'typed value'};page.session={};page.epoch=1;page.scene='s';page.current=()=>!page.dead;page.setData=function(v){Object.assign(this.data,v);};page.refresh=()=>{};page.request=async op=>{calls.push(op);return upload.promise;};page.syncCurrentMaterial=()=>{calls.push('sync');return sync.promise;};page.recognizeCurrentDocument=()=>{calls.push('ocr');return ocr.promise;};
  const start=()=>page.upload({currentTarget:{dataset:{kind:'business_license'}}});
  return {page,calls,upload,sync,ocr,start,choose(){choose.success({tempFiles:[{tempFilePath:'original'}]});},compress(){compression.success({tempFilePath:'compressed'});}};

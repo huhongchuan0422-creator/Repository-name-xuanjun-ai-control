@@ -20,7 +20,7 @@ function fixture(){
  };
  vm.runInNewContext(fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8'),{
   Page:value=>definition=value,wx,getApp:()=>app,getCurrentPages:()=>[],Date,Math,
-  require:p=>p==='../../session'?sessions:p==='../../customer-auth'?auth:p==='../../merchant-form'?form:p==='../../merchant-submit'?require('./merchant-submit'):p==='../../merchant-official-fields'?require('./merchant-official-fields'):p==='../../merchant-platform-reference-data'?require('./merchant-platform-reference-data'):require(p)
+  require:p=>p==='../../chain-telemetry'?require('./chain-telemetry'):p==='../../session'?sessions:p==='../../customer-auth'?auth:p==='../../merchant-form'?form:p==='../../merchant-submit'?require('./merchant-submit'):p==='../../merchant-official-fields'?require('./merchant-official-fields'):p==='../../merchant-platform-reference-data'?require('./merchant-platform-reference-data'):require(p)
  });
  const page={...definition,data:structuredClone(definition.data),setData(value){Object.assign(this.data,value);}};
  return {app,wx,page,calls,get logins(){return logins;},fail(operation,status){failure={operation,status};}};

@@ -1,8 +1,9 @@
 'use strict';
 const {safeSubmissionDiagnostic,submissionDiagnosticFeedback,profileValidationDetails}=require('./submission-diagnostic');
+const {classifyOcrEmptyResponse}=require('./chain-telemetry');
 function safeOcrDiagnostic(value) {
   if(!value||typeof value!=='object'||Array.isArray(value)||value.version!==1||
-     !["ADMISSION", "QUEUE", "AUTHENTICATION", "APPLICATION_AUTHORIZATION", "SOURCE_BINDING", "EXECUTION", "RESULT_READ", "CONFIRMATION", "WRITEBACK"].includes(value.stage)||!["HOST_NOT_READY", "REQUEST_IN_PROGRESS", "ANOTHER_REQUEST_IN_PROGRESS", "OWNER_QUEUE_FULL", "OWNER_WAIT_TIMEOUT", "HOST_STOPPED", "OWNER_THREAD_REQUIRED", "AUTHENTICATION_FAILED", "APPLICATION_ACCESS_DENIED", "SOURCE_BINDING_CHANGED", "APPLICATION_REVISION_CHANGED", "PROVIDER_VERSION_CHANGED", "ATTACHMENT_CHANGED", "SOURCE_EXPIRED", "JOB_NOT_FOUND", "IDEMPOTENCY_CONFLICT", "RATE_LIMITED", "IMAGE_INVALID", "MODEL_UNAVAILABLE", "MODEL_PIN_MISMATCH", "INFERENCE_FAILED", "RESULT_READ_FAILED", "CONFIRMATION_FAILED", "WRITEBACK_FAILED", "UNEXPECTED_FAILURE"].includes(value.reason)||
+     !["ADMISSION", "QUEUE", "AUTHENTICATION", "APPLICATION_AUTHORIZATION", "SOURCE_BINDING", "EXECUTION", "RESULT_READ", "CONFIRMATION", "WRITEBACK"].includes(value.stage)||!["HOST_NOT_READY", "REQUEST_IN_PROGRESS", "ANOTHER_REQUEST_IN_PROGRESS", "OWNER_QUEUE_FULL", "OWNER_WAIT_TIMEOUT", "HOST_STOPPED", "OWNER_THREAD_REQUIRED", "AUTHENTICATION_FAILED", "APPLICATION_ACCESS_DENIED", "SOURCE_BINDING_CHANGED", "APPLICATION_REVISION_CHANGED", "PROVIDER_VERSION_CHANGED", "ATTACHMENT_CHANGED", "SOURCE_EXPIRED", "JOB_NOT_FOUND", "IDEMPOTENCY_CONFLICT", "RATE_LIMITED", "IMAGE_INVALID", "MODEL_UNAVAILABLE", "MODEL_PIN_MISMATCH", "INFERENCE_FAILED", "RESULT_READ_FAILED", "CONFIRMATION_FAILED", "WRITEBACK_FAILED", "PROVIDER_EMPTY_RESPONSE", "UNEXPECTED_FAILURE"].includes(value.reason)||
      typeof value.diagnostic_id!=='string'||!/^[0-9a-f]{32}$/.test(value.diagnostic_id)||
      typeof value.retryable!=='boolean'||typeof value.request_retained!=='boolean')return null;
   return {version:1,diagnostic_id:value.diagnostic_id,stage:value.stage,reason:value.reason,retryable:value.retryable,request_retained:value.request_retained};
@@ -19,6 +20,11 @@ function customerError(error) {
   if(error&&error.networkKind==='TIMEOUT')return '登录连接超时（NET_TIMEOUT），请点击重新登录；不会自动重复请求';
   if(error&&error.mediaCode==='WECHAT_MEDIA_UNAVAILABLE')return '照片已保存在原申请；微信材料关联服务尚未开放，未关联或提交微信，可继续保存资料';
   if(error&&error.code==='ACCESS_DENIED')return '当前账号暂无访问权限，请联系项目负责人确认';
+  // 切片v3：文案按 provider 回读观察的 request_retained 条件化——false 时「已保留」与事实相反（UNEXPECTED_FAILURE@QUEUE 实测 request_retained=false，任务未建）；不自动上传。
+  if(code==='OCR_EMPTY_RESPONSE'){
+    if(error&&error.ocrDiagnostic&&error.ocrDiagnostic.request_retained===false)return '识别任务未建立、本次请求未被保留，需要重新上传证照照片后再发起识别；系统不会自动上传。';
+    return '识别服务本次返回空结果，原识别任务已保留，正在继续自动查询；无需重新上传。';
+  };
   if(code==='SERVICE_RESULT_UNKNOWN')return '暂时无法连接服务，请检查网络后重试；若仍失败，请联系项目负责人';
   if(code==='SERVICE_UNAVAILABLE')return '服务暂不可用，请稍后重试';
   if(code==='SERVICE_REQUEST_REJECTED')return '请求未能完成，请稍后重试';
@@ -45,7 +51,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'?30000:path==='/mini/merchant'&&data.operation==='ocr'?15000:path==='/mini/login'||path==='/mini/merchant'&&data.operation==='collection_code'?15000:5000,
       header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{}),...(scene?{'X-Community-Scene':scene}:{})},
       success:r=>{
-        if(r.statusCode===200){resolve(r.data);return;}
+        if(r.statusCode===200){if(path==='/mini/merchant'&&data.operation==='ocr'&&classifyOcrEmptyResponse(r.data)){const emptyError=Error('OCR_EMPTY_RESPONSE');emptyError.ocrCode='OCR_EMPTY_RESPONSE';emptyError.emptyResponseClassified=true;reject(emptyError);return;}resolve(r.data);return;}
         const error=Error('SERVICE_REQUEST_REJECTED');
         if(path==='/mini/merchant'&&data.operation==='onboarding')error.submissionDiagnostic=safeSubmissionDiagnostic(r.data&&r.data.submission_diagnostic);
         if(r.statusCode===429&&r.data&&r.data.error==='RATE_LIMIT'&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&typeof data.params.operation==='string'&&data.params.operation.startsWith('wechat_'))error.wechatRateLimited=true;

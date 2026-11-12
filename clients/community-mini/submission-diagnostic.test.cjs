@@ -44,7 +44,7 @@ test('legacy PROFILE triple is identified as pre-POST without guessing a field',
 for(const diagnostic of [value,{...profileValue,operation:'read'},{...profileValue,stage:'PROVIDER_POST'},null])test('uncertain or other operation must not claim pre-POST '+JSON.stringify(diagnostic),()=>assert.equal(profileValidationDetails({submissionDiagnostic:diagnostic},groups),null));
 function feedbackPage(){
  const fs=require('node:fs'),vm=require('node:vm');let page;
- vm.runInNewContext(fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8'),{Page:v=>{page=v;},require:p=>p==='../../session'?require('./session'):p==='../../customer-auth'?{}:(()=>{throw Error('not needed');})()});
+ vm.runInNewContext(fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8'),{Page:v=>{page=v;},require:p=>p==='../../chain-telemetry'?require('./chain-telemetry'):p==='../../session'?require('./session'):p==='../../customer-auth'?{}:(()=>{throw Error('not needed');})()});
  page.data=structuredClone(page.data);page.data.reviewGroups=groups;page.profile={preserved:'SYNTHETIC_PRIVATE_ORIGINAL'};
  page.setData=function(values){Object.assign(this.data,values);};page.current=()=>!page.dead;page.finishConfirmedOcrSave=async()=>{};page.presentStepOcrReview=()=>{};
  return page;

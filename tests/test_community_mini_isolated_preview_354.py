@@ -15,7 +15,7 @@ fs.writeFileSync(eventPath,JSON.stringify({after:control,head_commit:{message:'b
 const env={GITHUB_EVENT_NAME:'push',GITHUB_REPOSITORY:'huhongchuan0422-creator/Repository-name-xuanjun-ai-control',GITHUB_REF:'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017',GITHUB_SHA:control,GITHUB_EVENT_PATH:eventPath,COMMUNITY_MINI_OPERATION:'preview',COMMUNITY_MINI_PROJECT_PATH:path.join(tmp,'project'),COMMUNITY_PREVIEW_OUTPUT:path.join(tmp,'receipts'),COMMUNITY_MINI_CI_MODULE_ROOT:path.join(tmp,'sdk')};
 const ready={status:'READY',scope:'PROCESS_AND_DATABASE_CONNECTIVITY',production_acceptance:false,runtime_source_sha:helper.SOURCE,version_source:'IMAGE_BUILD_STAMP',observed_at:1000};
 check(()=>assert.equal(helper.context(env),control));
-check(()=>assert.equal(helper.SOURCE,'ab8eb3c6165c37dd7f70b1bb3cccf336508a0034'));
+check(()=>assert.equal(helper.SOURCE,'712f88d30a3eed2ee852cfd4a10ad0fcfb071c87'));
 check(()=>assert.throws(()=>helper.verifyHealth({...ready,runtime_source_sha:'6b3e78112da13d766a6d68e4ceafc0c301e004ac'},1000)));
 check(()=>assert(Object.hasOwn(helper.HASHES,'submission-diagnostic.js')));
 for(const [key,value] of Object.entries({GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REPOSITORY:'wrong/repo',GITHUB_REF:'refs/heads/main',GITHUB_SHA:'invalid',COMMUNITY_MINI_OPERATION:'upload'}))check(()=>assert.throws(()=>helper.context({...env,[key]:value})));
