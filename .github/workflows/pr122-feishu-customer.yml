@@ -1,0 +1,56 @@
+name: PR122 Feishu Customer Candidate
+on:
+  push:
+    branches: [feature/feishu-customer-integration-20261020]
+  pull_request:
+    paths:
+      - 'scripts/pr122_feishu_customer.py'
+      - 'tests/test_pr122_feishu_customer.py'
+      - '.github/workflows/pr122-feishu-customer.yml'
+permissions:
+  contents: read
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      matrix:
+        python: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install cryptography==46.0.3 cffi==2.0.0 pycparser==2.23
+      - name: Candidate and existing identity/provider regression
+        run: |
+          python -B - <<'PY'
+          import hashlib,json,os,subprocess,unittest
+          from pathlib import Path
+          from tests.test_pr122_customer_providers import ProviderTests
+          suite=unittest.TestSuite((
+              unittest.defaultTestLoader.loadTestsFromName('tests.test_pr122_feishu_customer.FeishuCustomerTests'),
+              unittest.defaultTestLoader.loadTestsFromName('tests.test_pr122_customer_center.CustomerTests'),
+              unittest.TestSuite(ProviderTests(n) for n in ProviderTests.__dict__ if n.startswith('test_') and callable(ProviderTests.__dict__[n]))))
+          count=suite.countTestCases()
+          result=unittest.TextTestRunner(verbosity=2).run(suite)
+          assert result.wasSuccessful() and not result.skipped and not result.expectedFailures
+          paths=('scripts/pr122_feishu_customer.py','tests/test_pr122_feishu_customer.py',
+                 'docs/development/PR122_FEISHU_CUSTOMER_INTEGRATION_20261020.md',
+                 '.github/workflows/pr122-feishu-customer.yml','governance/features.json')
+          out=Path('/tmp/feishu-customer');out.mkdir()
+          files=[]
+          for name in paths:
+              raw=Path(name).read_bytes();target=out/name;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(raw)
+              files.append({'path':name,'sha256':hashlib.sha256(raw).hexdigest(),'bytes':len(raw)})
+          receipt={'commit':os.environ['GITHUB_SHA'],'tree':subprocess.check_output(['git','rev-parse','HEAD^{tree}'],text=True).strip(),
+                   'run_id':os.environ['GITHUB_RUN_ID'],'tests':count,'passed':result.testsRun,'skipped':0,
+                   'scope':'SYNTHETIC_ONLY','production':'NOT_RUN','files':files}
+          (out/'CI_RECEIPT.json').write_text(json.dumps(receipt,sort_keys=True,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feishu-customer-${{ matrix.python }}-${{ github.sha }}
+          path: /tmp/feishu-customer/
+          include-hidden-files: true
+          retention-days: 14

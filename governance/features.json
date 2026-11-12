@@ -334,6 +334,41 @@
         "tests/test_contract_anchor_batch.py",
         "tests/test_contract_anchor_cost.py"
       ]
+    },
+    {
+      "feature_id": "PR122_FEISHU_CUSTOMER_CHANNEL",
+      "status": "CANDIDATE",
+      "design": {
+        "document": "docs/development/PR122_FEISHU_CUSTOMER_INTEGRATION_20261020.md",
+        "section": "1"
+      },
+      "development": {
+        "document": "docs/development/PR122_FEISHU_CUSTOMER_INTEGRATION_20261020.md",
+        "section": "2",
+        "phase": 2
+      },
+      "acceptance": {
+        "criteria": [
+          "飞书客服应用隔离、签名及租户验证、同消息跨event_id去重",
+          "复用客户身份、网页确认绑定、项目权限及AI证据链",
+          "模型与出站UNKNOWN持久保存不重试；LOGIN_ONLY拒绝挂载",
+          "真实渠道与模型联调独立验收，候选测试不代替上线"
+        ],
+        "tests": [
+          "tests/test_pr122_feishu_customer.py"
+        ],
+        "test_scope": "Synthetic isolated adapter tests; production wiring and real channel acceptance pending."
+      },
+      "reuse": [
+        "PR122 Center/Providers/HTTP/local_ai/evidence/outbox，不新建CRM",
+        "原FULL/LOGIN_ONLY门禁及scope准备流程"
+      ],
+      "paths": [
+        "scripts/pr122_feishu_customer.py",
+        "tests/test_pr122_feishu_customer.py",
+        "docs/development/PR122_FEISHU_CUSTOMER_INTEGRATION_20261020.md",
+        ".github/workflows/pr122-feishu-customer.yml"
+      ]
     }
   ]
 }
