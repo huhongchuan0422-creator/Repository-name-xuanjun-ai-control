@@ -6,13 +6,13 @@
 
 
 
-检查时间：2026-11-12T00:34:57.275498+00:00
+检查时间：2026-11-12T07:40:14.390092+00:00
 
 当前模块：最终候选需求交叉追踪与外部接线证据核对（阶段仍为PARTIAL）
 
-最后真实代码提交：712f88d30a3eed2ee852cfd4a10ad0fcfb071c87
+最后真实代码提交：8be7271b7993695153266bfb8c85f8ea382afd0e
 
-最后真实提交时间：2026-11-10T13:50:16Z
+最后真实提交时间：2026-11-12T04:41:56Z
 
 
 
@@ -30,7 +30,7 @@
 
 
 
-CI：[{"id": 42828224840, "name": "Community WeChat SP Offline Gate", "status": "completed", "conclusion": "success", "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/42828224840"}]
+CI：[{"id": 43156501879, "name": "Community isolated UI preview scoped gate", "status": "completed", "conclusion": "failure", "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/43156501879"}, {"id": 43156501942, "name": "Community WeChat SP Offline Gate", "status": "completed", "conclusion": "failure", "url": "https://github.com/huhongchuan0422-creator/Repository-name-xuanjun-ai-control/actions/runs/43156501942"}]
 
 
 
