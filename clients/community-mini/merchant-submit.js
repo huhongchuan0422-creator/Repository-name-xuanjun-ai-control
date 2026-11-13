@@ -1,4 +1,5 @@
 'use strict';
+const {safeSubmissionDiagnostic}=require('./submission-diagnostic');
 // One user action, two existing review queues. Never invokes provider execution.
 async function submitSharedReview({read,submitPlatform,submitWechat,current,preflight,prepareMaterials}){
  let state=await read();if(!current())return {cancelled:true};
@@ -53,7 +54,7 @@ async function submitApplicantApplication({read,current,prepareMaterials,preflig
  if(!current()||state.application!==id)return {cancelled:true};
  // A verified POST receipt is acceptance, not approval or payment activation.
  if(state.reviewState!=='SUBMITTED_TO_PROVIDER')throw Error('微信受理结果待核实，请刷新原申请，勿重复提交');
- try{await queryProvider({application:id});if(!current())return {cancelled:true};state=await read();}catch(error){if(!current())return {cancelled:true};return {...state,queryPending:true};}
+ try{await queryProvider({application:id});if(!current())return {cancelled:true};state=await read();}catch(error){if(!current())return {cancelled:true};return {...state,queryPending:true,queryDiagnostic:safeSubmissionDiagnostic(error&&error.submissionDiagnostic)};}
  return state;
 }
 module.exports.submitApplicantApplication=submitApplicantApplication;
