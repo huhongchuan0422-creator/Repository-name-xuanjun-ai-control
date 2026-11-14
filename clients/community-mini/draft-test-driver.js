@@ -2,8 +2,9 @@
 // A same-runtime test client for the ORIGINAL applicant page. It creates no
 // identities, exports no credentials and adds no backend/permission bypass.
 const {getSharedSession}=require('./session');
+const {safeSubmissionDiagnostic}=require('./submission-diagnostic');
 const pageFlights=new WeakMap(),sessionFlights=new WeakMap();
-const SOURCE_REVISION='1a47fb0b1aca83b2d9f5b96f1c055a2016495e09';
+const SOURCE_REVISION='41e778ed12dc9dcbe710d32a191c1b06ecbab3b3';
 const METHODS=['connectApplicant','request','upload','recognizeDocument','readOcr','confirmAndSaveOcr','save'];
 const ERROR_CODES=new Set(['SIGNED_OUT','SESSION_EXPIRED','STALE_SESSION','STALE_LOGIN','ACCESS_DENIED','WECHAT_LOGIN_FAILED','LOGIN_CODE_REQUIRED','UNTRUSTED_SESSION','SERVICE_RESULT_UNKNOWN','SERVICE_REQUEST_REJECTED','UNTRUSTED_MERCHANT_REPLY','DRAFT_CHANGED','PAGE_NOT_READY','PAGE_BUSY','DRAFT_REQUIRED','DRAFT_TEST_BUSY','UNSUPPORTED_TEST_ACTION','READBACK_VERSION_CHANGED','UNTRUSTED_DRAFT_READBACK','NON_WECHAT_RUNTIME','PAGE_UNAVAILABLE','INVALID_TEST_PAGE','TEST_SESSION_MISMATCH']);
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -128,6 +129,70 @@ function createDraftTestDriver({page,wx,config,now}) {
       components:[...Object.keys(platformFields).map(key=>'platform.'+key),...Object.keys(wechatFields).map(key=>'wechat.'+key)]};
     return true;
   }
+  async function observeApplicationAction(action,method) {
+    active();pin();if(page.data.pending)throw Error('PAGE_BUSY');
+    if(typeof page[method]!=='function')return receipt(action,'NOT_STARTED','ORIGINAL_METHOD_UNAVAILABLE');
+    const original=session.merchant,originalPageRequest=page.request,observed=[];
+    const generation=session.getGeneration(),scene=page.scene,application=binding.application;
+    let contaminated=false,origin=null;
+    const safeState=(value,allowed)=>typeof value==='string'&&allowed.includes(value)?value:null;
+    const progress=value=>value&&typeof value==='object'&&!Array.isArray(value)&&Number.isSafeInteger(value.version)&&value.version>=0&&['DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED','SUBMISSION_UNKNOWN','SUBMITTED_TO_PROVIDER'].includes(value.state)?{
+      provider_version:Number.isSafeInteger(value.version)?value.version:null,
+      review_state:safeState(value.state,['DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED','SUBMISSION_UNKNOWN','SUBMITTED_TO_PROVIDER']),
+      provider_state:safeState(value.provider_state,['APPLYMENT_STATE_EDITING','APPLYMENT_STATE_EDITTING','APPLYMENT_STATE_AUDITING','APPLYMENT_STATE_REJECTED','APPLYMENT_STATE_TO_BE_CONFIRMED','APPLYMENT_STATE_TO_BE_SIGNED','APPLYMENT_STATE_SIGNING','APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED']),
+      has_applyment_id:Number.isSafeInteger(value.applyment_id)&&value.applyment_id>0||typeof value.applyment_id==='string'&&/^[0-9]+$/.test(value.applyment_id)
+    }:null;
+    const observedPageRequest=function(operation,params) {
+      const previous=origin;origin=this===page?{operation}:null;
+      try{return originalPageRequest.call(this,operation,params);}
+      finally{origin=previous;}
+    };
+    const observedRequest=async function(requestScene,category,body) {
+      let entry=null;
+      try{
+        const operation=body&&body.operation,params=body&&body.params;
+        if(category==='onboarding'&&['wechat_apply','wechat_status','wechat_read','read'].includes(operation)){
+          if(!origin||origin.operation!==operation||requestScene!==(scene||'')||generation!==session.getGeneration()||!pageCurrent()||page.session!==session||!params||params.application!==application)contaminated=true;
+          entry={operation,response_observed:false};observed.push(entry);
+        }
+      }catch(_){contaminated=true;entry=null;}
+      try{
+        const result=await original.call(this,requestScene,category,body);
+        if(entry){try{
+          entry.response_observed=true;
+          if(entry.operation==='read')entry.response_valid=!!result&&result.application===application&&Number.isSafeInteger(result.revision)&&result.revision>=0;
+          else{entry.progress=progress(result);entry.response_valid=entry.progress!==null;}
+        }catch(_){contaminated=true;}}
+        return result;
+      }catch(error){
+        if(entry){try{
+          const d=safeSubmissionDiagnostic(error&&error.submissionDiagnostic);
+          entry.failed=true;
+          if(d)entry.diagnostic={operation:d.operation,stage:d.stage,code:d.code,status:d.status,correlation_id:d.correlation_id,timestamp:d.timestamp};
+        }catch(_){contaminated=true;}}
+        throw error;
+      }
+    };
+    page.request=observedPageRequest;session.merchant=observedRequest;
+    try{await page[method]();}
+    finally{
+      if(session.merchant===observedRequest)session.merchant=original;else contaminated=true;
+      if(page.request===observedPageRequest)page.request=originalPageRequest;else contaminated=true;
+    }
+    active();
+    if(contaminated||generation!==session.getGeneration()||scene!==page.scene||page.data.pending)return receipt(action,'NOT_VERIFIED','UNATTRIBUTED_APPLICATION_OBSERVATION');
+    const operations=observed.filter(v=>['wechat_apply','wechat_status'].includes(v.operation)),last=observed[observed.length-1];
+    // These are observed original responses, not proof of real identity,
+    // provider acceptance or financial activation. Never replay a lost response.
+    const outcome=observed.some(v=>v.failed||v.response_observed&&!v.response_valid)?'NOT_VERIFIED':operations.some(v=>v.response_valid)?'PROVIDER_RESPONSE_OBSERVED':last&&last.response_valid?'ORIGINAL_READ_OBSERVED':'NOT_VERIFIED';
+    return receipt(action,outcome,outcome==='NOT_VERIFIED'?'APPLICATION_RESULT_NOT_VERIFIED':null,{
+      operations:observed,progress:[...observed].reverse().find(v=>v.progress)?.progress||null,
+      provider_response_observed:operations.some(v=>v.response_valid),
+      original_submit_calls:operations.filter(v=>v.operation==='wechat_apply').length,
+      original_query_calls:operations.filter(v=>v.operation==='wechat_status').length,
+      real_provider_acceptance:'NOT_ESTABLISHED_BY_THIS_REPORT'
+    });
+  }
   const driver={
     connect(){return execute('connect',async()=>{
       if(!pageCurrent())throw Error('PAGE_UNAVAILABLE');
@@ -165,10 +230,13 @@ function createDraftTestDriver({page,wx,config,now}) {
     });},
     save(){return execute('save',async()=>{active(false);if(page.data.application)pin();if(page.data.pending)throw Error('PAGE_BUSY');expected=null;const captured=await observeSave(()=>page.save(),page.data.canEditWechat!==false);return receipt('save','OBSERVED_ONLY',null,{readback_available:captured});});},
     verifySaved(){return execute('verify_saved',()=>readback('verify_saved',true));},
+    // Explicit original UI actions only: no direct API, retries or new identity.
+    submitReview(){return execute('submit_review',()=>observeApplicationAction('submit_review','submitAllReview'));},
+    queryStatus(){return execute('query_status',()=>observeApplicationAction('query_status','refreshApplication'));},
     snapshot(){return clone(snapshot());},
     report(){return clone({version:1,source_revision:SOURCE_REVISION,boundary:'ORIGINAL_APPLICANT_PAGE_AND_SHARED_SESSION',
       environment_attestation:'NOT_SUPPLIED',real_device_acceptance:'NOT_ESTABLISHED_BY_THIS_REPORT',
-      credentials_exported:false,financial_or_review_submit_exposed:false,events});},
+      credentials_exported:false,financial_or_review_submit_exposed:true,events});},
     clearReport(){if(flight)return false;events=[];sequence=0;expected=null;return true;}
   };
   return driver;

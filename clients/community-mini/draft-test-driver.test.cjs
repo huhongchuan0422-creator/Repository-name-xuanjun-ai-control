@@ -129,7 +129,7 @@ test('all reports are credential/content free and make no real-device acceptance
   assert.equal(r.real_device_acceptance,'NOT_ESTABLISHED_BY_THIS_REPORT');assert.equal(r.credentials_exported,false);
   assert.equal(r.environment_attestation,'NOT_SUPPLIED');
 });
-test('no submission, financial, credential export or token import method exists',()=>{
+test('no direct API submission, financial shortcut, credential export or token import method exists',()=>{
   const f=fixture();for(const key of ['submit','wechat_apply','payment','exportToken','importToken','refreshToken'])assert.equal(f.driver[key],undefined);
 });
 test('malformed readback cannot become a successful probe',async()=>{
