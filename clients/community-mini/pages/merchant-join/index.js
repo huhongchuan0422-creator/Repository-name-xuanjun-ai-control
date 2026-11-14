@@ -7,6 +7,37 @@ function submissionFailureFeedback(error){
  if(error&&(['DIRECTORY_MISMATCH','AMBIGUOUS_ADDRESS','INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(error.regionReason)||error.uploadResultUnknown===true||['WECHAT_MEDIA_RESULT_UNKNOWN','WECHAT_MEDIA_UNAVAILABLE'].includes(error.mediaCode)||error.code==='ACCESS_DENIED'||['SESSION_EXPIRED','SIGNED_OUT','UNTRUSTED_SESSION'].includes(error.message)))return customerError(error);
  return '提交进度尚未核实，当前提示不代表微信已受理或未受理';
 }
+function failedOcrFeedback(result){
+ // These are existing public API classifications, never provider messages or error text.
+ const kinds={
+  OCR_INFERENCE_FAILED:['unknown','识别执行或结果处理失败，具体原因待查'],
+  ALIYUN_CALL_OUTCOME_UNKNOWN:['unknown','阿里 OCR 调用结果未知'],
+  ALIYUN_HTTP_ERROR:['response_received','阿里 OCR 接口返回 HTTP 错误'],
+  ALIYUN_PROVIDER_ERROR:['response_received','阿里 OCR 接口返回服务错误'],
+  ALIYUN_PERMISSION_DENIED:['response_received','阿里 OCR 接口权限被拒绝'],
+  ALIYUN_RATE_LIMITED:['response_received','阿里 OCR 接口限流'],
+  ALIYUN_DOCUMENT_TYPE_MISMATCH:['response_received','识别结果的证件类型不匹配'],
+  ALIYUN_RESPONSE_INVALID:['response_received','识别服务响应结构不符合约定'],
+  ALIYUN_DUPLICATE_JSON_KEY:['response_received','识别服务响应包含重复字段'],
+  ALIYUN_DATA_JSON_INVALID:['response_received','识别服务返回的数据无法解析'],
+  ALIYUN_ID_SIDE_MISMATCH:['response_received','识别结果的证件正反面不匹配'],
+  ALIYUN_FIELD_EVIDENCE_INVALID:['response_received','识别字段依据不符合约定'],
+  INVALID_IMAGE_SIZE:['not_sent','图片大小不符合识别要求'],
+  UNSUPPORTED_IMAGE_MAGIC:['not_sent','图片文件格式不受支持'],
+  IMAGE_PIXEL_LIMIT:['not_sent','图片像素超出识别范围'],
+  IMAGE_DECODE_FAILED:['not_sent','图片无法解码'],
+  ALIYUN_IMAGE_DIMENSIONS_UNSUPPORTED:['not_sent','图片尺寸不符合阿里 OCR 要求'],
+  EXPLICIT_SINGLE_ATTEMPT_RUNTIME_REQUIRED:['not_sent','识别调用配置不符合约定'],
+  UNSUPPORTED_DOCUMENT_TYPE:['not_sent','当前证件类型不受支持'],
+  SERVER_CONTEXT_REQUIRED:['not_sent','识别调用上下文缺失'],
+  SERVER_CONTEXT_MISMATCH:['not_sent','识别调用上下文不匹配']
+ };
+ const code=result&&result.error_code;
+ if(typeof code!=='string'||!Object.prototype.hasOwnProperty.call(kinds,code))return '识别任务失败或已中断，未生成可确认建议；请人工核对或联系管理员检查，勿重复上传';
+ const kind=kinds[code],outcomes={unknown:'本次调用是否完成尚未确定，不能据此判断是否计费。',not_sent:'本次失败发生在调用前。',response_received:'已收到识别服务响应，不代表识别成功。'};
+ const outcome=result.failure_outcome===kind[0]?outcomes[kind[0]]:'本次调用状态尚未核实。';
+ return '识别任务失败，未生成可确认建议。失败分类：'+code+'（'+kind[1]+'）。'+outcome+'原资料已保留，请联系管理员核对，勿重复上传。';
+}
 let form,submitSharedReview,officialFields,platformReference;
 let merchantDependencyError=null;
 function loadMerchantDependencies(){
@@ -544,7 +575,7 @@ if(this.ocrFocus&&this.ocrFocus.kind==='suggestion'){const focused=this.data.ocr
 values={...values,...toObject(Object.keys(edits).filter(key=>inputFields.includes(key)&&typeof edits[key]==='string').map(key=>[key,edits[key]]))};
 const confirmed=result.status==='confirmed'&&!pendingConfirmation&&!focusedValueHeld&&Object.keys(edits).length===0;
 this.chainRecord('ocr','OCR_04',result&&result.ocr_diagnostic);const completeSnapshot=['needs_review','confirmed'].includes(result.status);
-const rows=inputFields.filter(key=>completeSnapshot||Object.prototype.hasOwnProperty.call(values,key)&&typeof values[key]==='string').map(key=>({key,label:({account_number:'银行卡号（需人工核对）',account_bank:'卡面银行名称（需人工核对）',company_name:'主体名称',credit_code:'统一社会信用代码',legal_representative:'法定代表人',registered_address:'证件地址',id_name:'姓名',id_number:'身份证号码',issuing_authority:'签发机关（仅留存核对，不提交微信字段）',valid_from:'身份证有效期开始',valid_to:'身份证有效期结束或长期'})[key],value:typeof values[key]==='string'?values[key]:'',hint:completeSnapshot&&!(typeof values[key]==='string'&&values[key].trim())?(result.status==='confirmed'?'此项未确认，未识别到可靠值，请手动核对填写':ocrCandidateHint(result.fields&&result.fields[key])||'未识别到可靠值，请手动核对填写'):result.status==='confirmed'?'':result.fields&&result.fields[key]?ocrCandidateHint(result.fields[key]):((this.data.ocrRows.find(row=>row.key===key)||{}).hint||'')}));this.ocrCapture={...capture,pending_confirmation:pendingConfirmation,seen_application_revision:result.application_revision,seen_provider_version:result.provider_version,...(capture.recovery&&result.status==='confirmed'?{recovery_confirmation_revision:result.confirmation_revision}:{})};this.ocrConfirmationRevision=confirmationRevision;if(['queued','processing'].includes(result.status)||focusedValueHeld){this.ocrPolling=true;}else this.stopOcrPoll();this.updateOcrView({ocrConfirmed:confirmed,ocrRows:rows,ocrProgressState:result.status,ocrStatus:ocrOrientationHint(result)+(pendingConfirmation?'确认结果暂未返回，原任务已保留；请重新读取确认记录，勿重复确认':confirmed?'人工确认已留存；未自动覆盖申请字段':result.status==='needs_review'||result.status==='confirmed'?'识别建议，需逐项人工核对；不证明证件真实或审核通过':result.status==='processing'?'正在识别中，请稍候。结果返回后会自动显示。':result.status==='queued'?'正在等待识别，请稍候。完成后会自动显示。':result.status==='failed'?'识别任务失败或已中断，未生成可确认建议；请人工核对或联系管理员检查，勿重复上传':'识别尚无可确认建议，请人工核对')});}catch(error){if(this.ocrCurrent(capture)){
+const rows=inputFields.filter(key=>completeSnapshot||Object.prototype.hasOwnProperty.call(values,key)&&typeof values[key]==='string').map(key=>({key,label:({account_number:'银行卡号（需人工核对）',account_bank:'卡面银行名称（需人工核对）',company_name:'主体名称',credit_code:'统一社会信用代码',legal_representative:'法定代表人',registered_address:'证件地址',id_name:'姓名',id_number:'身份证号码',issuing_authority:'签发机关（仅留存核对，不提交微信字段）',valid_from:'身份证有效期开始',valid_to:'身份证有效期结束或长期'})[key],value:typeof values[key]==='string'?values[key]:'',hint:completeSnapshot&&!(typeof values[key]==='string'&&values[key].trim())?(result.status==='confirmed'?'此项未确认，未识别到可靠值，请手动核对填写':ocrCandidateHint(result.fields&&result.fields[key])||'未识别到可靠值，请手动核对填写'):result.status==='confirmed'?'':result.fields&&result.fields[key]?ocrCandidateHint(result.fields[key]):((this.data.ocrRows.find(row=>row.key===key)||{}).hint||'')}));this.ocrCapture={...capture,pending_confirmation:pendingConfirmation,seen_application_revision:result.application_revision,seen_provider_version:result.provider_version,...(capture.recovery&&result.status==='confirmed'?{recovery_confirmation_revision:result.confirmation_revision}:{})};this.ocrConfirmationRevision=confirmationRevision;if(['queued','processing'].includes(result.status)||focusedValueHeld){this.ocrPolling=true;}else this.stopOcrPoll();this.updateOcrView({ocrConfirmed:confirmed,ocrRows:rows,ocrProgressState:result.status,...(result.status==='failed'?{ocrDiagnostic:null}:{}),ocrStatus:ocrOrientationHint(result)+(pendingConfirmation?'确认结果暂未返回，原任务已保留；请重新读取确认记录，勿重复确认':confirmed?'人工确认已留存；未自动覆盖申请字段':result.status==='needs_review'||result.status==='confirmed'?'识别建议，需逐项人工核对；不证明证件真实或审核通过':result.status==='processing'?'正在识别中，请稍候。结果返回后会自动显示。':result.status==='queued'?'正在等待识别，请稍候。完成后会自动显示。':result.status==='failed'?failedOcrFeedback(result):'识别尚无可确认建议，请人工核对')});}catch(error){if(this.ocrCurrent(capture)){
 const diagnostic=error&&error.ocrDiagnostic;
 if(capture.recovery===true&&capture.original_locator&&capture.original_locator.current_material===true&&!capture.job_id&&!capture.idempotency_key&&error.ocrCode==='OCR_UNAVAILABLE'&&diagnostic&&diagnostic.stage==='RESULT_READ'&&diagnostic.reason==='MATERIAL_JOB_NOT_FOUND'&&diagnostic.retryable===false&&diagnostic.request_retained===false)missingCurrentMaterialJob=capture;
 if(error&&error.networkKind||['OCR_REQUEST_PENDING','OCR_UNAVAILABLE'].includes(String(error&&error.ocrCode||error&&error.message)))this.waitForOcr(error);else this.invalidateOcr(this.ocrFeedback(error));}}finally{this.ocrFlight=false;if(capture===this.ocrCapture&&!this.ocrCurrent(capture))this.pauseInvalidOcr(capture);if(this.ocrPolling)this.scheduleOcrPoll();else this.scheduleUploadedOcrRestore();}await this.finishConfirmedOcrSave();return missingCurrentMaterialJob&&this.ocrCurrent(missingCurrentMaterialJob)?missingCurrentMaterialJob:null;},

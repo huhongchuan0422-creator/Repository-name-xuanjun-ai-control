@@ -1,4 +1,9 @@
 App({
+  // Same-runtime applicant test access. The caller supplies the existing page,
+  // never a login code/token. This does not enable cross-browser identity reuse.
+  createDraftTestDriver(page) {
+    return require('./draft-test-driver').createDraftTestDriver({page,wx,config:this.globalData});
+  },
   globalData: {baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false},
   // Inject a LOCAL test server and test capability in developer tools memory.
   // No credential storage. Real payment requires explicit server and UI opt-in.
