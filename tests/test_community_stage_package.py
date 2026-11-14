@@ -130,7 +130,11 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(photo_target.read_bytes(),archive.read(photo))
                 self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
                 self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
-                self.assertEqual(len(receipt['prepared_files']),48)
+                self.assertEqual(len(receipt['prepared_files']),49)
+                driver='draft-test-driver.js'
+                self.assertEqual((output/driver).read_bytes(),archive.read('clients/community-mini/'+driver))
+                self.assertEqual(receipt['prepared_files'][driver],manifest['files']['clients/community-mini/'+driver])
+                self.assertIn('createDraftTestDriver(page)',(output/'app.js').read_text())
                 for name in ('chain-telemetry.js','submission-diagnostic.js','material-private-preview.js','merchant-fields-data.js','merchant-official-areas-data.js',
                              'merchant-official-industries-data.js','merchant-platform-reference-data.js'):
                     source='clients/community-mini/'+name
