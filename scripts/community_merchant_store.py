@@ -2,6 +2,11 @@
 import sqlite3
 from scripts.community_merchant_contract import scope, valid_id, text_ok, merchant_authorized
 
+class StorefrontUnavailable(ValueError):
+    """Missing and paused original profiles share one non-disclosing reason."""
+    def __init__(self):
+        super().__init__('UNAVAILABLE_STOREFRONT')
+
 SCHEMA_V1="""
 CREATE TABLE merchant_profiles (
  tenant_id TEXT NOT NULL, merchant_id TEXT NOT NULL, store_id TEXT NOT NULL,
@@ -85,7 +90,7 @@ def upsert_profile(db,identity,actor,record,expected_version=None):
 def profile(db,identity):
     t,m,s=scope(identity)
     row=db.execute("SELECT name,description,contact,status,version FROM merchant_profiles WHERE tenant_id=? AND merchant_id=? AND store_id=?",(t,m,s)).fetchone()
-    if row is None or row[3]!="ACTIVE":raise ValueError("UNAVAILABLE_STOREFRONT")
+    if row is None or row[3]!="ACTIVE":raise StorefrontUnavailable()
     return dict(zip(("name","description","contact","status","version"),row))
 def put_item(db,identity,actor,item):
     t,m,s=scope(identity)

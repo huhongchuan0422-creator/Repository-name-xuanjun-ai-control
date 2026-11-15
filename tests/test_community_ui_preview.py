@@ -64,15 +64,17 @@ class ClickThrough(unittest.TestCase):
         class Handler(SimpleHTTPRequestHandler):
             def log_message(self,*args):pass
         cls.server=ThreadingHTTPServer(('127.0.0.1',0),functools.partial(Handler,directory=str(ROOT)))
+        cls.addClassCleanup(cls.server.server_close)
         cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
-        cls.pw=sync_playwright().start();cls.browser=cls.pw.chromium.launch(headless=True)
+        cls.addClassCleanup(cls.thread.join,2);cls.addClassCleanup(cls.server.shutdown)
+        cls.pw=sync_playwright().start();cls.addClassCleanup(cls.pw.stop)
+        cls.browser=cls.pw.chromium.launch(headless=True);cls.addClassCleanup(cls.browser.close)
         cls.url='http://127.0.0.1:'+str(cls.server.server_port)+'/demos/community-stage/ui-preview/'
         cls.out=Path(os.environ.get('COMMUNITY_UI_EVIDENCE','/tmp/community-ui-evidence'));cls.out.mkdir(parents=True,exist_ok=True)
         cls.data=build();cls.metrics=[]
     @classmethod
     def tearDownClass(cls):
         (cls.out/'browser-metrics.json').write_text(json.dumps(cls.metrics,ensure_ascii=False,indent=2))
-        cls.browser.close();cls.pw.stop();cls.server.shutdown();cls.server.server_close();cls.thread.join(2)
     def assert_layout(self,page,width,name):
         m=page.evaluate('''() => ({width:innerWidth,scale:visualViewport.scale,scroll:document.documentElement.scrollWidth,font:getComputedStyle(document.querySelector('h1')).fontSize,visibleHeads:[...document.querySelectorAll('main h1')].filter(e=>e.getClientRects().length).length})''')
         self.assertEqual(m['width'],width);self.assertEqual(m['scale'],1)

@@ -33,6 +33,7 @@ RUNTIME_CHANGED = {
     'scripts/community_merchant_onboarding.py',
     'scripts/community_wechat_applyment.py',
     'scripts/community_mini_application.py',
+    'scripts/community_mini_login.py',
     'scripts/community_mini_http.py',
     'scripts/community_mini_merchant.py',
     'scripts/community_license_region.py',

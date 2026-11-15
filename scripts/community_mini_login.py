@@ -21,6 +21,11 @@ SCENE = re.compile(r'[A-Za-z0-9_-]{1,32}\Z')
 class LoginUnavailable(RuntimeError):
     pass
 
+class MiniStorefrontUnavailable(ValueError):
+    """Public read failure only after the original mini scene authorization."""
+    def __init__(self):
+        super().__init__('STOREFRONT_UNAVAILABLE')
+
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
@@ -217,7 +222,15 @@ class MiniGateway:
             # SaaS order access remains in the existing customer center, whose
             # customer-level ownership service is not replaced by tenant RBAC.
             raise PermissionError('MINI_CONSUMER_OPERATION_DENIED')
-        return self.runtime.dispatch(principal,operation,params,None)
+        from scripts.community_merchant_store import StorefrontUnavailable
+        try:
+            return self.runtime.dispatch(principal,operation,params,None)
+        except StorefrontUnavailable:
+            # Identity/scene resolution above and original runtime validation stay
+            # mandatory. Do not classify arbitrary ValueError text or other reads.
+            if operation == 'community.storefront' and params == {}:
+                raise MiniStorefrontUnavailable() from None
+            raise
 
     def logout(self, token):
         if type(token) is not str or not re.fullmatch('[A-Za-z0-9_-]{32,256}',token):

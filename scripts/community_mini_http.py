@@ -13,7 +13,7 @@ import socket
 import time
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from scripts.community_demo_api import _HeaderDeadlineReader
-from scripts.community_mini_login import LoginUnavailable
+from scripts.community_mini_login import LoginUnavailable,MiniStorefrontUnavailable
 from scripts.community_license_region import RegionValidationError
 
 def runtime_version():
@@ -366,6 +366,11 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
             except RegionValidationError as error:
                 submission_diagnostic.failure(error)
                 return self.answer(400,{'error':'MINI_LICENSE_REGION_INVALID','reason':error.reason,'message':str(error),'correction_step':error.correctionStep})
+            except MiniStorefrontUnavailable as error:
+                submission_diagnostic.failure(error)
+                # Keep the established HTTP failure status; no record, scope,
+                # distinction between missing/paused, or internal error detail.
+                return self.answer(400,{'error':'STOREFRONT_UNAVAILABLE' if self.path=='/mini/api' else 'INVALID_REQUEST'})
             except (ValueError,TypeError,KeyError) as error:
                 submission_diagnostic.failure(error)
                 return self.answer(400,{'error':'INVALID_REQUEST'})

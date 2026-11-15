@@ -3,10 +3,10 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const originalStore={name:'Original authorized store',description:'Original scene-authorized description',contact:'Fixture contact'};
 const publicStore={id:'a'.repeat(64),name:'Public directory store',description:'Published description',storefront_photo:null,photo_state:'NOT_CONNECTED'};
-function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,denied=false,network=false}={}){
+function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,denied=false,network=false,unavailable=false,rejected=false}={}){
   const calls=[],held=[],heldPublic=[],app={globalData:{baseUrl:'https://fixture.invalid',mode:'WECHAT_LOGIN',commerce:true,payments:false,...(scene?{scene}:{})}};let navigation='';
   const reply=(o,result)=>o.success({statusCode:200,data:{payment_enabled:false,result}});
-  const storefront=o=>reply(o,{merchant:store,ads:{},payment_started:false,provider_settlement_verified:false});
+  const storefront=o=>unavailable||rejected?o.success({statusCode:400,data:{error:unavailable?'STOREFRONT_UNAVAILABLE':'INVALID_REQUEST',message:'PRIVATE_DETAIL_NOT_FOR_DISPLAY'}}):reply(o,{merchant:store,ads:{},payment_started:false,provider_settlement_verified:false});
   const wx={login(o){calls.push({operation:'wx.login'});o.success({code:'current-storefront-fixture'});},navigateTo(o){navigation=o.url;o.success?.();o.complete?.();},redirectTo(o){navigation=o.url;o.success?.();o.complete?.();},request(o){
     calls.push({url:o.url,...o.data});
     if(o.url.endsWith('/mini/login'))return reply(o,{provider:'WECHAT_MINIPROGRAM',payment_enabled:false,session_token:'T'.repeat(32),expires_at:Math.floor(Date.now()/1000)+3600});
@@ -26,7 +26,7 @@ function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,
     vm.runInNewContext(fs.readFileSync(filename,'utf8'),{Page:value=>definition=value,require:p=>require(path.resolve(path.dirname(filename),p)),wx,getApp:()=>app,getCurrentPages:()=>[],encodeURIComponent});
     return {...definition,data:structuredClone(definition.data),setData(update,callback){Object.assign(this.data,update);callback?.();}};
   }
-  return {app,calls,held,heldPublic,page,get navigation(){return navigation;},deny(){denied=true;},releasePublic(){for(const o of heldPublic.splice(0))reply(o,publicStore);},release(){const waiting=held.splice(0);for(const o of waiting)storefront(o);},async waitHeld(){for(let n=0;n<30&&!held.length;n++)await tick();assert.ok(held.length,'original storefront request was issued');}};
+  return {app,calls,held,heldPublic,page,get navigation(){return navigation;},deny(){denied=true;},setUnavailable(value){unavailable=value;},releasePublic(){for(const o of heldPublic.splice(0))reply(o,publicStore);},release(){const waiting=held.splice(0);for(const o of waiting)storefront(o);},async waitHeld(){for(let n=0;n<30&&!held.length;n++)await tick();assert.ok(held.length,'original storefront request was issued');}};
 }
 const event=dataset=>({currentTarget:{dataset}});
 test('home current-store route reads original scene storefront with one identity and no invented directory id',async()=>{
@@ -98,4 +98,38 @@ test('approved WXML keeps current-scene and public detail separate with its curr
   assert.ok(text.includes("detailState==='READY'&&selectedRecommendation"));assert.ok(text.includes("detailState==='READY'&&sceneStorefront"));
   assert.ok(text.includes('{{sceneStorefront.name}}'));assert.ok(text.includes('{{sceneStorefront.description}}'));assert.ok(text.includes('店铺资料暂时无法加载，请返回重试。'));
   const detail=text.split("viewMode==='store-detail'")[1].split("viewMode==='orders'")[0];assert.ok(detail.includes('返回店铺列表'));assert.ok(!detail.includes('发起支付'));
+});
+
+test('known unavailable current-store stays failed, keeps session and does not invent a merchant',async()=>{
+  const f=fixture({unavailable:true}),p=f.page();await p.onLoad({scene:'shop1',view:'store-detail'});
+  assert.equal(p.data.detailState,'FAILED');assert.equal(p.data.sceneStorefront,null);assert.equal(p.data.selectedRecommendation,null);
+  assert.equal(p.data.sessionReady,true);assert.equal(p.session.isAuthenticated(),true);
+  assert.match(p.data.detailError,/当前门店资料暂不可用.*联系项目负责人核对/);assert.doesNotMatch(JSON.stringify(p.data),/PRIVATE_DETAIL_NOT_FOR_DISPLAY/);
+  assert.equal(f.calls.filter(x=>x.operation==='community.storefront').length,1);assert.equal(f.calls.filter(x=>/^customer\./.test(x.operation||'')).length,0);
+});
+test('old generic 400 cannot be presented as a confirmed unavailable profile',async()=>{
+  const f=fixture({rejected:true}),p=f.page();await p.onLoad({scene:'shop1',view:'store-detail'});
+  assert.equal(p.data.detailState,'FAILED');assert.equal(p.data.sceneStorefront,null);assert.equal(p.data.detailError,'');
+  assert.equal(f.calls.filter(x=>x.operation==='community.storefront').length,1);
+});
+test('typed unavailable reread removes old details and later success clears fixed feedback',async()=>{
+  const f=fixture(),p=f.page();await p.onLoad({scene:'shop1',view:'store-detail'});assert.ok(p.data.sceneStorefront);
+  f.setUnavailable(true);await p.loadSceneStorefront();assert.equal(p.data.sceneStorefront,null);assert.match(p.data.detailError,/当前门店资料暂不可用/);
+  f.setUnavailable(false);await p.loadSceneStorefront();assert.equal(p.data.detailState,'READY');assert.equal(p.data.detailError,'');assert.equal(p.data.sceneStorefront.name,originalStore.name);
+});
+for(const action of ['back','unload','logout','scene'])test('late unavailable reply cannot restore feedback after '+action,async()=>{
+  const f=fixture({hold:true,unavailable:true}),p=f.page(),loading=p.onLoad({scene:'shop1',view:'store-detail'});await f.waitHeld();
+  if(action==='back')await p.backRecommendations();
+  else if(action==='unload')p.onUnload();
+  else if(action==='logout')p.customerSessionRevoked('fixture logout');
+  else{f.app.globalData.scene='shop2';p.onShow();}
+  f.release();await loading;assert.equal(p.data.detailError,'');assert.equal(p.data.sceneStorefront,null);assert.notEqual(p.data.detailState,'READY');
+});
+test('public detail after a typed current-store error starts with no stale fixed feedback',async()=>{
+  const f=fixture({unavailable:true}),p=f.page();await p.onLoad({scene:'shop1',view:'store-detail'});assert.ok(p.data.detailError);
+  await p.backRecommendations();await p.openRecommendation(event({id:publicStore.id}));assert.equal(p.data.detailError,'');assert.equal(p.data.selectedRecommendation.name,publicStore.name);
+});
+test('detail template renders only fixed safe feedback with the existing generic fallback',()=>{
+  const text=fs.readFileSync(path.join(__dirname,'pages/checkout/index.wxml'),'utf8');
+  assert.ok(text.includes("{{detailError||'店铺资料暂时无法加载，请返回重试。'}}"));
 });

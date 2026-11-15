@@ -10,6 +10,7 @@ function safeOcrDiagnostic(value) {
 }
 function customerError(error) {
   const code=error&&error.message;
+  if(error&&error.storefrontCode==='STOREFRONT_UNAVAILABLE')return '当前门店资料暂不可用，请联系项目负责人核对；返回店铺列表可继续浏览。';
   if(error&&error.regionReason==='DIRECTORY_MISMATCH')return '营业执照地址与当前地区目录无法精确匹配；地址正确时请联系平台核对目录，不要改成旧地名';
   if(error&&error.regionReason==='AMBIGUOUS_ADDRESS')return '营业执照地址包含不同地区，请返回第一步核对，已填写的资料会保留';
   if(error&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(error.regionReason))return '地区与营业执照地址尚未匹配，请返回第一步核对，已填写的资料会保留';
@@ -53,6 +54,7 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
       success:r=>{
         if(r.statusCode===200){if(path==='/mini/merchant'&&data.operation==='ocr'&&classifyOcrEmptyResponse(r.data)){const emptyError=Error('OCR_EMPTY_RESPONSE');emptyError.ocrCode='OCR_EMPTY_RESPONSE';emptyError.emptyResponseClassified=true;reject(emptyError);return;}resolve(r.data);return;}
         const error=Error('SERVICE_REQUEST_REJECTED');
+        if(r.statusCode===400&&path==='/mini/api'&&data.operation==='community.storefront'&&r.data&&r.data.error==='STOREFRONT_UNAVAILABLE')error.storefrontCode='STOREFRONT_UNAVAILABLE';
         if(path==='/mini/merchant'&&data.operation==='onboarding')error.submissionDiagnostic=safeSubmissionDiagnostic(r.data&&r.data.submission_diagnostic);
         if(r.statusCode===429&&r.data&&r.data.error==='RATE_LIMIT'&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&typeof data.params.operation==='string'&&data.params.operation.startsWith('wechat_'))error.wechatRateLimited=true;
         if(path==='/mini/merchant'&&data.operation==='ocr')error.ocrDiagnostic=safeOcrDiagnostic(r.data&&r.data.ocr_diagnostic);

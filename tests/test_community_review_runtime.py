@@ -7,18 +7,22 @@ ROOT=Path(__file__).resolve().parents[1]
 class IntegratedReview(unittest.TestCase):
  @classmethod
  def setUpClass(cls):
+  cls.out=None
   cls.process=subprocess.Popen([sys.executable,'-u','scripts/community_review_runtime.py'],cwd=ROOT,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+  cls.addClassCleanup(cls._stop_process,cls.process)
   line=cls.process.stdout.readline()
   if not line:raise RuntimeError(cls.process.stderr.read())
   cls.receipt=json.loads(line);cls.url=cls.receipt['url']
-  cls.pw=sync_playwright().start();cls.browser=cls.pw.chromium.launch()
-  cls.out=Path(os.environ.get('COMMUNITY_REVIEW_EVIDENCE','/tmp/community-runtime-evidence'));cls.out.mkdir(parents=True,exist_ok=True)
+  cls.pw=sync_playwright().start();cls.addClassCleanup(cls.pw.stop)
+  cls.browser=cls.pw.chromium.launch();cls.addClassCleanup(cls.browser.close)
+  out=Path(os.environ.get('COMMUNITY_REVIEW_EVIDENCE','/tmp/community-runtime-evidence'));out.mkdir(parents=True,exist_ok=True);cls.out=out
  @classmethod
- def tearDownClass(cls):
-  cls.browser.close();cls.pw.stop();cls.process.send_signal(signal.SIGINT)
-  try:_,error=cls.process.communicate(timeout=5)
-  except subprocess.TimeoutExpired:cls.process.kill();_,error=cls.process.communicate()
-  (cls.out/'runner-shutdown.log').write_text(error)
+ def _stop_process(cls,process):
+  try:process.send_signal(signal.SIGINT)
+  finally:
+   try:_,error=process.communicate(timeout=5)
+   except subprocess.TimeoutExpired:process.kill();_,error=process.communicate()
+  if cls.out is not None:(cls.out/'runner-shutdown.log').write_text(error)
  def page(self,width=390):
   context=self.browser.new_context(viewport={'width':width,'height':900});page=context.new_page();page.set_default_timeout(7000)
   self.addCleanup(context.close);return page
