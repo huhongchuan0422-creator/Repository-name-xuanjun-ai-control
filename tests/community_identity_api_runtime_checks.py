@@ -13,11 +13,11 @@ class IdentityApiRuntime(unittest.TestCase):
     def test_runtime_is_exact_pinned_recovery_successor_and_immutable_core(self):
         from scripts import community_ocr_bridge
         lock=json.loads(Path(community_ocr_bridge.__file__).with_name('community_ocr_dependency.json').read_text())
-        self.assertEqual(lock['files']['api.py'],'65f7bc31e43d0104297aa574f4d42754288faab3c2d0e02fd37ab334742a877d')
+        self.assertEqual(lock['files']['api.py'],'398de8582ea1bfec4ec76cd89692c9064bdcd82aff2abe071011b2797d481ec5')
         self.assertEqual(lock['files']['secure_store.py'],'30ae4cafdd2749a4f24092a2c17f9465b429351ef6c5bf4831ce999e576b7d25')
         self.assertEqual(lock['local_successor']['source_files'],{'api.py':'services/ocr_engine/api.py','secure_store.py':'services/ocr_engine/secure_store.py'})
         self.assertEqual(lock['local_successor']['patch_path'],'deploy/community-preview/ocr-bank-card-successor.patch')
-        self.assertEqual(lock['local_successor']['patch_sha256'],'636230f82b27afa1cf88412698a78f244eeb207d2b08bee7fbf1173bf35b9e21')
+        self.assertEqual(lock['local_successor']['patch_sha256'],'bfd536122b316f88832af52dc8f4c2de62be79575c98cfa1b40a6f0173fa4fc7')
         for name,digest in lock['files'].items():
             self.assertEqual(hashlib.sha256((Path(api.__file__).parent/name).read_bytes()).hexdigest(),digest)
         self.assertEqual(lock['files']['ocr_core.py'],lock['upstream_files']['ocr_core.py'])

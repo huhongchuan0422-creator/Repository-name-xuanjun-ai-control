@@ -154,6 +154,9 @@ class CommunityOcrBridge:
             if source.get(field) != job.get(field):
                 raise PermissionError('OCR_ATTACHMENT_BINDING_CHANGED')
         if job['status'] not in ('needs_review','confirmed'):
+            if job['status']=='failed':
+                from scripts.community_ocr_host import stage_recovery_failure
+                stage_recovery_failure(job.get('ocr_diagnostic'),source,job['job_id'],material_lookup)
             raise ValueError('OCR_RECOVERY_RESULT_NOT_READY')
         if (type(source.get('application_revision')) is not str or not __import__('re').fullmatch('[1-9][0-9]*',source['application_revision'])
                 or source.get('wechat_version') is not None and (type(source['wechat_version']) is not int or source['wechat_version']<0)):

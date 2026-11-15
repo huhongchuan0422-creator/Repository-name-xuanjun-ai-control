@@ -24,7 +24,7 @@ UPSTREAM_FILES = {
 # for same-model offline comparison. Core/store/model pins are unchanged.
 COMPATIBLE_API_SHA256 = '32cf647f56f9f1fbed9d0c7d15bb50a0f60a9cd5124bd5ff835129196766636e'
 RECOVERY_RUNTIME_FILES = {'api.py': '8be7cf57377500f757d5fdaa8ebfab4cfef7e2ace718cce48d72a850f89ea04e', 'secure_store.py': '30ae4cafdd2749a4f24092a2c17f9465b429351ef6c5bf4831ce999e576b7d25', 'ocr_core.py': 'bbc99d7e5bc606fc0f069b5a26babc4b87a5f7b4e0726cd71acab231933bc308'}
-BANK_CARD_RUNTIME_FILES = dict(RECOVERY_RUNTIME_FILES, **{'api.py':'65f7bc31e43d0104297aa574f4d42754288faab3c2d0e02fd37ab334742a877d'})
+BANK_CARD_RUNTIME_FILES = dict(RECOVERY_RUNTIME_FILES, **{'api.py':'398de8582ea1bfec4ec76cd89692c9064bdcd82aff2abe071011b2797d481ec5'})
 EXPECTED_FIELDS = {
     'bank_card': ('account_number','account_bank'),
     'business_license': ('company_name', 'credit_code', 'legal_representative', 'registered_address'),

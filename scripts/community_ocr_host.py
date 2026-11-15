@@ -18,7 +18,7 @@ DIAGNOSTIC_REASONS = frozenset(('HOST_NOT_READY','REQUEST_IN_PROGRESS','ANOTHER_
     'OWNER_QUEUE_FULL','OWNER_WAIT_TIMEOUT','HOST_STOPPED','OWNER_THREAD_REQUIRED','AUTHENTICATION_FAILED',
     'APPLICATION_ACCESS_DENIED','SOURCE_BINDING_CHANGED','APPLICATION_REVISION_CHANGED','PROVIDER_VERSION_CHANGED',
     'ATTACHMENT_CHANGED','SOURCE_EXPIRED','JOB_NOT_FOUND','IDEMPOTENCY_CONFLICT','RATE_LIMITED','IMAGE_INVALID',
-    'MODEL_UNAVAILABLE','MODEL_PIN_MISMATCH','INFERENCE_FAILED','RESULT_READ_FAILED','CONFIRMATION_FAILED',
+    'MODEL_UNAVAILABLE','MODEL_PIN_MISMATCH','INFERENCE_FAILED','RESULT_PROCESSING_FAILED','RESULT_PERSISTENCE_FAILED','RESULT_READ_FAILED','CONFIRMATION_FAILED',
     'WRITEBACK_FAILED','UNEXPECTED_FAILURE'))
 _CURRENT_DIAGNOSTIC = contextvars.ContextVar('community_ocr_request_diagnostic', default=None)
 _LOG = logging.getLogger('community.ocr.diagnostic')
@@ -80,10 +80,29 @@ def safe_diagnostic(value):
     return {key:value[key] for key in ('version','diagnostic_id','stage','reason','retryable','request_retained')}
 
 
+def safe_failure_diagnostic(value):
+    result = safe_diagnostic(value)
+    if (result and result['stage']=='EXECUTION' and result['reason'] in
+            ('INFERENCE_FAILED','RESULT_PROCESSING_FAILED','RESULT_PERSISTENCE_FAILED')
+            and result['retryable'] is False and result['request_retained'] is True):
+        return result
+    return None
+
+
+
+def stage_recovery_failure(value, source, job_id, material_lookup):
+    # Request-local metadata only; never replace the live authorization failure.
+    try:
+        diagnostic=safe_failure_diagnostic(value);context=current_diagnostic()
+        if diagnostic is not None and context is not None:
+            context.recovery_failure=(diagnostic,{k:v for k,v in source.items() if k!='data'},job_id,material_lookup)
+    except Exception:pass
+
+
 class _RequestDiagnostic:
     def __init__(self, action):
         self.action=action;self.diagnostic_id=uuid.uuid4().hex;self.stage='ADMISSION'
-        self.failure=None;self.lock=threading.RLock();self.logged=False
+        self.failure=None;self.lock=threading.RLock();self.logged=False;self.recovery_failure=None
         self.expected_provider_version=None;self.has_expected_binding=False;self.durable_job_retained=False
     def phase(self, stage):
         if stage in DIAGNOSTIC_STAGES:
@@ -276,6 +295,7 @@ class HostOcr:
             try:return asyncio.run(request())
             finally:_CURRENT_DIAGNOSTIC.reset(reset)
         self.busy=True
+        completed_context=None
         try:
             if self.inflight is not None and self.inflight_key!=key:
                 if not self.inflight.done():
@@ -315,7 +335,10 @@ class HostOcr:
                 # Static API error codes only; no exception/body or identity echo.
                 if type(detail) is not str or not __import__('re').fullmatch('[A-Z_]{1,100}',detail):detail='OCR_REQUEST_REJECTED'
                 error=PermissionError(detail)
-                if completed_context.failure is not None:error.ocr_diagnostic=dict(completed_context.failure)
+                saved=(self._bound_recovery_failure(current,params,completed_context)
+                    if action=='recover_view' and response.status_code==403 and detail=='OCR_RECOVERY_RESULT_NOT_READY' else None)
+                if saved is not None:error.ocr_diagnostic=saved
+                elif completed_context.failure is not None:error.ocr_diagnostic=dict(completed_context.failure)
                 else:_attach_failure(error,completed_context)
                 raise error
             if recovery_action:
@@ -354,6 +377,37 @@ class HostOcr:
                         stage='SOURCE_BINDING',reason=reason)
             return {'status_code':response.status_code,'result':response.json() if response.status_code!=204 else None,
                     'writeback':'NOT_REQUESTED_MANUAL_SUGGESTIONS_ONLY'}
-        finally:self.busy=False
+        finally:
+            if completed_context is not None:completed_context.recovery_failure=None
+            self.busy=False
+    def _bound_recovery_failure(self, current, params, context):
+        # An old failed result is still rejected. Its optional reference is
+        # released only after the original late auth plus fresh source binding.
+        try:
+            pending=context.recovery_failure;context.recovery_failure=None
+            if pending is None:return None
+            diagnostic,snapshot,job_id,material_lookup=pending
+            source=self.bridge.source(current,params['application'],params['document_type'])
+            current_source={k:v for k,v in source.items() if k!='data'}
+            if current_source!=snapshot or any(type(current_source[k]) is not type(snapshot[k]) for k in current_source):return None
+            if material_lookup:
+                unique=self.bridge.store.resolve_material_recovery_job(current.tenant_id,current.subject,
+                    params['application'],source['document_type'],source['attachment_id'],source['document_sha256'])
+                if unique['job_id']!=job_id:return None
+                source=self.bridge.source(current,params['application'],params['document_type'])
+                current_source={k:v for k,v in source.items() if k!='data'}
+                if current_source!=snapshot or any(type(current_source[k]) is not type(snapshot[k]) for k in current_source):return None
+            # The staged reference is not a lease on the failed job. Resolve the
+            # same original owned record again after the asynchronous response;
+            # deletion or changed state/metadata must not claim it is retained.
+            fresh=self.bridge.store.resolve_recovery_job(current.tenant_id,current.subject,
+                params['application'],params['document_type'],job_id=job_id)
+            if (fresh.get('job_id')!=job_id or fresh.get('status')!='failed'
+                    or safe_failure_diagnostic(fresh.get('ocr_diagnostic'))!=diagnostic
+                    or any(fresh.get(k)!=source.get(k) or type(fresh.get(k)) is not type(source.get(k))
+                        for k in ('subject','tenant_id','document_type','attachment_id','document_sha256'))):return None
+            return safe_failure_diagnostic(diagnostic)
+        except Exception:return None
+
     def close(self):
         self.owner.close();self.worker.shutdown(wait=False,cancel_futures=True)

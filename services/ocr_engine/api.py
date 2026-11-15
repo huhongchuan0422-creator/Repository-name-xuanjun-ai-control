@@ -166,6 +166,33 @@ def _shared_writeback_eligible(snapshot):
                 "document_type": document_type, "attachment_id": attachment_id, "content_sha256": digest}
     return binding == expected and isinstance(snapshot.get("confirmed_fields"), dict) and bool(snapshot.get("confirmed_fields"))
 
+def _public_failure_diagnostic(value):
+    # Existing owner-authorized job response only. No provider text or business IDs.
+    try:
+        from scripts.community_ocr_host import safe_failure_diagnostic
+        return safe_failure_diagnostic(value)
+    except Exception:
+        pass
+    return None
+
+
+def _failure_diagnostic(phase, error):
+    # Reuse the original server-generated request ID; never accept one from input.
+    try:
+        from scripts.community_ocr_host import current_diagnostic
+        context = current_diagnostic()
+        if context is None:
+            return None
+        result = _public_failure_diagnostic(context.snapshot(phase, stage="EXECUTION", retained=True))
+        try:
+            context.fail(reason=phase, stage="EXECUTION")
+        except Exception:
+            pass
+        return result
+    except Exception:
+        return None
+
+
 def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=run_local_ocr, authorize_application=None, authorize_attachment=None, recovery=None) -> FastAPI:
     app = FastAPI(title="Xuanjun OCR Gateway", version="1.0.0")
     # Persistence is only activated when an explicit absolute path is configured.
@@ -256,22 +283,32 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
                 raise HTTPException(status_code=409, detail="OCR_JOB_ALREADY_CLAIMED")
         else:
             jobs.update(job["job_id"], status="processing")
+        failure_phase = "INFERENCE_FAILED"
         try:
             result = infer(data, document_type, max_bytes=MAX_BYTES)
+            failure_phase = "RESULT_PROCESSING_FAILED"
             # Preserve only documented geometry/orientation evidence from the trusted
             # local infer callback. No image, text dump or caller-provided metadata.
             evidence = {key: result[key] for key in (
                 "orientation", "correction_counterclockwise_degrees", "input_dimensions",
                 "source_coordinate_space", "extraction_after_pixel_rotation",
                 "unresolved_validity_candidates") if key in result}
-            jobs.update(job["job_id"], status="needs_review", fields=result["fields"],
-                        warnings=result.get("warnings", []), engine="RapidOCR", model_version="runtime-configured",
+            fields, warnings = result["fields"], result.get("warnings", [])
+            failure_phase = "RESULT_PERSISTENCE_FAILED"
+            jobs.update(job["job_id"], status="needs_review", fields=fields,
+                        warnings=warnings, engine="RapidOCR", model_version="runtime-configured",
                         **evidence)
         except Exception as exc:
             code = "OCR_INFERENCE_FAILED"
-            jobs.update(job["job_id"], status="failed", error_code=code, warnings=[code])
+            diagnostic = _failure_diagnostic(failure_phase, exc)
+            jobs.update(job["job_id"], status="failed", error_code=code, warnings=[code],
+                        **({"ocr_diagnostic": diagnostic} if diagnostic is not None else {}))
         final = jobs.get(job["job_id"], p.tenant_id)
-        return {"job_id": final["job_id"], "status": final["status"], "contract_version": final["contract_version"]}
+        response = {"job_id": final["job_id"], "status": final["status"], "contract_version": final["contract_version"]}
+        diagnostic = _public_failure_diagnostic(final.get("ocr_diagnostic")) if final["status"] == "failed" else None
+        if diagnostic is not None:
+            response["ocr_diagnostic"] = diagnostic
+        return response
     def reauthorize_existing_job(p: Principal, job: dict) -> None:
         if authorize_application is None or not authorize_application(p, job["onboarding_application_id"]):
             raise HTTPException(status_code=403, detail="APPLICATION_AUTHORIZATION_REVOKED")
@@ -301,7 +338,10 @@ def create_app(authenticate: Optional[Authenticator] = None, store=None, infer=r
         if not job or (job["subject"] != p.subject and "ocr:admin" not in p.permissions):
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
         reauthorize_existing_job(p, job)
-        response = {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_sha256"}}
+        response = {k: v for k, v in job.items() if k not in {"tenant_id", "subject", "onboarding_application_id", "attachment_id", "document_sha256", "ocr_diagnostic"}}
+        diagnostic = _public_failure_diagnostic(job.get("ocr_diagnostic")) if job["status"] == "failed" else None
+        if diagnostic is not None:
+            response["ocr_diagnostic"] = diagnostic
         response["provider_version"] = job.get("provider_version")
         response["shared_writeback_eligible"] = _shared_writeback_eligible(job)
         return response
