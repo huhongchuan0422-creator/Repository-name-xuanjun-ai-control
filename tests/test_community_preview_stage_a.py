@@ -465,32 +465,39 @@ try:
         command=command.replace('/usr/bin/sudo',str(fake))
         pid,master=pty.fork()
         if pid==0:os.execv('/bin/bash',['/bin/bash','-c','set -e\n'+command+'\nprintf "PARENT_ALIVE\\n"\n'])
-        data=b'';sent=0;done=False;end=time.monotonic()+4
+        data=b'';sent=0;done=False;stream_open=True;end=time.monotonic()+4
         try:
             while time.monotonic()<end:
-                if select.select([master],[],[],.05)[0]:
+                if stream_open and select.select([master],[],[],.05)[0]:
                     try:part=os.read(master,65536)
                     except OSError as exc:
-                        if exc.errno==errno.EIO:break
-                        raise
-                    if not part:break
-                    data+=part
-                    # Wait for each actual prompt, never pre-inject answers.
-                    for index,phase in enumerate(('INSTALL','IMAGE_LOAD')):
-                        prompt=('APPROVE_'+phase+' '+scope).encode()
-                        if sent==index and prompt in data and mode!='timeout':
-                            line=b'\x04' if mode=='eof' else (b'WRONG\n' if mode=='wrong' else prompt+b'\n')
-                            os.write(master,line);sent+=1
+                        if exc.errno!=errno.EIO:raise
+                        part=b''
+                    if not part:stream_open=False
+                    else:
+                        data+=part
+                        # Wait for each actual prompt, never pre-inject answers.
+                        for index,phase in enumerate(('INSTALL','IMAGE_LOAD')):
+                            prompt=('APPROVE_'+phase+' '+scope).encode()
+                            if sent==index and prompt in data and mode!='timeout':
+                                line=b'\x04' if mode=='eof' else (b'WRONG\n' if mode=='wrong' else prompt+b'\n')
+                                os.write(master,line);sent+=1
                 got,status=os.waitpid(pid,os.WNOHANG)
                 if got:done=True;self.assertEqual(os.waitstatus_to_exitcode(status),0);break
+                # PTY closure can precede waitable child exit. Keep the original
+                # deadline and assertions; never interpret EOF itself as success.
+                if not stream_open:time.sleep(min(.01,max(0,end-time.monotonic())))
             if not done:
                 got,status=os.waitpid(pid,os.WNOHANG)
                 if got:done=True;self.assertEqual(os.waitstatus_to_exitcode(status),0)
             self.assertTrue(done,data.decode(errors='replace'))
         finally:
-            if not done:
-                os.kill(pid,signal.SIGKILL);os.waitpid(pid,0)
-            os.close(master)
+            try:
+                if not done:
+                    try:os.kill(pid,signal.SIGKILL)
+                    except ProcessLookupError:pass
+                    os.waitpid(pid,0)
+            finally:os.close(master)
         records=[]
         for line in data.splitlines():
             if line.startswith(b'{'):
