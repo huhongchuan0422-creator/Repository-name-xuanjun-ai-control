@@ -191,9 +191,14 @@ def _read_only_connection(db_path, required_tables):
         raise
 
 
-def read_only_projection(db_path, authority_key, tenant_id, principal_id):
+def read_only_projection(db_path, authority_key, tenant_id, principal_id,
+                         consistent_snapshot=False):
     connection = _read_only_connection(db_path, PROJECTION_TABLES)
     try:
+        if consistent_snapshot:
+            # Pin all projection SELECTs to one read-only SQLite snapshot.
+            # The first data SELECT establishes the snapshot; close releases it.
+            connection.execute('BEGIN')
         authority = TestTenantAuthority(authority_key)
         gateway = GatewayKernel.__new__(GatewayKernel)
         gateway.db = connection
@@ -214,7 +219,7 @@ PUBLIC_BOARD_FIELDS = ('board_id', 'task_count', 'active_count',
 def read_only_public_projection(db_path, authority_key, tenant_id,
                                 principal_id):
     projection = read_only_projection(db_path, authority_key, tenant_id,
-                                      principal_id)
+                                      principal_id, consistent_snapshot=True)
     public = {
         'mode': projection['mode'],
         'production_status': projection['production_status'],
