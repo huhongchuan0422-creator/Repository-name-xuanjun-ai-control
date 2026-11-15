@@ -37,7 +37,7 @@ class DevelopmentHost:
     {ticket,caller,lock_root}; review_keys_provider(task,key_ids) supplies existing keys.
     None is permitted and fails closed only the dependent operation.
     """
-    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None):
+    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None,contract_provider=None,execution_provider=None):
         if not isinstance(bindings,list) or len(bindings)>128:raise ValueError('BOUNDED_DEVELOPMENT_BINDINGS_REQUIRED')
         required={'tenant_id','principal_id','project_id','task_id','spec_sha256','checkpoint_sha256','contract_sha256',
                   'role_id','role_version','phase','review_kind','authority_identity','actions','candidate_root','executor_profile'}
@@ -59,15 +59,45 @@ class DevelopmentHost:
             if b['executor_profile'] is not None:
                 profile=b['executor_profile']
                 expected={'project_id','role_id','role_version','principal_id','repository','branch','repository_root','resource_key','allowed_file','max_source_bytes'}
-                if (not isinstance(profile,dict) or set(profile)!=expected or b['phase']!='EXECUTOR'
+                if (not isinstance(profile,dict) or set(profile) not in (expected, expected | {'producer_snapshot_sha256'}) or b['phase']!='EXECUTOR'
                     or any(profile[k]!=b[k] for k in ('project_id','role_id','role_version','principal_id'))):
                     raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
             key=tuple(b[k] for k in ('tenant_id','principal_id','project_id','task_id'))
             if key in seen:raise ValueError('DUPLICATE_DEVELOPMENT_HOST_BINDING')
             seen.add(key)
-        for fn in (review_keys_provider,writer_context_provider):
+        for fn in (review_keys_provider,writer_context_provider,contract_provider,execution_provider):
             if fn is not None and not callable(fn):raise ValueError('TRUSTED_HOST_PROVIDER_REQUIRED')
-        self.bindings=copy.deepcopy(bindings);self.review_keys_provider=review_keys_provider;self.writer_context_provider=writer_context_provider
+        self.bindings=copy.deepcopy(bindings);self.review_keys_provider=review_keys_provider;self.writer_context_provider=writer_context_provider;self.contract_provider=contract_provider;self.execution_provider=execution_provider
+    def register_contract(self,control,task_id):
+        """Admit only an existing host-custodied contract pinned by bindings."""
+        if self.contract_provider is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
+        control._admin()
+        control.gateway.assert_task_context(control.context,task_id)
+        contract=self.contract_provider(task_id)
+        control.gateway.supervisor._development_contract_shape(contract)
+        rows=[b for b in self.bindings if b['tenant_id']==control.tenant_id and b['task_id']==task_id]
+        if not rows:raise ValueError('DEVELOPMENT_HOST_ACTION_REQUIRED')
+        sha=hashlib.sha256(canonical(contract).encode()).hexdigest()
+        if any(b['contract_sha256']!=sha or b['spec_sha256']!=contract['spec_sha256'] or b['checkpoint_sha256']!=contract['checkpoint_sha256'] for b in rows):
+            raise ValueError('CURRENT_PINNED_DEVELOPMENT_SCOPE_REQUIRED')
+        for b in rows:control._assert_expected_project(task_id,b['project_id'])
+        executors=[b for b in rows if b['phase']=='EXECUTOR']
+        reviewers=[b for b in rows if b['phase']=='REVIEWER']
+        from entry_review_gate import identity
+        developer=identity(contract['developer'])
+        policies=contract['trusted_reviewers']
+        identities=[identity(p,True) for p in policies]
+        if (len(executors)!=1 or executors[0]['authority_identity']!=contract['developer'] or
+            len(reviewers)!=2 or set(p['role'] for p in policies)!={'QA','SECURITY'} or
+            len(set(identities))!=2 or developer in identities or
+            len(set(p['key_id'] for p in policies))!=2 or
+            any(not any(b['review_kind']==p['role'] and b['authority_identity']=={'issuer':p['issuer'],'subject':p['subject']} for b in reviewers) for p in policies)):
+            raise ValueError('CANONICAL_DEVELOPMENT_IDENTITY_REQUIRED')
+        profile=executors[0]['executor_profile']
+        if profile is None or profile['repository']!=contract['target_repository'] or contract['allowed_files']!=[profile['allowed_file']]:
+            raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
+        return control.gateway.supervisor.register_development_contract(task_id,contract)
+
     def visible(self,identity):
         allowed=set()
         for b in self.bindings:
@@ -116,7 +146,7 @@ class DevelopmentHost:
                 if (not isinstance(context,dict) or set(context)!={'ticket','caller','lock_root'}
                     or not isinstance(context['lock_root'],str) or not context['lock_root'].startswith('/')):raise ValueError('EXISTING_WRITER_CONTEXT_REQUIRED')
                 fence=Fence(s,context['lock_root'])
-                try:result=LocalDevelopmentExecutor(c,fence,profile,admission_check=lambda:check(True)).apply_proposal(
+                try:result=LocalDevelopmentExecutor(c,fence,profile,admission_check=lambda:check(True),execution_provider=self.execution_provider).apply_proposal(
                     a['task_id'],a['attempt_id'],a['request_id'],context['ticket'],context['caller'])
                 finally:fence.close()
             elif name=='task_development_review':
@@ -150,22 +180,23 @@ def _read_host_json(path,code):
     except (OSError,ValueError,TypeError):raise ValueError(code+'_UNAVAILABLE_OR_INVALID') from None
 
 
-def load_host(path):
+def load_host(path, *, execution_provider=None):
     """Read-only original-host custody references; never generates/saves keys.
 
     Files are owned0600 regular single-link and bounded by secure_file_input.
     The host must supply already-authorized custody material; this loader is
     not a producer of authority and does not copy canonical Writer fields.
+    execution_provider is an already-constructed trusted host instance, not config.
     """
     cfg=_read_host_json(path,'DEVELOPMENT_HOST_CONFIG')
-    if (not isinstance(cfg,dict) or set(cfg)!={'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}
+    if (not isinstance(cfg,dict) or set(cfg) not in ({'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}, {'schema_version','enabled','bindings','review_keyring_file','writer_context_file','contract_file'})
             or type(cfg['schema_version']) is not int or cfg['schema_version']!=1 or type(cfg['enabled']) is not bool):
         raise ValueError('EXACT_DEVELOPMENT_HOST_CONFIG_REQUIRED')
-    for k in ('review_keyring_file','writer_context_file'):
-        if cfg[k] is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
+    for k in ('review_keyring_file','writer_context_file','contract_file'):
+        if cfg.get(k) is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
             raise ValueError('EXISTING_PROTECTED_HOST_REFERENCE_REQUIRED')
     if not cfg['enabled']:
-        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None:
+        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('contract_file') is not None:
             raise ValueError('DISABLED_DEVELOPMENT_CONFIG_MUST_BE_EMPTY')
         return None
     def keys(task,ids):
@@ -179,5 +210,11 @@ def load_host(path):
         if not isinstance(value,dict) or set(value)!={'attempt_id','ticket','caller','lock_root'} or value['attempt_id']!=attempt:
             raise ValueError('EXISTING_EXACT_WRITER_CONTEXT_REQUIRED')
         return {k:value[k] for k in ('ticket','caller','lock_root')}
+    def contract(task):
+        raw=_read_host_json(cfg['contract_file'],'TRUSTED_DEVELOPMENT_CONTRACT')
+        if not isinstance(raw,dict) or task not in raw:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
+        return raw[task]
     return DevelopmentHost(cfg['bindings'],keys if cfg['review_keyring_file'] else None,
-                            writer if cfg['writer_context_file'] else None)
+                            writer if cfg['writer_context_file'] else None,
+                            contract if cfg.get('contract_file') else None,
+                            execution_provider=execution_provider)

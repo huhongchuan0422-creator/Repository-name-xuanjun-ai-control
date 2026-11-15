@@ -13,6 +13,11 @@ import subprocess
 from pathlib import Path
 from task_writer_fence import OfflineGitCAS
 from native_syntax_gate import check_bytes
+from task_supervisor import canonical
+from producer_tree_delta import plan as producer_tree_plan, REPOSITORY as PRODUCER_REPOSITORY, PATH as PRODUCER_PATH
+
+PRODUCER_SNAPSHOT = 'fe9b78539bf92674ca8dcddeb5fb1813ccd032d6b34d5e6e65528444dc63fd35'
+PRODUCER_BASE_TREE = '6ce6cc628cc8107c5146e17357844b8aa9d84d42'
 
 SANDBOX_STATE='HOLD_SANDBOX_UNAVAILABLE'
 
@@ -41,18 +46,22 @@ def _strict_json(raw):
 
 
 class LocalDevelopmentExecutor:
-    def __init__(self, control, fence, profile, admission_check=None):
+    def __init__(self, control, fence, profile, admission_check=None, execution_provider=None):
         required={'project_id','role_id','role_version','principal_id','repository',
                   'branch','repository_root','resource_key','allowed_file','max_source_bytes'}
-        if not isinstance(profile,dict) or set(profile)!=required:
+        if not isinstance(profile,dict) or set(profile) not in (required, required | {'producer_snapshot_sha256'}):
             raise ValueError('EXACT_HOST_EXECUTOR_PROFILE_REQUIRED')
+        nested = 'producer_snapshot_sha256' in profile
+        if nested and (profile['producer_snapshot_sha256'] != PRODUCER_SNAPSHOT or profile['repository'] != PRODUCER_REPOSITORY or profile['allowed_file'] != PRODUCER_PATH):
+            raise ValueError('EXACT_PRODUCER_PROFILE_REQUIRED')
         if (not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+',profile['repository'])
                 or not re.fullmatch(r'[A-Za-z0-9_-]+',profile['branch'])
-                or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*\.py',profile['allowed_file'])
+                or (not nested and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*\.py',profile['allowed_file']))
                 or type(profile['max_source_bytes']) is not int
                 or not 1<=profile['max_source_bytes']<=131072):
             raise ValueError('BOUNDED_SINGLE_MODULE_PROFILE_REQUIRED')
         self.admission_check=admission_check
+        self.execution_provider=execution_provider
         self.control=control;self.gateway=control.gateway
         self.supervisor=self.gateway.supervisor;self.fence=fence;self.profile=dict(profile)
         if fence.supervisor is not self.supervisor:
@@ -79,7 +88,7 @@ class LocalDevelopmentExecutor:
         if self._git('remote','get-url','origin')!='https://github.com/'+self.profile['repository']+'.git':
             raise ValueError('HOST_REPOSITORY_ORIGIN_MISMATCH')
 
-    def _git(self,*args,raw=None):
+    def _git(self,*args,raw=None,raw_output=False):
         if hasattr(self,'root_identity'):
             info=self.root.lstat()
             if (str(self.root.resolve())!=str(self.root) or
@@ -95,7 +104,7 @@ class LocalDevelopmentExecutor:
                               env=env,timeout=10,check=False)
         if result.returncode:raise ValueError('FIXED_LOCAL_GIT_COMMAND_FAILED')
         if len(result.stdout)>262144:raise ValueError('GIT_OUTPUT_LIMIT')
-        return result.stdout.decode().strip()
+        return result.stdout if raw_output else result.stdout.decode().strip()
 
     def _read_proposal(self, task_id, attempt_id, request_id):
         c=self.control;p=self.profile
@@ -143,11 +152,20 @@ class LocalDevelopmentExecutor:
         self._check_root()
         before=contract['target_base_sha'];ref='refs/heads/'+p['branch']
         before_tree=self._git('rev-parse',before+'^{tree}')
-        expected_line='100644 blob '+proposal['base_blob']+'\t'+p['allowed_file']
-        if self._git('ls-tree',before)!=expected_line:raise ValueError('EXACT_SINGLE_MODULE_BASE_REQUIRED')
-        blob=_git_sha('blob',raw)
-        tree_raw=b'100644 '+p['allowed_file'].encode()+b'\0'+bytes.fromhex(blob)
-        tree=_git_sha('tree',tree_raw)
+        producer = 'producer_snapshot_sha256' in p
+        if producer:
+            if before_tree != PRODUCER_BASE_TREE:raise ValueError('EXACT_PRODUCER_BASE_TREE_REQUIRED')
+            root_raw=self._git('cat-file','tree',before_tree,raw_output=True)
+            scripts_tree=self._git('rev-parse',before+':scripts')
+            scripts_raw=self._git('cat-file','tree',scripts_tree,raw_output=True)
+            planned=producer_tree_plan(p['repository'],p['allowed_file'],before_tree,root_raw,scripts_raw,proposal['base_blob'],raw)
+            blob=planned['blob_oid'];tree=planned['tree_oid']
+        else:
+            expected_line='100644 blob '+proposal['base_blob']+'\t'+p['allowed_file']
+            if self._git('ls-tree',before)!=expected_line:raise ValueError('EXACT_SINGLE_MODULE_BASE_REQUIRED')
+            blob=_git_sha('blob',raw)
+            tree_raw=b'100644 '+p['allowed_file'].encode()+b'\0'+bytes.fromhex(blob)
+            tree=_git_sha('tree',tree_raw)
         opid='local-source-'+hashlib.sha256((task_id+'\0'+attempt_id+'\0'+request_id).encode()).hexdigest()
         operation=OfflineGitCAS.operation(opid,opid,p['resource_key'],p['repository'],p['branch'],
                     before,before_tree,proposal['base_blob'],tree,blob,'xj-'+opid)
@@ -165,8 +183,14 @@ class LocalDevelopmentExecutor:
                 if current_raw!=raw or current_contract!=contract:raise ValueError('SOURCE_BINDING_CHANGED')
                 if self._git('rev-parse',ref)!=before:raise ValueError('LOCAL_GIT_BASE_CHANGED')
                 if self._git('hash-object','-w','--stdin',raw=raw)!=blob:raise ValueError('BLOB_WRITE_MISMATCH')
-                line=('100644 blob '+blob+'\t'+p['allowed_file']+'\n').encode()
-                if self._git('mktree',raw=line)!=tree:raise ValueError('TREE_WRITE_MISMATCH')
+                if producer:
+                    if self._git('hash-object','-w','-t','tree','--stdin',raw=planned['scripts_raw']) != planned['scripts_oid']:
+                        raise ValueError('TREE_WRITE_MISMATCH')
+                    if self._git('hash-object','-w','-t','tree','--stdin',raw=planned['root_raw']) != tree:
+                        raise ValueError('TREE_WRITE_MISMATCH')
+                else:
+                    line=('100644 blob '+blob+'\t'+p['allowed_file']+'\n').encode()
+                    if self._git('mktree',raw=line)!=tree:raise ValueError('TREE_WRITE_MISMATCH')
                 commit=self._git('commit-tree',tree,'-p',before,raw=(operation['operation_marker']+'\n').encode())
                 self._git('update-ref',ref,commit,before)
                 readback={'repo':p['repository'],'branch':p['branch'],'commit':self._git('rev-parse',ref),
@@ -185,7 +209,10 @@ class LocalDevelopmentExecutor:
             status='RECEIPT_VALIDATED_NOT_ADMITTED',native_identity='NOT_APPLICABLE_LOCAL_ONLY',
             quota_attribution='NO_MODEL_CALL_BY_EXECUTOR',authority_effect='NONE',
             required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE',**caller)
-        if self.admission_check is None:
+        if producer:
+            candidate=self.supervisor.bind_local_development_candidate(receipt,{p['allowed_file']:raw},
+                admission_check=self.admission_check,producer_tree_proof={'root_raw':root_raw,'scripts_raw':scripts_raw})
+        elif self.admission_check is None:
             candidate=self.supervisor.bind_local_development_candidate(receipt,{p['allowed_file']:raw})
         else:
             candidate=self.supervisor.bind_local_development_candidate(receipt,{p['allowed_file']:raw},admission_check=self.admission_check)
@@ -200,8 +227,130 @@ class LocalDevelopmentExecutor:
         if old is None:self.gateway.save_checkpoint(self.control.context,task_id,attempt_id,checkpoint,
                             payload,[], 'RECONCILED',self.gateway.canonical_resources(task_id))
         elif json.loads(old['payload_json'])!=payload:raise ValueError('CHECKPOINT_BINDING_CONFLICT')
-        return dict(payload,task_id=task_id,attempt_id=attempt_id,request_id=request_id,
+        output=dict(payload,task_id=task_id,attempt_id=attempt_id,request_id=request_id,
                     canonical_task_state=current['state'],source_write_confirmed=True,duplicate=prepared['duplicate'])
+        if 'producer_http_test_sha256' in contract:
+            output.update(self._run_producer_http_acceptance(task_id,attempt_id,candidate['candidate_event_id'],ticket,caller))
+        return output
+
+    def _run_producer_http_acceptance(self,task_id,attempt_id,candidate_event_id,ticket,caller):
+        from producer_http_contract import REFERENCE_SHA256,ALLOWED_FILE
+        binding=self.prepare_execution_binding(task_id,attempt_id,candidate_event_id)
+        contract=self.supervisor.development_contract(task_id)
+        if any(ticket.get(k)!=binding[k] for k in ('task_id','attempt_id','lease_id','fence','epoch')):
+            raise ValueError('EXECUTION_WRITER_BINDING_MISMATCH')
+        if contract.get('producer_http_test_sha256') != REFERENCE_SHA256:
+            raise ValueError('PINNED_PRODUCER_TEST_REQUIRED')
+        if self.execution_provider is None:
+            return {'execution_state':'NOT_CONNECTED','execution_evidence_verified':False,
+                    'next_action':'WAIT_CONTROLLED_EXECUTION_PROVIDER'}
+        candidate=self.supervisor.development_candidate(task_id,candidate_event_id)
+        if self._git('rev-parse','refs/heads/'+self.profile['branch'])!=binding['code_commit']:
+            raise ValueError('CANDIDATE_SOURCE_READBACK_CHANGED')
+        raw=self._git('show',binding['code_commit']+':'+ALLOWED_FILE,raw_output=True)
+        source_sha256=hashlib.sha256(raw).hexdigest()
+        if source_sha256!=candidate['files'][ALLOWED_FILE]:
+            raise ValueError('CANDIDATE_SOURCE_DIGEST_MISMATCH')
+        intent=dict(binding,source_sha256=source_sha256,test_reference_sha256=REFERENCE_SHA256,
+                    source_operation_id=candidate['source_operation_id'])
+        intent_id='producer-http-intent:'+candidate['source_operation_id']
+        intent_body=canonical(intent)
+        intent_digest=hashlib.sha256(intent_body.encode()).hexdigest()
+        self.control.db.execute('BEGIN IMMEDIATE')
+        with self.control.db:
+            task,now=self.supervisor._validate_writer_locked(ticket,caller,self.fence.locks.provider_id)
+            if self.admission_check is not None:self.admission_check()
+            if self.prepare_execution_binding(task_id,attempt_id,candidate_event_id)!=binding:
+                raise ValueError('CANDIDATE_CHANGED_BEFORE_TEST')
+            old=self.control.db.execute('SELECT kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                (task_id,attempt_id,intent_id)).fetchone()
+            if old is not None:
+                if (old['kind']!='DEVELOPMENT_EXECUTION_INTENT' or old['evidence_ref']!=intent_digest
+                    or old['payload_json']!=intent_body):
+                    raise ValueError('EXECUTION_INTENT_BINDING_CONFLICT')
+            else:
+                self.control.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                    (task_id,attempt_id,intent_id,'DEVELOPMENT_EXECUTION_INTENT',now,'TEST_INTENT',intent_digest,intent_body))
+        # Only the host-injected provider may query the original invocation.
+        # MCP callers cannot supply a receipt, or assert that execution never began.
+        if old is not None:
+            query=getattr(self.execution_provider,'query',None)
+            if not callable(query):raise ValueError('EXECUTION_INTENT_ALREADY_EXISTS_RECONCILE')
+            observation=query(intent)
+            if observation is None:
+                return {'execution_state':'UNKNOWN','execution_evidence_verified':False,
+                        'next_action':'RECONCILE_ORIGINAL_EXECUTION'}
+        else:
+            observation=self.execution_provider(intent,raw)
+        if (not isinstance(observation,dict) or set(observation)!={'intent_sha256','result','test_reference_sha256','source_sha256','artifact_sha256'}
+            or observation['intent_sha256']!=intent_digest
+            or observation['result']!={'state':'PASS','detail':'HTTP_PUBLIC_CONTRACT'}
+            or observation['test_reference_sha256']!=REFERENCE_SHA256
+            or observation['source_sha256']!=source_sha256
+            or not isinstance(observation['artifact_sha256'],str)
+            or re.fullmatch('[0-9a-f]{64}',observation['artifact_sha256']) is None):
+            raise ValueError('PRODUCER_HTTP_TEST_BINDING_MISMATCH')
+        self.control.db.execute('BEGIN IMMEDIATE')
+        with self.control.db:
+            task,now=self.supervisor._validate_writer_locked(ticket,caller,self.fence.locks.provider_id)
+            if self.admission_check is not None:self.admission_check()
+            if self.prepare_execution_binding(task_id,attempt_id,candidate_event_id)!=binding:
+                raise ValueError('CANDIDATE_CHANGED_DURING_TEST')
+            if self._git('rev-parse','refs/heads/'+self.profile['branch'])!=binding['code_commit']:
+                raise ValueError('CANDIDATE_SOURCE_READBACK_CHANGED')
+            evidence={'schema':1,'candidate_event_id':candidate_event_id,'candidate_sha256':binding['candidate_sha256'],
+                'task_id':task_id,'attempt_id':attempt_id,'lease_id':binding['lease_id'],'fence':binding['fence'],
+                'epoch':binding['epoch'],'contract_sha256':binding['contract_sha256'],'code_commit':binding['code_commit'],
+                'source_sha256':observation['source_sha256'],'test_reference_sha256':REFERENCE_SHA256,
+                'artifact_sha256':observation['artifact_sha256'],'result':'PASS'}
+            body=canonical(evidence);digest=hashlib.sha256(body.encode()).hexdigest()
+            eid='producer-http-execution:'+candidate['source_operation_id']
+            old=self.control.db.execute('SELECT kind,payload_json,evidence_ref FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(task_id,attempt_id,eid)).fetchone()
+            if old is not None:
+                if old['kind']!='DEVELOPMENT_EXECUTION' or old['payload_json']!=body or old['evidence_ref']!=digest:
+                    raise ValueError('PRODUCER_EXECUTION_EVIDENCE_CONFLICT')
+            else:
+                self.control.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
+                    (task_id,attempt_id,eid,'DEVELOPMENT_EXECUTION',now,'TEST_RUN',digest,body))
+        return {'execution_state':'ISOLATED_TEST_ELIGIBLE','execution_evidence_verified':True,
+                'execution_event_id':eid,'execution_artifact_sha256':observation['artifact_sha256'],
+                'generated_code_executed':True,'next_action':'WAIT_INDEPENDENT_REVIEW'}
+
+    def prepare_execution_binding(self,task_id,attempt_id,candidate_event_id):
+        """Read-only binding for a future authorized test executor; never admit it.
+
+        This does not validate an active Writer lease, select a command, run
+        code, verify execution provenance, or relax the canonical HOLD.
+        """
+        self.gateway.assert_task_context(self.control.context,task_id)
+        task=self.supervisor._task(task_id)
+        if task['attempt_id']!=attempt_id:raise ValueError('STALE_TASK_ATTEMPT')
+        meta=self.control.db.execute('SELECT project_id FROM gateway_task_metadata WHERE tenant_id=? AND task_id=?',
+            (self.control.tenant_id,task_id)).fetchone()
+        if meta is None or meta['project_id']!=self.profile['project_id']:
+            raise ValueError('PROJECT_TASK_NOT_VISIBLE')
+        row=self.control.db.execute('''SELECT kind,payload_json,evidence_ref FROM events
+            WHERE task_id=? AND attempt_id=? AND event_id=?''',
+            (task_id,attempt_id,candidate_event_id)).fetchone()
+        if row is None or row['kind']!='DEVELOPMENT_CANDIDATE':
+            raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
+        candidate=json.loads(row['payload_json'])
+        digest=hashlib.sha256(canonical(candidate).encode('utf-8')).hexdigest()
+        if row['evidence_ref']!=digest:raise ValueError('CANDIDATE_DIGEST_MISMATCH')
+        if (candidate.get('source_kind')!='LOCAL_ONLY_CONFIRMED_OPERATION' or
+            any(candidate.get(k)!=task[k] for k in ('task_id','attempt_id','lease_id','fence','epoch','spec_sha256','checkpoint_sha256'))):
+            raise ValueError('CURRENT_LOCAL_CANDIDATE_BINDING_REQUIRED')
+        contract=self.supervisor.development_contract(task_id)
+        if (candidate.get('contract_sha256')!=hashlib.sha256(canonical(contract).encode('utf-8')).hexdigest()
+                or contract['target_repository']!=self.profile['repository']
+                or contract['allowed_files']!=[self.profile['allowed_file']]):
+            raise ValueError('CURRENT_DEVELOPMENT_CONTRACT_REQUIRED')
+        return {'task_id':task_id,'attempt_id':attempt_id,'candidate_event_id':candidate_event_id,
+                'candidate_sha256':digest,'code_commit':candidate['code_commit'],
+                'contract_sha256':candidate['contract_sha256'],'lease_id':candidate['lease_id'],
+                'fence':candidate['fence'],'epoch':candidate['epoch'],
+                'execution_state':SANDBOX_STATE,'test_command_state':'NOT_BOUND',
+                'writer_lease_validated':False,'execution_evidence_verified':False}
 
     def status(self,task_id,attempt_id):
         self.gateway.assert_task_context(self.control.context,task_id)

@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import socketserver
+import sqlite3
 import tempfile
 import threading
 import unittest
@@ -109,6 +110,303 @@ class ConnectionManagementTests(unittest.TestCase):
         self.assertEqual(self.manager.revoke('oauth')['status'],'REVOKED')
         with self.assertRaisesRegex(ValueError,'ACTIVE_CONNECTION'):
             self.manager.credential('oauth',self.base,'MODEL_INFERENCE',now=1003)
+
+    def test_refresh_only_rotation_advances_generation_across_restart(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],
+          'one-time-code',self.base,self.base+'/callback',now=1001)
+        self.assertEqual(self.manager.projection()[0]['credential_generation'],1)
+        class RefreshOnly(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-token-one',
+                  'refresh_token':'refresh-rotated','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        self.manager.refresh('oauth',RefreshOnly(),now=1002)
+        self.assertEqual(self.manager.projection()[0]['credential_generation'],2)
+        self.supervisor.close();self.supervisor=Supervisor(self.db)
+        self.gateway=GatewayKernel(self.supervisor,self.authority)
+        self.manager=ConnectionManager(self.gateway,self.context,self.master,
+          clock=lambda:1003)
+        row=self.manager.projection()[0]
+        self.assertEqual((row['config_version'],row['credential_generation']),(1,2))
+
+    def test_refresh_lease_rejects_concurrent_complete_without_lost_update(self):
+        self.manager.upsert(self.oauth_config());first=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',first['flow_id'],first['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        second=self.manager.begin_oauth('oauth',now=1002);errors=[];manager=self.manager
+        class CompleteExchange(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-token-one',
+                  'refresh_token':'reauth-refresh','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        class OuterRefresh(object):
+            def exchange(inner,*_args):
+                try:manager.complete_oauth('oauth',second['flow_id'],second['state'],
+                  'code',self.base,self.base+'/callback',CompleteExchange(),now=1003)
+                except ValueError as exc:errors.append(str(exc))
+                return {'access_token':'access-token-one',
+                  'refresh_token':'refresh-one','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        self.manager.refresh('oauth',OuterRefresh(),now=1003)
+        row=self.supervisor.db.execute('''SELECT * FROM service_connections WHERE
+          connection_id='oauth' ''').fetchone()
+        self.assertEqual(errors,['OAUTH_CREDENTIAL_WRITE_IN_PROGRESS'])
+        self.assertEqual((row['status'],row['config_version'],
+          row['credential_generation'],row['connection_mutation_epoch']),
+          ('ACTIVE',1,1,3))
+        self.assertEqual(self.manager.fernet.decrypt(row['refresh_cipher']).decode(),
+          'refresh-one')
+
+    def test_complete_loses_generation_cas_to_concurrent_refresh(self):
+        self.manager.upsert(self.oauth_config());first=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',first['flow_id'],first['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        second=self.manager.begin_oauth('oauth',now=1002);manager=self.manager
+        refresh_errors=[]
+        class OuterRefresh(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-token-one',
+                  'refresh_token':'outer-refresh','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        class CompleteExchange(object):
+            def exchange(inner,*_args):
+                try:manager.refresh('oauth',OuterRefresh(),now=1003)
+                except ValueError as exc:refresh_errors.append(str(exc))
+                return {'access_token':'access-token-one',
+                  'refresh_token':'refresh-one','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        self.manager.complete_oauth('oauth',second['flow_id'],second['state'],
+          'code',self.base,self.base+'/callback',CompleteExchange(),now=1003)
+        row=self.supervisor.db.execute('''SELECT * FROM service_connections WHERE
+          connection_id='oauth' ''').fetchone()
+        self.assertEqual(refresh_errors,['OAUTH_CREDENTIAL_WRITE_IN_PROGRESS'])
+        self.assertEqual((row['status'],row['credential_generation'],
+          row['connection_mutation_epoch']),('ACTIVE',1,3))
+        self.assertEqual(self.manager.fernet.decrypt(row['refresh_cipher']).decode(),
+          'refresh-one')
+
+    def test_revoke_supersedes_inflight_refresh(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],'code',
+          self.base,self.base+'/callback',now=1001);manager=self.manager
+        class RevokeDuringRefresh(object):
+            def exchange(inner,*_args):
+                manager.revoke('oauth',now=1003)
+                return {'access_token':'access-token-one',
+                  'refresh_token':'outer-refresh','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        with self.assertRaisesRegex(ValueError,'OAUTH_REFRESH_SUPERSEDED'):
+            self.manager.refresh('oauth',RevokeDuringRefresh(),now=1003)
+        row=self.supervisor.db.execute('''SELECT status,config_version,
+          credential_generation,secret_cipher,refresh_cipher FROM
+          service_connections WHERE connection_id='oauth' ''').fetchone()
+        self.assertEqual(tuple(row),('REVOKED',2,2,None,None))
+
+    def test_upsert_supersedes_inflight_complete(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        manager=self.manager;replacement=self.api_config('oauth')
+        errors=[]
+        class UpsertDuringComplete(object):
+            def exchange(inner,*_args):
+                try:manager.upsert(replacement,'replacement-api-key',now=1001)
+                except ValueError as exc:errors.append(str(exc))
+                return {'access_token':'access-token-one',
+                  'refresh_token':'reauth-refresh','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],'code',
+          self.base,self.base+'/callback',UpsertDuringComplete(),now=1001)
+        row=self.supervisor.db.execute('''SELECT auth_type,status,config_version,
+          credential_generation,secret_cipher FROM service_connections WHERE
+          connection_id='oauth' ''').fetchone()
+        self.assertEqual(errors,['OAUTH_REFRESH_IN_PROGRESS'])
+        self.assertEqual(tuple(row)[:4],('OAUTH2_AUTH_CODE_PKCE','ACTIVE',1,1))
+        self.assertEqual(self.manager.fernet.decrypt(row['secret_cipher']).decode(),
+          'access-token-one')
+
+    def test_parse_failure_cleanup_cannot_clobber_concurrent_revoke(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        manager=self.manager
+        class RevokeThenMalformed(object):
+            def exchange(inner,*_args):
+                manager.revoke('oauth',now=1001)
+                return {'refresh_token':'must-not-write','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        with self.assertRaisesRegex(ValueError,'NONEMPTY_ACCESS_TOKEN_REQUIRED'):
+            self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],'code',
+              self.base,self.base+'/callback',RevokeThenMalformed(),now=1001)
+        row=self.supervisor.db.execute('''SELECT auth_type,status,config_version,
+          credential_generation,connection_mutation_epoch,secret_cipher,
+          refresh_cipher FROM service_connections WHERE connection_id='oauth' ''').fetchone()
+        self.assertEqual(tuple(row),('OAUTH2_AUTH_CODE_PKCE','REVOKED',2,0,3,
+          None,None))
+
+    def test_expired_complete_claim_recovers_after_restart_and_refreshes(self):
+        self.manager.upsert(self.oauth_config());first=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',first['flow_id'],first['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        abandoned=self.manager.begin_oauth('oauth',now=1002)
+        class WorkerExit(object):
+            def exchange(inner,*_args):raise SystemExit('worker-exit')
+        with self.assertRaises(SystemExit):
+            self.manager.complete_oauth('oauth',abandoned['flow_id'],
+              abandoned['state'],'code',self.base,self.base+'/callback',
+              WorkerExit(),now=1003)
+        self.assertEqual(self.manager.projection()[0]['status'],'CREDENTIAL_WRITING')
+        self.supervisor.close();self.supervisor=Supervisor(self.db)
+        self.gateway=GatewayKernel(self.supervisor,self.authority)
+        self.manager=ConnectionManager(self.gateway,self.context,self.master,
+          clock=lambda:1040)
+        class SameCredential(object):
+            def exchange(inner,*_args):
+                return {'access_token':'access-token-one',
+                  'refresh_token':'refresh-one','token_type':'Bearer',
+                  'expires_in':120,'scope':'models.run tools.read'}
+        self.manager.refresh('oauth',SameCredential(),now=1040)
+        row=self.manager.projection()[0]
+        self.assertEqual((row['status'],row['credential_generation'],
+          row['connection_mutation_epoch']),('ACTIVE',1,5))
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,1)
+
+    def test_stale_takeover_failures_restore_only_stable_state(self):
+        self.manager.upsert(self.oauth_config());first=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',first['flow_id'],first['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        def strand(now):
+            self.supervisor.db.execute('''UPDATE service_connections SET
+              status='CREDENTIAL_WRITING',stable_prior_status='ACTIVE',
+              refresh_lease='dead-writer',refresh_lease_until=?,
+              connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+              connection_id='oauth' ''',(now-1,));self.supervisor.db.commit()
+        class Malformed(object):
+            def exchange(inner,*_args):return {'token_type':'Bearer'}
+        class AdapterFailure(object):
+            def exchange(inner,*_args):raise RuntimeError('adapter-failure')
+        for offset,kind in enumerate(('malformed','adapter','verifier'),start=10):
+            now=1000+offset;flow=self.manager.begin_oauth('oauth',now=now-1)
+            if kind=='verifier':
+                self.supervisor.db.execute('''UPDATE oauth_flows SET
+                  verifier_cipher=? WHERE flow_id=?''',(b'not-fernet',
+                  flow['flow_id']));self.supervisor.db.commit()
+            strand(now)
+            call=(Malformed() if kind=='malformed' else AdapterFailure())
+            with self.assertRaises(Exception):
+                self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],
+                  'code',self.base,self.base+'/callback',call,now=now)
+            row=self.manager.projection()[0]
+            self.assertEqual(row['status'],'ACTIVE')
+            stored=self.supervisor.db.execute('''SELECT refresh_lease,
+              refresh_lease_until,stable_prior_status FROM service_connections
+              WHERE connection_id='oauth' ''').fetchone()
+            self.assertEqual(tuple(stored),(None,None,'ACTIVE'))
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,3)
+
+    def test_ownerless_transient_recovery_is_idempotent_before_upsert(self):
+        self.manager.upsert(self.api_config(),credential='api-key-123456')
+        self.supervisor.db.execute('''UPDATE service_connections SET
+          status='CREDENTIAL_WRITING',stable_prior_status='ACTIVE',
+          refresh_lease=NULL,refresh_lease_until=NULL,
+          connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+          connection_id='key' ''');self.supervisor.db.commit()
+        self.manager.upsert(self.api_config(),credential='api-key-123456',now=1001)
+        self.manager.upsert(self.api_config(),credential='api-key-123456',now=1002)
+        row=self.manager.projection()[0]
+        self.assertEqual((row['status'],row['credential_generation']),('ACTIVE',1))
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,1)
+
+    def test_recovery_checkpoint_survives_missing_refresh_and_invalid_flow(self):
+        self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')
+        self.manager.complete_oauth('oauth',flow['flow_id'],flow['state'],'code',
+          self.base,self.base+'/callback',now=1001)
+        self.supervisor.db.execute('''UPDATE service_connections SET
+          status='CREDENTIAL_WRITING',stable_prior_status='ACTIVE',
+          refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
+          connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+          connection_id='oauth' ''');self.supervisor.db.commit()
+        before=self.manager.projection()[0]['connection_mutation_epoch']
+        with self.assertRaisesRegex(ValueError,'OAUTH_REFRESH_TOKEN_REQUIRED'):
+            self.manager.refresh('oauth',now=1010)
+        row=self.manager.projection()[0]
+        self.assertEqual((row['status'],row['connection_mutation_epoch']),
+          ('ACTIVE',before+1))
+        with self.assertRaisesRegex(ValueError,'OAUTH_REFRESH_TOKEN_REQUIRED'):
+            self.manager.refresh('oauth',now=1011)
+        self.supervisor.db.execute('''UPDATE service_connections SET
+          status='CREDENTIAL_WRITING',stable_prior_status='ACTIVE',
+          refresh_lease=NULL,refresh_lease_until=NULL,
+          connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+          connection_id='oauth' ''');self.supervisor.db.commit()
+        with self.assertRaisesRegex(ValueError,'OAUTH_FLOW_REQUIRED'):
+            self.manager.complete_oauth('oauth','missing-flow','missing-state','code',
+              self.base,self.base+'/callback',now=1012)
+        self.assertEqual(self.manager.projection()[0]['status'],'ACTIVE')
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,2)
+
+    def test_recovery_checkpoint_survives_upsert_and_revoke_business_failure(self):
+        self.manager.upsert(self.oauth_config())
+        self.supervisor.db.execute('''UPDATE service_connections SET
+          status='CREDENTIAL_WRITING',stable_prior_status='CONFIGURED',
+          refresh_lease=NULL,refresh_lease_until=NULL,
+          connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+          connection_id='oauth' ''');self.supervisor.db.commit()
+        expanded=self.oauth_config();expanded['scopes'].append('admin.write')
+        with self.assertRaisesRegex(ValueError,'SCOPE_EXPANSION'):
+            self.manager.upsert(expanded,now=1010)
+        self.assertEqual(self.manager.projection()[0]['status'],'CONFIGURED')
+        self.supervisor.db.execute('''UPDATE service_connections SET
+          status='CREDENTIAL_WRITING',stable_prior_status='CONFIGURED',
+          refresh_lease=NULL,refresh_lease_until=NULL,
+          connection_mutation_epoch=connection_mutation_epoch+1 WHERE
+          connection_id='oauth' ''')
+        self.supervisor.db.execute('''CREATE TRIGGER reject_revoke BEFORE UPDATE
+          ON service_connections WHEN NEW.status='REVOKED' BEGIN SELECT
+          RAISE(ABORT,'fixture revoke failure'); END''');self.supervisor.db.commit()
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.manager.revoke('oauth',now=1011)
+        self.supervisor.db.execute('DROP TRIGGER reject_revoke');self.supervisor.db.commit()
+        self.assertEqual(self.manager.projection()[0]['status'],'CONFIGURED')
+        audits=self.supervisor.db.execute('''SELECT COUNT(*) FROM connection_audit
+          WHERE action='STALE_CREDENTIAL_WRITER_RECOVERED' ''').fetchone()[0]
+        self.assertEqual(audits,2)
+
+    def test_legacy_transient_migration_with_secret_is_conservative(self):
+        cipher=self.manager.fernet.encrypt(b'legacy-access')
+        self.supervisor.db.execute('DROP TABLE service_connections')
+        self.supervisor.db.execute('''CREATE TABLE service_connections(
+          tenant_id TEXT NOT NULL,connection_id TEXT NOT NULL,
+          provider_id TEXT NOT NULL,purpose TEXT NOT NULL,auth_type TEXT NOT NULL,
+          destination_origin TEXT NOT NULL,issuer TEXT,
+          authorization_endpoint TEXT,token_endpoint TEXT,revocation_endpoint TEXT,
+          redirect_uri TEXT,client_id TEXT,scopes_json TEXT NOT NULL,
+          supports_refresh INTEGER NOT NULL,status TEXT NOT NULL,
+          config_version INTEGER NOT NULL,secret_cipher BLOB,secret_mask TEXT,
+          refresh_cipher BLOB,access_expires_at REAL,refresh_lease TEXT,
+          refresh_lease_until REAL,credential_generation INTEGER NOT NULL DEFAULT 0,
+          connection_mutation_epoch INTEGER NOT NULL DEFAULT 0,
+          created_at REAL NOT NULL,updated_at REAL NOT NULL,
+          PRIMARY KEY(tenant_id,connection_id))''')
+        self.supervisor.db.execute('''INSERT INTO service_connections(
+          tenant_id,connection_id,provider_id,purpose,auth_type,
+          destination_origin,scopes_json,supports_refresh,status,config_version,
+          secret_cipher,secret_mask,credential_generation,
+          connection_mutation_epoch,created_at,updated_at) VALUES
+          ('tenant-a','legacy','fixture','MODEL_INFERENCE','API_KEY',?,
+          '[]',0,'CREDENTIAL_WRITING',1,?,'masked',1,7,1,1)''',(
+          self.base,cipher));self.supervisor.db.commit()
+        migrated=ConnectionManager(self.gateway,self.context,self.master)
+        row=migrated.projection()[0]
+        self.assertEqual(row['status'],'CREDENTIAL_WRITING')
+        stored=self.supervisor.db.execute('''SELECT stable_prior_status FROM
+          service_connections WHERE connection_id='legacy' ''').fetchone()[0]
+        self.assertEqual(stored,'REAUTH_REQUIRED')
 
     def test_oauth_state_issuer_redirect_expiry_and_refresh_conflict(self):
         self.manager.upsert(self.oauth_config());flow=self.manager.begin_oauth('oauth')

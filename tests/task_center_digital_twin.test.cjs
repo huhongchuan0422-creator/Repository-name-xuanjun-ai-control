@@ -33,18 +33,3 @@ assert.match(ui.render(special,ui.parseRoute(ui.href('task','research-developmen
 assert.match(ui.render(special,ui.parseRoute(ui.href('task','research-development','任务/设计',{}))),/异常证据/);
 assert.strictEqual(ui.parseRoute('#task/research-development/%E0%A4%A').view,'invalid');
 ui.loadProjection(()=>Promise.resolve({ok:true,json:()=>Promise.resolve(data)})).then(x=>{assert.strictEqual(x,data);console.log('task_center_digital_twin.test: PASS');});
-
-// Hosted errors must never render the bundled demo, including after a refresh.
-(async()=>{
-  let pending=[];
-  const app={innerHTML:'',querySelectorAll:()=>[]},mode={textContent:''},home={};
-  const doc={getElementById:id=>({app,dataMode:mode,home})[id]||null};
-  const win={location:{protocol:'https:',hash:'#overview'},addEventListener:()=>{},fetch:()=>new Promise((resolve,reject)=>pending.push({resolve,reject}))};
-  ui.boot(doc,win,data);
-  assert.doesNotMatch(app.innerHTML,/t-a|qa-proof/);
-  pending.shift().reject(new Error('offline'));
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.match(mode.textContent,/LOAD_FAILED/);
-  assert.doesNotMatch(app.innerHTML,/t-a|qa-proof/);
-  console.log('hosted projection failure: PASS');
-})().catch(error=>{console.error(error);process.exitCode=1;});

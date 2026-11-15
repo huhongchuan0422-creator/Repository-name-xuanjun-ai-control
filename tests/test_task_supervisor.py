@@ -9,7 +9,7 @@ import unittest
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
-from task_supervisor import Supervisor, UNKNOWN, TestOnlyDevelopmentIdentityVerifier
+from task_supervisor import Supervisor, UNKNOWN
 
 
 class SupervisorTests(unittest.TestCase):
@@ -17,18 +17,7 @@ class SupervisorTests(unittest.TestCase):
         handle, self.path = tempfile.mkstemp()
         os.close(handle)
         self.now = 1000.0
-        os.environ['XUANJUN_TEST_ONLY_IDENTITY']='1'
-        self.s = Supervisor(self.path, lambda: self.now,
-          TestOnlyDevelopmentIdentityVerifier(self.authenticated_development_identity))
-
-    @staticmethod
-    def authenticated_development_identity(owner_grant, developer_credential,
-                                           task_id, contract_sha256):
-        if owner_grant != 'owner-proof' or developer_credential != 'developer-proof':
-            raise ValueError('AUTHENTICATION_FAILED')
-        return {'task_id': task_id, 'contract_sha256': contract_sha256,
-                'owner': {'issuer': 'owner-auth', 'subject': 'developer'},
-                'developer': {'issuer': 'native', 'subject': 'developer'}}
+        self.s = Supervisor(self.path, lambda: self.now)
 
     def tearDown(self):
         try:
@@ -37,7 +26,6 @@ class SupervisorTests(unittest.TestCase):
             pass
         if os.path.exists(self.path):
             os.unlink(self.path)
-        os.environ.pop('XUANJUN_TEST_ONLY_IDENTITY',None)
 
     def registration(self, task='t1', deps=None):
         self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',
@@ -73,32 +61,6 @@ class SupervisorTests(unittest.TestCase):
         changed=dict(contract);changed['target_base_sha']='d'*40
         with self.assertRaisesRegex(ValueError,'DEVELOPMENT_CONTRACT_CONFLICT'):
             self.s.register_development_contract('t1',changed)
-
-    def test_first_development_claim_allocates_ids_and_projects_reader_v3(self):
-        self.registration()
-        self.s.register_development_contract('t1',self.development_contract())
-        caller={'caller_id':'writer','run_id':'run1',
-                'session_id':'session1','gateway_id':'gateway1'}
-        ticket=self.s.claim_development_writer(
-            't1','WORK',caller,'provider1',['git:owner/repo/main'],1700,
-            'owner-proof','developer-proof')
-        self.assertRegex(ticket['attempt_id'],r'^attempt-[0-9a-f]{32}$')
-        self.assertRegex(ticket['lease_id'],r'^lease-[0-9a-f]{32}$')
-        self.assertEqual((ticket['fence'],ticket['epoch']),(1,1))
-        with self.assertRaisesRegex(ValueError,'WRITER_AUTHORITY_NOT_CLAIMABLE'):
-            self.s.claim_development_writer(
-              't1','WORK',caller,'provider1',['git:owner/repo/main'],1700,
-              'owner-proof','developer-proof')
-
-    def test_first_development_claim_rejects_self_report_without_authenticator(self):
-        self.registration(); self.s.register_development_contract(
-            't1', self.development_contract())
-        self.s.development_identity_verifier = None
-        with self.assertRaisesRegex(ValueError, 'AUTHENTICATED_DEVELOPMENT'):
-            self.s.claim_development_writer(
-              't1','WORK',{'caller_id':'writer','run_id':'run1',
-              'session_id':'session1','gateway_id':'gateway1'},'provider1',
-              ['git:owner/repo/main'],1700,'developer','developer')
 
     def test_failed_development_completion_never_unlocks_dependency(self):
         self.registration('t1')

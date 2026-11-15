@@ -11,7 +11,6 @@ import json
 import math
 import os
 import re
-import secrets
 import sqlite3
 import time
 
@@ -26,22 +25,6 @@ SUPERVISOR_APPLICATION_ID = 0x58534A31
 SUPERVISOR_SCHEMA_VERSION = 3
 AUTHORITY_STATES = frozenset(('NONE', 'VALID', 'REVOKING', 'REVOKED',
                               UNKNOWN))
-
-class DevelopmentIdentityVerifier(object):
-    """Sealed production boundary; arbitrary callables are never accepted."""
-    production_trusted = False
-    test_only = False
-    def verify(self, owner_grant, developer_credential, task_id, contract_sha256):
-        raise NotImplementedError
-
-class TestOnlyDevelopmentIdentityVerifier(DevelopmentIdentityVerifier):
-    test_only = True
-    def __init__(self, implementation):
-        if os.environ.get('XUANJUN_TEST_ONLY_IDENTITY') != '1':
-            raise ValueError('TEST_ONLY_IDENTITY_ENV_REQUIRED')
-        self._implementation = implementation
-    def verify(self, *args):
-        return self._implementation(*args)
 V2_TASK_COLUMNS = (
     'task_id', 'parent_task_id', 'stage', 'writer_scope', 'state', 'owner',
     'entry', 'run_id', 'session_id', 'attempt_id', 'checkpoint_sha256',
@@ -129,13 +112,9 @@ class Supervisor(object):
         finally:
             db.close()
 
-    def __init__(self, path, clock=None, development_identity_verifier=None):
+    def __init__(self, path, clock=None):
         self.path = path
         self.clock = clock or time.time
-        if (development_identity_verifier is not None
-                and not isinstance(development_identity_verifier, DevelopmentIdentityVerifier)):
-            raise ValueError('CONTROLLED_IDENTITY_VERIFIER_REQUIRED')
-        self.development_identity_verifier = development_identity_verifier
         # Read-only immutable preflight prevents an old WAL-mode v1/v2 ledger
         # from creating wal/shm/journal sidecars merely because normal runtime
         # attempted to open it.
@@ -145,17 +124,6 @@ class Supervisor(object):
         try:
             self.db.execute('PRAGMA foreign_keys=ON')
             self._schema()
-            self.db.execute('''CREATE TABLE IF NOT EXISTS authority_runtime_profile(
-              singleton INTEGER PRIMARY KEY CHECK(singleton=1),profile TEXT NOT NULL)''')
-            profile = ('FORMAL' if development_identity_verifier is not None
-                       and development_identity_verifier.production_trusted
-                       else 'TEST_ONLY')
-            self.db.execute('INSERT OR IGNORE INTO authority_runtime_profile VALUES(1,?)',
-                            (profile,))
-            stored = self.db.execute('SELECT profile FROM authority_runtime_profile WHERE singleton=1').fetchone()[0]
-            if stored != profile and development_identity_verifier is not None:
-                raise ValueError('AUTHORITY_RUNTIME_PROFILE_MISMATCH')
-            self.db.commit()
             self.db.execute('PRAGMA journal_mode=WAL')
         except Exception:
             self.db.close()
@@ -555,8 +523,15 @@ class Supervisor(object):
         required = {'task_id','spec_sha256','checkpoint_sha256',
                     'target_repository','target_base_sha','entry',
                     'developer','allowed_files','trusted_reviewers'}
-        if not isinstance(contract, dict) or set(contract) != required:
+        if (not isinstance(contract, dict) or
+                set(contract) not in (required, required | {'producer_http_test_sha256'})):
             raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
+        if 'producer_http_test_sha256' in contract:
+            from producer_http_contract import REFERENCE_SHA256,REPOSITORY,ALLOWED_FILE
+            if (contract['producer_http_test_sha256'] != REFERENCE_SHA256
+                    or contract['target_repository'] != REPOSITORY
+                    or contract['allowed_files'] != [ALLOWED_FILE]):
+                raise ValueError('EXACT_PRODUCER_HTTP_TEST_REQUIRED')
         for name in ('task_id','entry'):
             if not isinstance(contract[name], str) or not contract[name]:
                 raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
@@ -630,17 +605,17 @@ class Supervisor(object):
     def bind_development_candidate(self, receipt, file_manifest):
         return self._bind_development_candidate(receipt, file_manifest)
 
-    def bind_local_development_candidate(self, receipt, files, admission_check=None):
+    def bind_local_development_candidate(self, receipt, files, admission_check=None, producer_tree_proof=None):
         # Local provenance must not invent a GitHub source_comment_id.
         if (not isinstance(files, dict) or len(files) != 1 or
-                any(not isinstance(path,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*\.py',path)
+                any(not isinstance(path,str) or not (re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*\.py',path) or path == 'scripts/task_center_app.py')
                     for path in files) or
                 any(type(raw) is not bytes or len(raw)>131072 for raw in files.values())):
             raise ValueError('BOUNDED_LOCAL_SOURCE_REQUIRED')
         manifest={path:hashlib.sha256(raw).hexdigest() for path,raw in files.items()}
-        return self._bind_development_candidate(receipt, manifest, files, admission_check)
+        return self._bind_development_candidate(receipt, manifest, files, admission_check, producer_tree_proof)
 
-    def _bind_development_candidate(self, receipt, file_manifest, local_files=None, admission_check=None):
+    def _bind_development_candidate(self, receipt, file_manifest, local_files=None, admission_check=None, producer_tree_proof=None):
         required = {'schema','entry','execution_path','task_id','spec_sha256',
                     'checkpoint_sha256','target_repository','target_base_sha',
                     'code_commit','event','attempt_id','lease_id','fence',
@@ -718,8 +693,19 @@ class Supervisor(object):
                 raw=next(iter(local_files.values()))
                 blob=hashlib.sha1(('blob %d\0'%len(raw)).encode()+raw).hexdigest()
                 path=next(iter(local_files))
-                tree_bytes=b'100644 '+path.encode()+b'\0'+bytes.fromhex(blob)
-                tree=hashlib.sha1(('tree %d\0'%len(tree_bytes)).encode()+tree_bytes).hexdigest()
+                if path == 'scripts/task_center_app.py':
+                    from producer_tree_delta import plan, REPOSITORY
+                    if (contract['target_repository'] != REPOSITORY or not isinstance(producer_tree_proof,dict)
+                            or set(producer_tree_proof) != {'root_raw','scripts_raw'}
+                            or any(type(value) is not bytes or len(value)>262144 for value in producer_tree_proof.values())
+                            or operation['expected_before'].get('tree') != '6ce6cc628cc8107c5146e17357844b8aa9d84d42'):
+                        raise ValueError('EXACT_PRODUCER_TREE_PROOF_REQUIRED')
+                    tree=plan(REPOSITORY,path,operation['expected_before']['tree'],producer_tree_proof['root_raw'],
+                        producer_tree_proof['scripts_raw'],operation['expected_before']['blob'],raw)['tree_oid']
+                else:
+                    if producer_tree_proof is not None:raise ValueError('UNEXPECTED_PRODUCER_TREE_PROOF')
+                    tree_bytes=b'100644 '+path.encode()+b'\0'+bytes.fromhex(blob)
+                    tree=hashlib.sha1(('tree %d\0'%len(tree_bytes)).encode()+tree_bytes).hexdigest()
                 if (operation['operation_kind']!='GIT_CAS' or
                         observed.get('observed_revision')!=receipt['code_commit'] or
                         operation['expected_before'].get('repo')!=contract['target_repository'] or
@@ -785,13 +771,37 @@ class Supervisor(object):
             raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
         return json.loads(row['payload_json'])
 
-    @staticmethod
-    def _require_development_execution_ready(candidate):
-        # Local source-write receipts and Writer revocation are not runtime proof.
-        # No trusted sandbox execution evidence format is implemented yet: fail
-        # closed in canonical APIs, including historical reviewed-event replay.
-        if (candidate.get('source_kind') == 'LOCAL_ONLY_CONFIRMED_OPERATION'
+    def _require_development_execution_ready(self,candidate):
+        if not (candidate.get('source_kind') == 'LOCAL_ONLY_CONFIRMED_OPERATION'
                 or 'source_operation_id' in candidate):
+            return
+        from producer_http_contract import REFERENCE_SHA256,REPOSITORY,ALLOWED_FILE
+        task_id=candidate.get('task_id');attempt=candidate.get('attempt_id')
+        operation=candidate.get('source_operation_id')
+        if not isinstance(operation,str):raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
+        row=self.db.execute("SELECT * FROM events WHERE task_id=? AND attempt_id=? AND event_id=?",
+            (task_id,attempt,'producer-http-execution:'+operation)).fetchone()
+        if row is None or row['kind']!='DEVELOPMENT_EXECUTION':raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
+        try:
+            evidence=json.loads(row['payload_json']);contract=self.development_contract(task_id)
+            cand_event='development-local-candidate:'+operation
+            crow=self.db.execute('SELECT kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                (task_id,attempt,cand_event)).fetchone()
+            expected={'schema':1,'candidate_event_id':cand_event,
+                'candidate_sha256':hashlib.sha256(canonical(candidate).encode()).hexdigest(),
+                'task_id':task_id,'attempt_id':attempt,'lease_id':candidate['lease_id'],'fence':candidate['fence'],
+                'epoch':candidate['epoch'],'contract_sha256':candidate['contract_sha256'],'code_commit':candidate['code_commit'],
+                'source_sha256':candidate['files'][ALLOWED_FILE],'test_reference_sha256':REFERENCE_SHA256,'result':'PASS'}
+            if (contract.get('producer_http_test_sha256')!=REFERENCE_SHA256 or contract.get('target_repository')!=REPOSITORY
+                    or contract.get('allowed_files')!=[ALLOWED_FILE] or not isinstance(evidence,dict)
+                    or set(evidence)!=set(expected)|{'artifact_sha256'}
+                    or any(evidence.get(k)!=v for k,v in expected.items())
+                    or not isinstance(evidence['artifact_sha256'],str) or re.fullmatch('[0-9a-f]{64}',evidence['artifact_sha256']) is None
+                    or row['evidence_ref']!=hashlib.sha256(canonical(evidence).encode()).hexdigest()
+                    or crow is None or crow['kind']!='DEVELOPMENT_CANDIDATE'
+                    or crow['evidence_ref']!=expected['candidate_sha256'] or crow['payload_json']!=canonical(candidate)):
+                raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
+        except (KeyError,TypeError,ValueError):
             raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
 
     def record_development_review(self, task_id, candidate_event_id, files,
@@ -1349,36 +1359,6 @@ class Supervisor(object):
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
             return self._authority_ticket(self._task(task_id))
-
-    def claim_development_writer(self, task_id, entry, caller,
-                                 lock_provider_id, resource_keys, valid_until,
-                                 owner_grant, developer_credential):
-        """Allocate first-attempt and lease identities inside the writer CAS."""
-        contract = self.development_contract(task_id)
-        task = self._task(task_id)
-        verifier = self.development_identity_verifier
-        if verifier is None:
-            raise ValueError('AUTHENTICATED_DEVELOPMENT_IDENTITY_REQUIRED')
-        contract_sha = hashlib.sha256(canonical(contract).encode('utf-8')).hexdigest()
-        if not (verifier.production_trusted or (verifier.test_only and
-                os.environ.get('XUANJUN_TEST_ONLY_IDENTITY') == '1')):
-            raise ValueError('TRUSTED_IDENTITY_VERIFIER_REQUIRED')
-        identity = verifier.verify(owner_grant, developer_credential, task_id,
-                                   contract_sha)
-        required = {'task_id', 'contract_sha256', 'owner', 'developer'}
-        if (not isinstance(identity, dict) or set(identity) != required
-                or identity['task_id'] != task_id
-                or identity['contract_sha256'] != contract_sha
-                or identity['owner'] != {'issuer': 'owner-auth',
-                                         'subject': task['owner']}
-                or identity['developer'] != contract['developer']
-                or contract['entry'] != entry):
-            raise ValueError('CANONICAL_DEVELOPMENT_CONTRACT_MISMATCH')
-        attempt_id = 'attempt-' + secrets.token_hex(16)
-        lease_id = 'lease-' + secrets.token_hex(16)
-        return self.claim_writer(task_id, attempt_id, task['owner'], entry, caller,
-                                 lease_id, lock_provider_id, resource_keys,
-                                 valid_until)
 
     def _validate_writer_locked(self, ticket, caller, lock_provider_id):
         now = self.clock()

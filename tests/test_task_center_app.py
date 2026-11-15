@@ -9,7 +9,7 @@ import threading
 import unittest
 import sqlite3
 from unittest import mock
-from urllib.request import Request, urlopen, build_opener, ProxyHandler
+from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from cryptography.fernet import Fernet
 
@@ -81,12 +81,6 @@ class TaskCenterAppTests(unittest.TestCase):
         status, _, body = self.get('/')
         self.assertEqual(status, 200)
         self.assertIn(b'id="dataMode"', body)
-
-    def test_test_only_app_has_no_formal_authority_signing_capability(self):
-        with self.assertRaises(HTTPError) as missing:
-            urlopen(self.base + '/api/v3/development-authority?task_id=dev-1',
-                    timeout=3)
-        self.assertEqual(missing.exception.code, 404)
 
     def test_projection_get_is_read_only_with_active_wal(self):
         writer = Supervisor(self.db)

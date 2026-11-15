@@ -57,8 +57,13 @@ def authenticated(record,keyring):
 def review_bundle(contract,files,reviews,review_keys=None):
     required={'task_id','spec_sha256','checkpoint_sha256','target_repository','target_base_sha',
               'code_commit','entry','developer','allowed_files','trusted_reviewers'}
-    if not isinstance(contract,dict) or set(contract)!=required:
+    if not isinstance(contract,dict) or set(contract) not in (required,required | {'producer_http_test_sha256'}):
         raise ValueError('EXACT_TRUSTED_CONTRACT_REQUIRED')
+    if 'producer_http_test_sha256' in contract:
+        from producer_http_contract import REFERENCE_SHA256,REPOSITORY,ALLOWED_FILE
+        if (contract['producer_http_test_sha256'] != REFERENCE_SHA256 or contract['target_repository'] != REPOSITORY
+                or contract['allowed_files'] != [ALLOWED_FILE]):
+            raise ValueError('EXACT_PRODUCER_HTTP_TEST_REQUIRED')
     if contract['entry'] not in ENTRIES:
         raise ValueError('UNKNOWN_ENTRY')
     if (not isinstance(contract['task_id'],str) or not re.fullmatch(r'[A-Za-z0-9_.:/-]{1,160}',contract['task_id'])

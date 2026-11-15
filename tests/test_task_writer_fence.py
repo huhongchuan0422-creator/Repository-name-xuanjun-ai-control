@@ -11,7 +11,7 @@ import unittest
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
 
-from task_supervisor import Supervisor, UNKNOWN, TestOnlyDevelopmentIdentityVerifier
+from task_supervisor import Supervisor, UNKNOWN
 from task_writer_fence import (
     Fence, FakeTransactionalSink, LocalActionLocks, OfflineGitCAS,
     SourceResourceAdapter, production_fencing_verdict, reconcile_unknown,
@@ -24,12 +24,7 @@ class WriterFenceTests(unittest.TestCase):
         self.path = os.path.join(self.directory.name, 'ledger.sqlite')
         self.lock_root = os.path.join(self.directory.name, 'locks')
         self.now = 1000.0
-        os.environ['XUANJUN_TEST_ONLY_IDENTITY']='1'
-        self.s = Supervisor(self.path, lambda: self.now,
-            TestOnlyDevelopmentIdentityVerifier(lambda owner, developer, task, digest: {
-              'task_id':task,'contract_sha256':digest,
-              'owner':{'issuer':'owner-auth','subject':'developer'},
-              'developer':{'issuer':'native','subject':'developer'}}))
+        self.s = Supervisor(self.path, lambda: self.now)
         self.fence = Fence(self.s, self.lock_root)
         self.register('t1')
 
@@ -43,7 +38,6 @@ class WriterFenceTests(unittest.TestCase):
         except Exception:
             pass
         self.directory.cleanup()
-        os.environ.pop('XUANJUN_TEST_ONLY_IDENTITY',None)
 
     def register(self, task):
         self.s.register(dict(
@@ -66,22 +60,6 @@ class WriterFenceTests(unittest.TestCase):
             task, attempt, 'developer', 'WORK', caller or self.caller(),
             'lease-' + attempt, resources or ['fake:account/a'],
             valid_until=1700)
-
-    def test_first_development_claim_uses_fixed_provider_and_ledger_ids(self):
-        self.s.register_development_contract('t1',dict(
-          task_id='t1',spec_sha256='b'*64,checkpoint_sha256='a'*64,
-          target_repository='owner/repo',target_base_sha='c'*40,entry='WORK',
-          developer={'issuer':'native','subject':'developer'},
-          allowed_files=['src/f.py'],trusted_reviewers=[
-            {'issuer':'native','subject':'qa','key_id':'qa','role':'QA'},
-            {'issuer':'native','subject':'sec','key_id':'sec','role':'SECURITY'}]))
-        ticket=self.fence.claim_first_development_writer(
-          't1','WORK',self.caller(),['git:owner/repo/main'],1700,
-          'owner-proof','developer-proof')
-        self.assertRegex(ticket['attempt_id'],r'^attempt-[0-9a-f]{32}$')
-        self.assertRegex(ticket['lease_id'],r'^lease-[0-9a-f]{32}$')
-        self.assertEqual(ticket['lock_provider_id'],self.fence.locks.provider_id)
-        self.assertEqual((ticket['fence'],ticket['epoch']),(1,1))
 
     def op(self, opid='op1', event='event1', resource='fake:account/a'):
         return {

@@ -159,7 +159,19 @@ class HostHTTPTests(unittest.TestCase):
             check_existing_bindings(self.f.db,bad)
 
     def test_http_scoped_cancel_is_durable_and_duplicate_safe(self):
-        token=self.token();identity={'task_id':'demo-b','attempt_id':'attempt-b','role_id':'developer'}
+        # Legitimate HTTP cancel chain under the canonical 2026-11-14 scoped-
+        # cancel contract (admin or the principal currently bound in canonical
+        # model_assignments, scoped to the exact task/attempt; asserted for
+        # host wiring by test_dispatch_authenticated_actor).  The canceller's
+        # own OAuth subject must therefore be the bound role principal, which
+        # deployment-authority config binds to itself here (minimal trusted
+        # binding row; no code, permission-rule or admin change).  All
+        # durability, duplicate, status, no-model-call and stale-attempt
+        # assertions below are unchanged.
+        cfg=copy.deepcopy(config());self_bound=copy.deepcopy(cfg['bindings'][0])
+        self_bound['principal_id']='developer-1';cfg['bindings'].append(self_bound)
+        self.restart(cfg)
+        token=self.token(principal='developer-1');identity={'task_id':'demo-b','attempt_id':'attempt-b','role_id':'developer'}
         self.rpc(token,'task_assign_role',identity)
         queued=self.control.queue_request('demo-b','developer',[{'role':'user','content':'cancel fixture'}],
             'cancel-host',16,'fixture-connection',expected_attempt_id='attempt-b',expected_project_id='project-mcp')
@@ -167,6 +179,10 @@ class HostHTTPTests(unittest.TestCase):
         self.assertEqual(self.rpc(token,'task_cancel_dispatch',request)['state'],'CANCELLED')
         self.assertTrue(self.rpc(token,'task_cancel_dispatch',request)['duplicate'])
         self.assertEqual(self.rpc(token,'task_dispatch_status',request)['request_state'],'CANCELLED')
+        audit=self.control.db.execute('''SELECT principal_id FROM model_audit WHERE
+            action='REQUEST_CANCEL' AND target_id=? ORDER BY observed_at DESC''',
+            (request['request_id'],)).fetchone()
+        self.assertEqual(audit['principal_id'],'developer-1')
         self.assertEqual(fixture.ModelFixture.calls,0)
         with self.assertRaises(HTTPError):
             self.rpc(token,'task_cancel_dispatch',dict(request,attempt_id='other'))

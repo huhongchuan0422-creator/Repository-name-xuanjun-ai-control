@@ -197,7 +197,10 @@ class ConnectionManager(object):
               supports_refresh INTEGER NOT NULL,status TEXT NOT NULL,
               config_version INTEGER NOT NULL,secret_cipher BLOB,secret_mask TEXT,
               refresh_cipher BLOB,access_expires_at REAL,refresh_lease TEXT,
-              refresh_lease_until REAL,created_at REAL NOT NULL,updated_at REAL NOT NULL,
+              refresh_lease_until REAL,credential_generation INTEGER NOT NULL DEFAULT 0,
+              connection_mutation_epoch INTEGER NOT NULL DEFAULT 0,
+              stable_prior_status TEXT NOT NULL DEFAULT 'CONFIGURED',
+              created_at REAL NOT NULL,updated_at REAL NOT NULL,
               PRIMARY KEY(tenant_id,connection_id))''')
             self.db.execute('''CREATE TABLE IF NOT EXISTS oauth_flows(
               tenant_id TEXT NOT NULL,flow_id TEXT NOT NULL,connection_id TEXT NOT NULL,
@@ -215,6 +218,21 @@ class ConnectionManager(object):
               selected_preference TEXT NOT NULL,api_connection_id TEXT,
               oauth_connection_id TEXT,config_version INTEGER NOT NULL,
               updated_at REAL NOT NULL,PRIMARY KEY(tenant_id,route_key))''')
+            columns={row['name'] for row in self.db.execute(
+              'PRAGMA table_info(service_connections)')}
+            if 'credential_generation' not in columns:
+                self.db.execute('''ALTER TABLE service_connections ADD COLUMN
+                  credential_generation INTEGER NOT NULL DEFAULT 0''')
+            if 'connection_mutation_epoch' not in columns:
+                self.db.execute('''ALTER TABLE service_connections ADD COLUMN
+                  connection_mutation_epoch INTEGER NOT NULL DEFAULT 0''')
+            if 'stable_prior_status' not in columns:
+                self.db.execute('''ALTER TABLE service_connections ADD COLUMN
+                  stable_prior_status TEXT NOT NULL DEFAULT 'CONFIGURED' ''')
+                self.db.execute('''UPDATE service_connections SET
+                  stable_prior_status=CASE WHEN status IN
+                  ('ACTIVE','CONFIGURED','REAUTH_REQUIRED','REVOKED') THEN status
+                  ELSE 'REAUTH_REQUIRED' END''')
             self.db.commit()
         except Exception:self.db.rollback();raise
 
@@ -232,6 +250,42 @@ class ConnectionManager(object):
         self.db.execute('INSERT INTO connection_audit VALUES (?,?,?,?,?,?,?)',(
           hashlib.sha256(seed.encode()).hexdigest(),self.tenant_id,principal,
           action,target,canonical(safe),now))
+
+    def _checkpoint_stale_credential_writer(self,connection_id,now):
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=self.db.execute('''SELECT * FROM service_connections WHERE
+              tenant_id=? AND connection_id=?''',(self.tenant_id,
+              connection_id)).fetchone()
+            recovered=False
+            if (row is not None and row['status'] in
+                    ('REFRESHING','CREDENTIAL_WRITING') and not (
+                    row['refresh_lease'] is not None and
+                    row['refresh_lease_until'] is not None and
+                    row['refresh_lease_until']>now)):
+                stable=('REAUTH_REQUIRED' if row['status']=='REFRESHING' else
+                        row['stable_prior_status'])
+                if stable not in ('ACTIVE','CONFIGURED','REAUTH_REQUIRED','REVOKED'):
+                    stable='REAUTH_REQUIRED'
+                if stable=='ACTIVE' and row['secret_cipher'] is None:
+                    stable='REAUTH_REQUIRED'
+                changed=self.db.execute('''UPDATE service_connections SET
+                  status=?,stable_prior_status=?,refresh_lease=NULL,
+                  refresh_lease_until=NULL,
+                  connection_mutation_epoch=connection_mutation_epoch+1,
+                  updated_at=? WHERE tenant_id=? AND connection_id=? AND
+                  status=? AND connection_mutation_epoch=?''',(stable,stable,
+                  now,self.tenant_id,connection_id,row['status'],
+                  row['connection_mutation_epoch'])).rowcount
+                if changed!=1:
+                    raise ValueError('STALE_CREDENTIAL_WRITER_CAS_FAILED')
+                self._audit('STALE_CREDENTIAL_WRITER_RECOVERED',connection_id,{
+                  'prior_transient_status':row['status'],'stable_status':stable,
+                  'expired_writer_epoch':row['connection_mutation_epoch'],
+                  'recovered_writer_epoch':row['connection_mutation_epoch']+1},now)
+                recovered=row['status']
+            self.db.commit();return recovered if recovered else None
+        except Exception:self.db.rollback();raise
 
     def upsert(self,config,credential=None,now=None):
         principal=self._admin();now=self.clock() if now is None else now
@@ -258,12 +312,14 @@ class ConnectionManager(object):
             _safe_endpoint(config['token_endpoint']);_safe_endpoint(config['redirect_uri'])
             if config['revocation_endpoint'] is not None:_safe_endpoint(config['revocation_endpoint'])
             if credential is not None:raise ValueError('OAUTH_CREDENTIAL_DIRECT_SET_FORBIDDEN')
+        self._checkpoint_stale_credential_writer(config['connection_id'],now)
         self.db.execute('BEGIN IMMEDIATE')
         try:
             existing=self.db.execute('''SELECT * FROM service_connections WHERE
               tenant_id=? AND connection_id=?''',(self.tenant_id,
               config['connection_id'])).fetchone()
-            if (existing and existing['status']=='REFRESHING' and
+            if (existing and existing['status'] in
+                    ('REFRESHING','CREDENTIAL_WRITING') and
                     existing['refresh_lease_until'] is not None and
                     existing['refresh_lease_until']>now):
                 raise ValueError('OAUTH_REFRESH_IN_PROGRESS')
@@ -271,42 +327,71 @@ class ConnectionManager(object):
             if existing and not set(scopes).issubset(old_scopes):
                 raise ValueError('SCOPE_EXPANSION_REQUIRES_NEW_AUTHORIZATION')
             version=(existing['config_version']+1) if existing else 1
+            generation=existing['credential_generation'] if existing else 0
+            mutation_epoch=(existing['connection_mutation_epoch']+1
+                            if existing else 1)
             secret_cipher=existing['secret_cipher'] if existing else None
             secret_mask=existing['secret_mask'] if existing else None
             refresh_cipher=existing['refresh_cipher'] if existing else None
             expires=existing['access_expires_at'] if existing else None
             status=existing['status'] if existing else 'CONFIGURED'
-            if existing and existing['status']=='REFRESHING':
+            credential_changed=False
+            if existing and existing['status'] in ('REFRESHING','CREDENTIAL_WRITING'):
                 # A stale/unknown refresh cannot be carried into a new
                 # configuration version.  Force explicit re-authorization.
                 secret_cipher=secret_mask=refresh_cipher=expires=None
-                status='REAUTH_REQUIRED'
+                status='REAUTH_REQUIRED';credential_changed=(
+                  existing['secret_cipher'] is not None or
+                  existing['refresh_cipher'] is not None)
             old_binding=(existing['destination_origin'],existing['issuer'],
               existing['auth_type']) if existing else None
             new_binding=(destination,config['issuer'],config['auth_type'])
             if old_binding and old_binding!=new_binding:
+                credential_changed=credential_changed or (
+                  existing['secret_cipher'] is not None or
+                  existing['refresh_cipher'] is not None)
                 secret_cipher=secret_mask=refresh_cipher=expires=None;status='REAUTH_REQUIRED'
             if credential is not None:
                 if (not isinstance(credential,str) or len(credential)<8 or
                         '\n' in credential or '\r' in credential):
                     raise ValueError('VALID_CONNECTION_CREDENTIAL_REQUIRED')
-                secret_cipher=self.fernet.encrypt(credential.encode());secret_mask='••••'+credential[-4:]
+                old_secret=(self.fernet.decrypt(existing['secret_cipher']).decode()
+                  if existing and existing['secret_cipher'] is not None else None)
+                replacement_changed=old_secret!=credential or (
+                  existing is not None and existing['refresh_cipher'] is not None)
+                credential_changed=credential_changed or replacement_changed
+                if replacement_changed:
+                    secret_cipher=self.fernet.encrypt(credential.encode())
+                    secret_mask='••••'+credential[-4:]
                 status='ACTIVE'
+            if credential_changed:generation+=1
             created=existing['created_at'] if existing else now
-            self.db.execute('''INSERT OR REPLACE INTO service_connections VALUES
-              (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+            self.db.execute('''INSERT OR REPLACE INTO service_connections(
+              tenant_id,connection_id,provider_id,purpose,auth_type,
+              destination_origin,issuer,authorization_endpoint,token_endpoint,
+              revocation_endpoint,redirect_uri,client_id,scopes_json,
+              supports_refresh,status,config_version,secret_cipher,secret_mask,
+              refresh_cipher,access_expires_at,refresh_lease,refresh_lease_until,
+              credential_generation,connection_mutation_epoch,created_at,
+              stable_prior_status,updated_at) VALUES
+              (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
               self.tenant_id,config['connection_id'],config['provider_id'],
               config['purpose'],config['auth_type'],destination,config['issuer'],
               config['authorization_endpoint'],config['token_endpoint'],
               config['revocation_endpoint'],config['redirect_uri'],config['client_id'],
               canonical(scopes),int(bool(config['supports_refresh'])),status,version,
-              secret_cipher,secret_mask,refresh_cipher,expires,None,None,created,now))
+              secret_cipher,secret_mask,refresh_cipher,expires,None,None,
+              generation,mutation_epoch,created,status,now))
             self._audit('CONNECTION_UPSERT',config['connection_id'],{
               'config_version':version,'auth_type':config['auth_type'],
-              'credential_replaced':credential is not None},now);self.db.commit()
+              'credential_replaced':credential is not None,
+              'credential_generation':generation,
+              'connection_mutation_epoch':mutation_epoch},now);self.db.commit()
         except Exception:self.db.rollback();raise
         return {'connection_id':config['connection_id'],'config_version':version,
-          'status':status,'secret_mask':secret_mask}
+          'status':status,'secret_mask':secret_mask,
+          'credential_generation':generation,
+          'connection_mutation_epoch':mutation_epoch}
 
     def set_openai_channel_preference(self,preference,api_connection_id=None,
                                       oauth_connection_id=None,
@@ -394,6 +479,8 @@ class ConnectionManager(object):
     def complete_oauth(self,connection_id,flow_id,state,code,issuer,
                        redirect_uri,adapter=None,now=None):
         self._admin();now=self.clock() if now is None else now
+        writer=secrets.token_urlsafe(18)
+        self._checkpoint_stale_credential_writer(connection_id,now)
         self.db.execute('BEGIN IMMEDIATE')
         try:
             flow=self.db.execute('''SELECT * FROM oauth_flows WHERE tenant_id=?
@@ -402,6 +489,11 @@ class ConnectionManager(object):
             connection=self.db.execute('''SELECT * FROM service_connections WHERE
               tenant_id=? AND connection_id=?''',(self.tenant_id,connection_id)).fetchone()
             if flow is None or connection is None:raise ValueError('OAUTH_FLOW_REQUIRED')
+            if (connection['status'] in ('REFRESHING','CREDENTIAL_WRITING') and
+                    connection['refresh_lease'] is not None and
+                    connection['refresh_lease_until'] is not None and
+                    connection['refresh_lease_until']>now):
+                raise ValueError('OAUTH_CREDENTIAL_WRITE_IN_PROGRESS')
             if flow['status']!='PENDING':raise ValueError('OAUTH_STATE_REPLAY')
             if now>=flow['expires_at']:raise ValueError('OAUTH_FLOW_EXPIRED')
             if hashlib.sha256(_text(state,'state').encode()).hexdigest()!=flow['state_sha256']:
@@ -412,23 +504,55 @@ class ConnectionManager(object):
                 raise ValueError('OAUTH_REDIRECT_MISMATCH')
             if connection['config_version']!=flow['connection_version']:
                 raise ValueError('OAUTH_CONFIG_VERSION_MISMATCH')
+            prior_status=connection['status']
+            writer_epoch=connection['connection_mutation_epoch']+1
+            claimed=self.db.execute('''UPDATE service_connections SET
+              status='CREDENTIAL_WRITING',refresh_lease=?,refresh_lease_until=?,
+              stable_prior_status=?,connection_mutation_epoch=?,updated_at=?
+              WHERE tenant_id=? AND
+              connection_id=? AND auth_type='OAUTH2_AUTH_CODE_PKCE' AND
+              status=? AND connection_mutation_epoch=? AND config_version=? AND
+              credential_generation=?''',(writer,now+30,prior_status,
+              writer_epoch,now,
+              self.tenant_id,connection_id,prior_status,
+              connection['connection_mutation_epoch'],connection['config_version'],
+              connection['credential_generation'])).rowcount
+            if claimed!=1:raise ValueError('OAUTH_CREDENTIAL_WRITER_CHANGED')
             changed=self.db.execute('''UPDATE oauth_flows SET status='EXCHANGING',
               used_at=? WHERE tenant_id=? AND flow_id=? AND status='PENDING' ''',(
               now,self.tenant_id,flow_id)).rowcount
             if changed!=1:raise ValueError('OAUTH_STATE_REPLAY')
             self.db.commit()
         except Exception:self.db.rollback();raise
+        def fail_claim():
+            self.db.execute('BEGIN IMMEDIATE')
+            try:
+                self.db.execute('''UPDATE oauth_flows SET status='FAILED' WHERE
+                  tenant_id=? AND flow_id=? AND status='EXCHANGING' ''',(
+                  self.tenant_id,flow_id))
+                self.db.execute('''UPDATE service_connections SET status=?,
+                  stable_prior_status=?,refresh_lease=NULL,
+                  refresh_lease_until=NULL,updated_at=? WHERE
+                  tenant_id=? AND connection_id=? AND
+                  auth_type='OAUTH2_AUTH_CODE_PKCE' AND
+                  status='CREDENTIAL_WRITING' AND refresh_lease=? AND
+                  connection_mutation_epoch=? AND config_version=? AND
+                  credential_generation=?''',(prior_status,prior_status,now,
+                  self.tenant_id,
+                  connection_id,writer,writer_epoch,connection['config_version'],
+                  connection['credential_generation']))
+                self.db.commit()
+            except Exception:self.db.rollback();raise
         try:verifier=self.fernet.decrypt(flow['verifier_cipher']).decode()
-        except InvalidToken:raise ValueError('OAUTH_VERIFIER_DECRYPT_FAILED')
+        except InvalidToken:
+            fail_claim();raise ValueError('OAUTH_VERIFIER_DECRYPT_FAILED')
         adapter=adapter or PinnedOAuthAdapter()
         try:value=adapter.exchange(connection['token_endpoint'],{
           'grant_type':'authorization_code','code':_text(code,'code'),
           'redirect_uri':redirect_uri,'client_id':connection['client_id'],
           'code_verifier':verifier})
         except Exception:
-            self.db.execute('''UPDATE oauth_flows SET status='FAILED' WHERE
-              tenant_id=? AND flow_id=? AND status='EXCHANGING' ''',(
-              self.tenant_id,flow_id));self.db.commit();raise
+            fail_claim();raise
         try:
             access=_text(value.get('access_token'),'access_token')
             token_type=value.get('token_type','Bearer')
@@ -443,37 +567,57 @@ class ConnectionManager(object):
             if refresh is not None and not connection['supports_refresh']:
                 raise ValueError('OAUTH_REFRESH_NOT_SUPPORTED')
         except Exception:
-            self.db.execute('''UPDATE oauth_flows SET status='FAILED' WHERE
-              tenant_id=? AND flow_id=? AND status='EXCHANGING' ''',(
-              self.tenant_id,flow_id));self.db.execute('''UPDATE service_connections
-              SET status='REAUTH_REQUIRED',updated_at=? WHERE tenant_id=? AND
-              connection_id=?''',(now,self.tenant_id,connection_id));self.db.commit()
-            raise
+            fail_claim();raise
+        old_access=(self.fernet.decrypt(connection['secret_cipher']).decode()
+          if connection['secret_cipher'] is not None else None)
+        old_refresh=(self.fernet.decrypt(connection['refresh_cipher']).decode()
+          if connection['refresh_cipher'] is not None else None)
+        credential_changed=(old_access!=access or old_refresh!=refresh)
+        generation=connection['credential_generation']+int(credential_changed)
+        new_secret_cipher=(self.fernet.encrypt(access.encode()) if
+          credential_changed else connection['secret_cipher'])
+        new_refresh_cipher=(self.fernet.encrypt(refresh.encode()) if
+          credential_changed and refresh else
+          connection['refresh_cipher'] if not credential_changed else None)
         self.db.execute('BEGIN IMMEDIATE')
         try:
             changed=self.db.execute('''UPDATE service_connections SET
               secret_cipher=?,secret_mask=?,refresh_cipher=?,access_expires_at=?,
-              status='ACTIVE',updated_at=? WHERE tenant_id=? AND connection_id=?
-              AND config_version=? AND status!='REVOKED' AND EXISTS(SELECT 1 FROM
+              status='ACTIVE',stable_prior_status='ACTIVE',
+              credential_generation=?,refresh_lease=NULL,
+              refresh_lease_until=NULL,updated_at=? WHERE
+              tenant_id=? AND connection_id=?
+              AND config_version=? AND credential_generation=? AND
+              connection_mutation_epoch=? AND auth_type='OAUTH2_AUTH_CODE_PKCE'
+              AND status='CREDENTIAL_WRITING' AND refresh_lease=? AND
+              EXISTS(SELECT 1 FROM
               oauth_flows f WHERE f.tenant_id=service_connections.tenant_id AND
               f.flow_id=? AND f.connection_id=service_connections.connection_id
-              AND f.status='EXCHANGING')''',(self.fernet.encrypt(access.encode()),
-              '••••'+access[-4:],self.fernet.encrypt(refresh.encode()) if refresh else None,
-              now+expires_in,now,self.tenant_id,connection_id,
-              connection['config_version'],flow_id)).rowcount
+              AND f.status='EXCHANGING')''',(new_secret_cipher,
+              '••••'+access[-4:],new_refresh_cipher,
+              now+expires_in,generation,now,self.tenant_id,connection_id,
+              connection['config_version'],connection['credential_generation'],
+              writer_epoch,writer,flow_id)).rowcount
             if changed!=1:raise ValueError('OAUTH_FLOW_REVOKED_OR_CONFIG_CHANGED')
             self.db.execute('''UPDATE oauth_flows SET status='COMPLETED' WHERE
               tenant_id=? AND flow_id=? AND status='EXCHANGING' ''',(
               self.tenant_id,flow_id));self._audit('OAUTH_COMPLETED',connection_id,
-              {'config_version':connection['config_version'],'scope_count':len(granted)},now)
+              {'config_version':connection['config_version'],
+               'credential_generation':generation,
+               'connection_mutation_epoch':writer_epoch,
+               'scope_count':len(granted)},now)
             self.db.commit()
         except Exception:self.db.rollback();raise
         return {'connection_id':connection_id,'status':'ACTIVE',
+          'connection_mutation_epoch':writer_epoch,
           'expires_at':now+expires_in,'granted_scopes':sorted(granted)}
 
     def refresh(self,connection_id,adapter=None,now=None):
         self._admin();now=self.clock() if now is None else now
         lease=secrets.token_urlsafe(18)
+        recovered=self._checkpoint_stale_credential_writer(connection_id,now)
+        if recovered=='REFRESHING':
+            raise ValueError('OAUTH_REFRESH_RECOVERY_REAUTH_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         try:
             row=self.db.execute('''SELECT * FROM service_connections WHERE
@@ -481,6 +625,8 @@ class ConnectionManager(object):
             if row is None or row['auth_type']!='OAUTH2_AUTH_CODE_PKCE':
                 raise ValueError('OAUTH_CONNECTION_REQUIRED')
             if not row['supports_refresh']:raise ValueError('OAUTH_REFRESH_NOT_SUPPORTED')
+            if row['status']=='CREDENTIAL_WRITING':
+                raise ValueError('OAUTH_CREDENTIAL_WRITE_IN_PROGRESS')
             if row['status'] not in ('ACTIVE','REFRESHING'):
                 raise ValueError('OAUTH_REAUTH_REQUIRED')
             if row['refresh_cipher'] is None:raise ValueError('OAUTH_REFRESH_TOKEN_REQUIRED')
@@ -489,23 +635,44 @@ class ConnectionManager(object):
                     raise ValueError('OAUTH_REFRESH_IN_PROGRESS')
                 self.db.execute('''UPDATE service_connections SET
                   status='REAUTH_REQUIRED',refresh_cipher=NULL,refresh_lease=NULL,
-                  refresh_lease_until=NULL,updated_at=? WHERE tenant_id=? AND
+                  refresh_lease_until=NULL,
+                  stable_prior_status='REAUTH_REQUIRED',
+                  credential_generation=credential_generation+1,
+                  connection_mutation_epoch=connection_mutation_epoch+1,
+                  updated_at=?
+                  WHERE tenant_id=? AND
                   connection_id=?''',(now,self.tenant_id,connection_id))
                 self.db.commit()
                 raise ValueError('OAUTH_REFRESH_RECOVERY_REAUTH_REQUIRED')
-            self.db.execute('''UPDATE service_connections SET status='REFRESHING',
-              refresh_lease=?,refresh_lease_until=?,updated_at=? WHERE tenant_id=?
-              AND connection_id=?''',(lease,now+30,now,self.tenant_id,connection_id))
+            writer_epoch=row['connection_mutation_epoch']+1
+            changed=self.db.execute('''UPDATE service_connections SET
+              status='REFRESHING',refresh_lease=?,refresh_lease_until=?,
+              stable_prior_status='ACTIVE',connection_mutation_epoch=?,
+              updated_at=? WHERE tenant_id=? AND
+              connection_id=? AND status='ACTIVE' AND
+              connection_mutation_epoch=? AND credential_generation=?''',(
+              lease,now+30,writer_epoch,now,self.tenant_id,connection_id,
+              row['connection_mutation_epoch'],
+              row['credential_generation'])).rowcount
+            if changed!=1:raise ValueError('OAUTH_CREDENTIAL_WRITER_CHANGED')
             self.db.commit()
         except Exception:self.db.rollback();raise
         refresh=self.fernet.decrypt(row['refresh_cipher']).decode();adapter=adapter or PinnedOAuthAdapter()
         try:value=adapter.exchange(row['token_endpoint'],{'grant_type':'refresh_token',
           'refresh_token':refresh,'client_id':row['client_id']})
         except Exception:
-            self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
-              refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL WHERE tenant_id=? AND
-              connection_id=? AND refresh_lease=?''',(self.tenant_id,connection_id,
-              lease));self.db.commit();raise
+            self.db.execute('''BEGIN IMMEDIATE''')
+            changed=self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
+              refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
+              stable_prior_status='REAUTH_REQUIRED',
+              credential_generation=credential_generation+1 WHERE tenant_id=? AND
+              connection_id=? AND status='REFRESHING' AND
+              credential_generation=? AND connection_mutation_epoch=? AND
+              refresh_lease=?''',(
+              self.tenant_id,connection_id,row['credential_generation'],
+              writer_epoch,lease)).rowcount;self.db.commit()
+            if changed!=1:raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            raise
         try:
             access=_text(value.get('access_token'),'access_token')
             if str(value.get('token_type','Bearer')).lower()!='bearer':
@@ -519,34 +686,89 @@ class ConnectionManager(object):
                 raise ValueError('OAUTH_EXPIRY_REQUIRED')
             new_refresh=value.get('refresh_token') or refresh
         except Exception:
-            self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
-              refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL WHERE tenant_id=? AND
-              connection_id=? AND refresh_lease=?''',(self.tenant_id,connection_id,
-              lease));self.db.commit();raise
-        changed=self.db.execute('''UPDATE service_connections SET secret_cipher=?,
-          secret_mask=?,refresh_cipher=?,access_expires_at=?,status='ACTIVE',
-          refresh_lease=NULL,refresh_lease_until=NULL,updated_at=? WHERE tenant_id=?
-          AND connection_id=? AND refresh_lease=?''',(self.fernet.encrypt(access.encode()),
-          '••••'+access[-4:],self.fernet.encrypt(new_refresh.encode()),now+expires,
-          now,self.tenant_id,connection_id,lease)).rowcount;self.db.commit()
-        if changed!=1:raise ValueError('OAUTH_REFRESH_LEASE_LOST')
-        return {'connection_id':connection_id,'status':'ACTIVE','expires_at':now+expires}
+            self.db.execute('BEGIN IMMEDIATE')
+            changed=self.db.execute('''UPDATE service_connections SET status='REAUTH_REQUIRED',
+              refresh_cipher=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
+              stable_prior_status='REAUTH_REQUIRED',
+              credential_generation=credential_generation+1 WHERE tenant_id=? AND
+              connection_id=? AND status='REFRESHING' AND
+              credential_generation=? AND connection_mutation_epoch=? AND
+              refresh_lease=?''',(
+              self.tenant_id,connection_id,row['credential_generation'],
+              writer_epoch,lease)).rowcount;self.db.commit()
+            if changed!=1:raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            raise
+        old_access=self.fernet.decrypt(row['secret_cipher']).decode()
+        credential_changed=(old_access!=access or refresh!=new_refresh)
+        generation=row['credential_generation']+int(credential_changed)
+        new_secret_cipher=(self.fernet.encrypt(access.encode()) if
+          credential_changed else row['secret_cipher'])
+        new_refresh_cipher=(self.fernet.encrypt(new_refresh.encode()) if
+          credential_changed else row['refresh_cipher'])
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            current=self.db.execute('''SELECT status,credential_generation,
+              connection_mutation_epoch,refresh_lease FROM service_connections WHERE tenant_id=? AND
+              connection_id=?''',(self.tenant_id,connection_id)).fetchone()
+            if (current is None or current['status']!='REFRESHING' or
+                    current['refresh_lease']!=lease or
+                    current['connection_mutation_epoch']!=writer_epoch or
+                    current['credential_generation']!=row['credential_generation']):
+                raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            changed=self.db.execute('''UPDATE service_connections SET
+              secret_cipher=?,secret_mask=?,refresh_cipher=?,access_expires_at=?,
+              status='ACTIVE',stable_prior_status='ACTIVE',refresh_lease=NULL,
+              refresh_lease_until=NULL,
+              credential_generation=?,updated_at=? WHERE tenant_id=? AND
+              connection_id=? AND status='REFRESHING' AND refresh_lease=? AND
+              credential_generation=? AND connection_mutation_epoch=?''',(
+              new_secret_cipher,
+              '••••'+access[-4:],new_refresh_cipher,now+expires,generation,now,
+              self.tenant_id,connection_id,lease,
+              row['credential_generation'],writer_epoch)).rowcount
+            if changed!=1:raise ValueError('OAUTH_REFRESH_SUPERSEDED')
+            self._audit('OAUTH_REFRESHED',connection_id,
+              {'credential_generation':generation,
+               'connection_mutation_epoch':writer_epoch},now);self.db.commit()
+        except Exception:self.db.rollback();raise
+        return {'connection_id':connection_id,'status':'ACTIVE',
+          'credential_generation':generation,
+          'connection_mutation_epoch':writer_epoch,'expires_at':now+expires}
 
     def revoke(self,connection_id,now=None):
         self._admin();now=self.clock() if now is None else now
+        self._checkpoint_stale_credential_writer(connection_id,now)
         self.db.execute('BEGIN IMMEDIATE')
         try:
+            current=self.db.execute('''SELECT * FROM service_connections WHERE
+              tenant_id=? AND connection_id=?''',(self.tenant_id,
+              connection_id)).fetchone()
+            if current is None:raise KeyError(connection_id)
             changed=self.db.execute('''UPDATE service_connections SET status='REVOKED',
+              stable_prior_status='REVOKED',
               secret_cipher=NULL,secret_mask=NULL,refresh_cipher=NULL,
               access_expires_at=NULL,refresh_lease=NULL,refresh_lease_until=NULL,
-              config_version=config_version+1,updated_at=? WHERE tenant_id=? AND connection_id=?''',(
+              config_version=config_version+1,
+              credential_generation=credential_generation+CASE WHEN
+              secret_cipher IS NOT NULL OR refresh_cipher IS NOT NULL THEN 1 ELSE 0 END,
+              connection_mutation_epoch=connection_mutation_epoch+1,
+              updated_at=? WHERE tenant_id=? AND connection_id=?''',(
               now,self.tenant_id,connection_id)).rowcount
             if changed!=1:raise KeyError(connection_id)
             self.db.execute('''UPDATE oauth_flows SET status='REVOKED',used_at=? WHERE
               tenant_id=? AND connection_id=? AND status IN ('PENDING','EXCHANGING')''',
-              (now,self.tenant_id,connection_id));self.db.commit()
+              (now,self.tenant_id,connection_id));generation=self.db.execute(
+              '''SELECT credential_generation,connection_mutation_epoch FROM
+              service_connections WHERE tenant_id=? AND connection_id=?''',(
+              self.tenant_id,
+              connection_id)).fetchone()
+            self._audit('CONNECTION_REVOKED',connection_id,
+              {'credential_generation':generation['credential_generation'],
+               'connection_mutation_epoch':
+               generation['connection_mutation_epoch']},now);self.db.commit()
         except Exception:self.db.rollback();raise
         return {'connection_id':connection_id,'status':'REVOKED',
+          'connection_mutation_epoch':generation['connection_mutation_epoch'],
           'external_revocation':'NOT_EXECUTED'}
 
     def credential(self,connection_id,required_origin,required_purpose,now=None):
@@ -569,7 +791,8 @@ class ConnectionManager(object):
         result=[]
         for row in self.db.execute('''SELECT connection_id,provider_id,purpose,
           auth_type,destination_origin,issuer,scopes_json,supports_refresh,status,
-          config_version,secret_mask,access_expires_at,updated_at FROM
+          config_version,credential_generation,connection_mutation_epoch,
+          secret_mask,access_expires_at,updated_at FROM
           service_connections WHERE tenant_id=? ORDER BY connection_id''',(
           self.tenant_id,)):
             item=dict(row);item['scopes']=json.loads(item.pop('scopes_json'))
