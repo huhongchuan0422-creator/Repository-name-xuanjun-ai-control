@@ -86,6 +86,12 @@ ASSETS = {
     '/oauth-callback.html': ('oauth-callback.html', 'text/html; charset=utf-8'),
     '/task-center.html': ('task-center.html', 'text/html; charset=utf-8'),
     '/task-center.js': ('task-center.js', 'application/javascript; charset=utf-8'),
+    '/research-workbench/': ('research-workbench/index.html', 'text/html; charset=utf-8'),
+    '/research-workbench/index.html': ('research-workbench/index.html', 'text/html; charset=utf-8'),
+    '/research-workbench/styles.css': ('research-workbench/styles.css', 'text/css; charset=utf-8'),
+    '/research-workbench/workbench.js': ('research-workbench/workbench.js', 'application/javascript; charset=utf-8'),
+    '/research-workbench/public-projection.js': ('research-workbench/public-projection.js', 'application/javascript; charset=utf-8'),
+    '/research-workbench/preview.js': ('research-workbench/preview.js', 'application/javascript; charset=utf-8'),
 }
 WORKBENCH_ASSETS = {
     '/workbench/': ('index.html', 'text/html; charset=utf-8'),

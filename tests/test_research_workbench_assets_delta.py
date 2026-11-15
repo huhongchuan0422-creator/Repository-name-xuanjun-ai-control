@@ -1,0 +1,91 @@
+import hashlib
+import json
+import os
+import shutil
+import sys
+import tempfile
+import threading
+import unittest
+from html.parser import HTMLParser
+from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.parse import urljoin
+from urllib.request import urlopen
+
+ROOT=os.path.realpath(os.path.join(os.path.dirname(__file__),'..'))
+sys.path.insert(0,os.path.join(ROOT,'scripts'))
+import task_center_app as app
+from reusable_scheduler_cli import demo_graph
+from reusable_task_gateway import GatewayKernel,TestTenantAuthority
+from task_supervisor import Supervisor
+
+KEY=bytes(range(32))
+PREFIX='/task-center-test/'
+CSP="default-src 'self'; object-src 'none'; frame-ancestors 'none'"
+ASSETS={
+    'index.html':('d13ce92e34403a26eb12aff76ac827e8be38a39c92ae6ba2e2651cd4dbe5eecf','text/html; charset=utf-8'),
+    'styles.css':('7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab','text/css; charset=utf-8'),
+    'workbench.js':('444a1bf2ea76c9b795c0e3e9190b3ddabf316b964dcf6277684395687599b31d','application/javascript; charset=utf-8'),
+    'public-projection.js':('60625fed226b5daced47a5ce9c79ce3cf5a24546d4d9cfdbc2bd7f9c51caf543','application/javascript; charset=utf-8'),
+    'preview.js':('be4ed31f1d9244c837acdf47b5c249e46d6f97008dd948309cb2c98a9019735b','application/javascript; charset=utf-8'),
+}
+
+class ScriptTags(HTMLParser):
+    def __init__(self):super().__init__();self.scripts=[];self.inline=False
+    def handle_starttag(self,tag,attrs):
+        if tag=='script':
+            value=dict(attrs).get('src');self.scripts.append(value)
+            if value is None:self.inline=True
+
+class ResearchWorkbenchAssetsDelta(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.mkdtemp();self.db=os.path.join(self.tmp,'fixture.sqlite')
+        supervisor=Supervisor(self.db);authority=TestTenantAuthority(KEY)
+        GatewayKernel(supervisor,authority).register_graph(authority.issue('tenant-fixture','seed'),demo_graph('tenant-fixture'))
+        supervisor.db.execute('UPDATE tasks SET last_event_at=100');supervisor.db.commit();supervisor.close()
+        self.server=app.make_server(self.db,KEY,'tenant-fixture','viewer',port=0,base_path=PREFIX)
+        self.thread=threading.Thread(target=self.server.serve_forever);self.thread.daemon=True;self.thread.start()
+        self.base='http://127.0.0.1:%d'%self.server.server_port
+    def tearDown(self):
+        self.server.shutdown();self.server.server_close();self.thread.join(2);shutil.rmtree(self.tmp)
+    def get(self,path):
+        with urlopen(self.base+path,timeout=3) as response:
+            return response.status,response.headers,response.read()
+    def test_six_assets_bytes_headers_and_script_order(self):
+        for name,(expected,mime) in ASSETS.items():
+            status,headers,body=self.get(PREFIX+'research-workbench/'+name)
+            self.assertEqual(status,200);self.assertEqual(hashlib.sha256(body).hexdigest(),expected)
+            self.assertEqual(headers['Content-Type'],mime);self.assertEqual(headers['Content-Security-Policy'],CSP)
+            self.assertEqual(headers['X-Content-Type-Options'],'nosniff');self.assertEqual(headers['Cache-Control'],'no-store')
+            if name=='index.html':html=body.decode('utf-8')
+            if name=='public-projection.js':adapter=body.decode('utf-8')
+            if name=='preview.js':preview=body.decode('utf-8')
+        status,headers,body=self.get(PREFIX+'research-workbench/')
+        self.assertEqual(status,200);self.assertEqual(hashlib.sha256(body).hexdigest(),ASSETS['index.html'][0])
+        parser=ScriptTags();parser.feed(html)
+        self.assertFalse(parser.inline);self.assertEqual(parser.scripts,['workbench.js','public-projection.js','preview.js'])
+        self.assertIn("credentials:'omit'",adapter)
+        self.assertIn("new URL('../api/public-projection',document.baseURI)",preview)
+        self.assertEqual(urljoin(self.base+PREFIX+'research-workbench/index.html','../api/public-projection'),self.base+PREFIX+'api/public-projection')
+    def test_anonymous_public_api_and_legacy_roots_preserved(self):
+        _,headers,body=self.get(PREFIX+'api/public-projection');data=json.loads(body.decode('utf-8'))
+        self.assertEqual(headers['Content-Security-Policy'],CSP)
+        self.assertEqual(data['source'],'task-center-public-projection');self.assertEqual(data['schema_version'],1)
+        self.assertEqual(data['observed_at'],100);self.assertEqual(data['freshness'],'UNKNOWN');self.assertIsNone(data['valid_until'])
+        self.assertNotIn('tenant_id',data);self.assertNotIn('tasks',data)
+        _,_,body=self.get(PREFIX)
+        with open(os.path.join(app.ASSET_ROOT,'index.html'),'rb') as f:self.assertEqual(body,f.read())
+        _,_,body=self.get(PREFIX+'workbench/')
+        with open(os.path.join(app.WORKBENCH_ROOT,'index.html'),'rb') as f:self.assertEqual(body,f.read())
+        for name in ('integration-manifest.json','resource-metadata.test.cjs','dev-preview.cjs'):
+            with self.assertRaises(HTTPError) as caught:self.get(PREFIX+'research-workbench/'+name)
+            self.assertEqual(caught.exception.code,404)
+    def test_public_api_error_is_503_without_internal_details(self):
+        with patch.object(app,'read_only_projection',side_effect=ValueError('INTERNAL_PRIVATE_DETAIL')):
+            with self.assertRaises(HTTPError) as caught:self.get(PREFIX+'api/public-projection')
+        self.assertEqual(caught.exception.code,503)
+        body=caught.exception.read().decode('utf-8')
+        self.assertEqual(json.loads(body),{'error':'PUBLIC_PROJECTION_UNAVAILABLE'})
+        self.assertNotIn('INTERNAL_PRIVATE_DETAIL',body)
+
+if __name__=='__main__':unittest.main()
