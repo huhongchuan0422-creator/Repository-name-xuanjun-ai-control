@@ -3,14 +3,40 @@
 No provider, scheduler, credential, destination or writer authority is installed.
 A syntactically valid report is not verified source evidence.
 """
-import re
+import json, re
+from datetime import datetime, timezone
 from task_delivery_ledger.core import ident,parse_time,safe,LedgerError
+from task_delivery_observation import ObservationUnavailable
 
 EXCLUSIONS=frozenset(('secrets','environment','customer','business_database','raw_logs','cache'))
 REQUIRED=frozenset(('schema_version','project_ref','receipt_id','source_ref','reported_status',
     'observed_at','base_ref','result_ref','manifest_ref','restore_ref','last_success_at',
     'content_changed','file_hashes','excluded','limitations'))
 class BackupReceiptError(Exception):pass
+
+class LocalBackupReceiptReader(object):
+    """Read a caller-bound local report; neither authenticate it nor expose raw fields."""
+    def __init__(self,path):
+        self.path=path
+    def read(self):
+        try:
+            with open(self.path,'rb') as f:raw=f.read(65537)
+            if len(raw)>65536:raise ValueError('oversize')
+            d=json.loads(raw.decode('utf8'))
+            if not isinstance(d,dict) or d.get('status') not in ('ok','failed'):raise ValueError('status')
+            parse_time(d['time_utc'])
+            for k in ('files','excluded_count'):
+                if k in d and (type(d[k]) is not int or d[k]<0):raise ValueError('count')
+            for k in ('changed','remote_verified'):
+                if k in d and type(d[k]) is not bool:raise ValueError('flag')
+            if d['status']=='ok' and any(k not in d for k in ('files','excluded_count')):raise ValueError('missing count')
+            return {'state':'OBSERVED_METADATA_ONLY','source_observation_verified':'LOCAL_RECEIPT_REPORTED_NOT_AUTHENTICATED',
+                'provider_verification':'UNKNOWN','freshness':'local-receipt-not-live-scheduler',
+                'backup_observation':{'observed_at':datetime.now(timezone.utc).isoformat(),
+                    'backup_at':d['time_utc'],'backup_status':d['status'],
+                    'files':d.get('files','UNKNOWN'),'excluded_count':d.get('excluded_count','UNKNOWN'),
+                    'changed':d.get('changed','UNKNOWN'),'remote_verified_reported':d.get('remote_verified','UNKNOWN')}}
+        except (OSError,UnicodeError,ValueError,TypeError,KeyError,LedgerError):raise ObservationUnavailable('local backup receipt unavailable')
 
 def unavailable():
     return {'state':'UNAVAILABLE','provider_verification':'UNKNOWN','schedule_enabled':'UNKNOWN',

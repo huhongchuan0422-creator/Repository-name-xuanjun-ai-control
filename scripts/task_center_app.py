@@ -1620,14 +1620,16 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
     parser.add_argument('--delivery-observation-file')
     parser.add_argument('--delivery-observation-collector')
     parser.add_argument('--delivery-backup-observation-file')
+    parser.add_argument('--delivery-backup-receipt-file')
     args = parser.parse_args(argv)
     ledger_config=(args.delivery_ledger_root,args.delivery_ledger_namespace,args.delivery_ledger_writer)
     observation_config=(args.delivery_observation_file,args.delivery_observation_collector)
     if any(value is not None for value in observation_config):
         if not all(observation_config) or not all(ledger_config):
             parser.error('delivery observation file and collector require complete delivery ledger configuration')
-    if args.delivery_backup_observation_file is not None and (not args.delivery_backup_observation_file or not all(ledger_config)):
-        parser.error('delivery backup observation requires complete delivery ledger configuration')
+    for value in (args.delivery_backup_observation_file,args.delivery_backup_receipt_file):
+        if value is not None and (not value or not all(ledger_config)):
+            parser.error('delivery backup observation requires complete delivery ledger configuration')
     if any(value is not None for value in ledger_config):
         if not all(ledger_config):
             parser.error('delivery ledger root, namespace and writer must be supplied together')
@@ -1644,7 +1646,11 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
         if args.delivery_backup_observation_file:
             from task_delivery_observation import ApprovedObservationReader
             backup_reader=ApprovedObservationReader(args.delivery_backup_observation_file,'main-backup-observation-20261117')
-        delivery_ledger_reader=MetadataReader(*ledger_config,tenant_id=args.tenant,observation_reader=observation_reader,backup_observation_reader=backup_reader)
+        local_backup_reader=None
+        if args.delivery_backup_receipt_file:
+            from task_delivery_backup_receipt import LocalBackupReceiptReader
+            local_backup_reader=LocalBackupReceiptReader(args.delivery_backup_receipt_file)
+        delivery_ledger_reader=MetadataReader(*ledger_config,tenant_id=args.tenant,observation_reader=observation_reader,backup_observation_reader=backup_reader,local_backup_reader=local_backup_reader)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
                else _read_owned_secret_file(args.test_authority_key_file,
                                              'TEST_AUTHORITY_KEY').rstrip('\r\n'))
