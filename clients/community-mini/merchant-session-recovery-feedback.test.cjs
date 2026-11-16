@@ -33,7 +33,7 @@ function fixture(options={}){
       o.success({statusCode:200,data:{payment_enabled:false,result}});
     }
   };
-  const form={put(object,key,value){const parts=key.split('.');let target=object;for(const part of parts.slice(0,-1))target=target[part]||(target[part]={});target[parts.at(-1)]=value;},materialGroups(){return [];},syncReusedFields(){},platformFields(){return {};},get(object,key){return key.split('.').reduce((v,k)=>v&&v[k],object);},reusedFieldLinks(){return {};}};
+  const form={ensureMiniProgramDefault:require('./merchant-form').ensureMiniProgramDefault,put(object,key,value){const parts=key.split('.');let target=object;for(const part of parts.slice(0,-1))target=target[part]||(target[part]={});target[parts.at(-1)]=value;},materialGroups(){return [];},syncReusedFields(){},platformFields(){return {};},get(object,key){return key.split('.').reduce((v,k)=>v&&v[k],object);},reusedFieldLinks(){return {};}};
   vm.runInNewContext(source,{Page:d=>{definition=d;},Date:MockDate,wx,getApp:()=>({globalData:config}),setTimeout(fn){timers.set(++nextTimer,fn);return nextTimer;},clearTimeout(id){timers.delete(id);},
     require(p){if(p==='../../session')return session;if(p==='../../customer-auth')return auth;if(p==='../../chain-telemetry')return load('chain-telemetry');if(p==='../../merchant-form')return form;if(p==='../../merchant-submit')return {submitApplicantApplication(){}};if(['../../merchant-official-fields','../../merchant-platform-reference-data'].includes(p))return {};throw Error('Unexpected import');}
   },{filename:'merchant-join/index.js'});

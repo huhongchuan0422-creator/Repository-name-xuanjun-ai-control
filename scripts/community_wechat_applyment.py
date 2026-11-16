@@ -16,16 +16,42 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from scripts.pr122_customer_core import canonical,private_path
 from scripts.community_provider_transport import request
 
+# Explicit owner-approved service-provider default; never inferred from runtime identity.
+DEFAULT_MINI_PROGRAM_APPID = 'wx1d5f8873eaea5392'
+
+def mini_program_snapshot_appids(mini):
+    """Resolve only IDs actually recorded in an attestation; never invent a default."""
+    mini=mini if type(mini) is dict else {}
+    def value(key):
+        raw=mini.get(key)
+        return raw.strip() if type(raw) is str else ''
+    merchant=value('mini_program_sub_appid')
+    provider=value('mini_program_appid')
+    return {'mini_program_sub_appid':merchant} if merchant else ({'mini_program_appid':provider} if provider else {})
+
 def mini_program_appids(profile):
-    sales=profile.get('business_info',{}).get('sales_info',{}) if type(profile) is dict else {}
+    business=profile.get('business_info',{}) if type(profile) is dict else {}
+    sales=business.get('sales_info',{}) if type(business) is dict else {}
     mini=sales.get('mini_program_info',{}) if type(sales) is dict else {}
-    return {k:mini[k] for k in ('mini_program_appid','mini_program_sub_appid') if type(mini) is dict and type(mini.get(k)) is str and mini[k].strip()}
+    return mini_program_snapshot_appids(mini) or {'mini_program_appid':DEFAULT_MINI_PROGRAM_APPID}
+
+def with_mini_program_default(profile):
+    """Copy the draft and add only the authorized fallback for a selected mini scene."""
+    result=json.loads(canonical(profile))
+    business=result.get('business_info',{}) if type(result) is dict else {}
+    sales=business.get('sales_info',{}) if type(business) is dict else {}
+    scenes=sales.get('sales_scenes_type',[]) if type(sales) is dict else []
+    if type(scenes) is list and 'SALES_SCENES_MINI_PROGRAM' in scenes:
+        mini=sales.setdefault('mini_program_info',{})
+        if type(mini) is dict and not any(type(mini.get(k)) is str and mini[k].strip() for k in ('mini_program_appid','mini_program_sub_appid')):
+            mini['mini_program_appid']=DEFAULT_MINI_PROGRAM_APPID
+    return result
 
 
 def mini_program_is_live(record):
     return (type(record) is dict and record.get('mini_program_live') is True
             and bool(mini_program_appids(record.get('profile')))
-            and record.get('mini_program_live_appids')==mini_program_appids(record.get('profile')))
+            and mini_program_snapshot_appids(record.get('mini_program_live_appids'))==mini_program_appids(record.get('profile')))
 
 
 def provider_submission_profile(profile):
@@ -35,6 +61,12 @@ def provider_submission_profile(profile):
     sales=result.get('business_info',{}).get('sales_info',{})
     scenes=sales.get('sales_scenes_type',[])
     if 'SALES_SCENES_MINI_PROGRAM' not in scenes:sales.pop('mini_program_info',None)
+    else:
+        mini=sales.setdefault('mini_program_info',{})
+        if type(mini) is dict:
+            ids=mini_program_appids(result)
+            mini.pop('mini_program_appid',None);mini.pop('mini_program_sub_appid',None)
+            mini.update(ids)
     if 'SALES_SCENES_STORE' not in scenes:sales.pop('biz_store_info',None)
     return result
 
@@ -429,6 +461,7 @@ class WechatApplyment:
             if collision and (row['subject_idx']!=application or other_code!=code):
                 raise ValueError('PROVIDER_APPLYMENT_OWNERSHIP_CONFLICT')
     def _validate(self,profile,entity,*,mini_program_live=False):
+        profile=with_mini_program_default(profile)
         required={'contact_info','subject_info','business_info','settlement_info','bank_account_info'}
         if type(profile) is not dict or not required.issubset(profile) or set(profile)-required-{'addition_info'} or any(type(profile[k]) is not dict for k in profile):raise ValueError('OFFICIAL_APPLYMENT_SECTIONS_REQUIRED')
         if len(canonical(profile))>100000:raise ValueError('APPLYMENT_PROFILE_TOO_LARGE')
@@ -904,6 +937,7 @@ class WechatApplyment:
             elif op=='wechat_save':
                 if record and record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
                 if type(p['profile']) is not dict or len(canonical(p['profile']))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+                p=dict(p,profile=with_mini_program_default(p['profile']))
                 from scripts.community_ocr_draft import merge_drafts, MATERIAL, FIELDS
                 updates=None
                 if 'ocr_drafts' in p:

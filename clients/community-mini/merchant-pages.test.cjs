@@ -766,12 +766,12 @@ test('Next saves unconfirmed OCR edits privately and advances without confirming
  assert.equal(f.calls.some(c=>c.p&&['wechat_media','wechat_apply'].includes(c.p.operation)),false);
 });
 
-test('runtime AppID is never silently inserted for any merchant scene',async()=>{
+test('explicit provider default applies only to mini scene and never borrows runtime identity',async()=>{
  for(const scene of ['unknown','store','mini','both']){
   const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
-  f.page.platformAppid='wx1d5f8873eaea5392';f.page.setData({options:{...f.page.data.options,scene},dirty:true});
+  f.page.platformAppid='wxDIFFERENT_RUNTIME';f.page.setData({options:{...f.page.data.options,scene},dirty:true});
   await f.page.save();
-  assert.equal(form.get(f.storedProfile,'business_info.sales_info.mini_program_info.mini_program_appid'),undefined);
+  assert.equal(form.get(f.storedProfile,'business_info.sales_info.mini_program_info.mini_program_appid'),['mini','both'].includes(scene)?form.DEFAULT_MINI_PROGRAM_APPID:undefined);assert.equal(f.page.data.options.miniLive,false);
   assert.equal(form.get(f.storedProfile,'business_info.sales_info.mini_program_info.mini_program_sub_appid'),undefined);
   assert.equal(f.page.data.options.scene,scene);
   assert.equal(f.calls.some(c=>c.p&&['wechat_media','wechat_apply'].includes(c.p.operation)),false);
@@ -808,9 +808,9 @@ test('live mini declaration is explicit, persists through original save/read, an
  assert.equal(f.calls.filter(c=>c.p&&c.p.operation==='wechat_save').at(-1).p.params.mini_program_live,true);
  assert.equal(f.calls.some(c=>c.p&&['wechat_apply','wechat_media','submit'].includes(c.p.operation)),false);
 });
-test('live mini cannot silently borrow runtime AppID and changing declared ID clears live fact',async()=>{
+test('default requires explicit live declaration and changing declared ID clears live fact',async()=>{
  const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});f.page.platformAppid='wx1d5f8873eaea5392';
- f.page.chooseMiniLive({detail:{value:['live']}});assert.equal(f.page.data.options.miniLive,false);assert.match(f.page.data.status,/有权/);
+ assert.equal(f.page.data.options.miniLive,false);f.page.chooseMiniLive({detail:{value:['live']}});assert.equal(f.page.data.options.miniLive,true);
  const path='business_info.sales_info.mini_program_info.mini_program_appid';form.put(f.page.profile,path,'wx2222222222222222');
  f.page.chooseMiniLive({detail:{value:['live']}});assert.equal(f.page.data.options.miniLive,true);
  f.page.input({currentTarget:{dataset:{path}},detail:{value:'wx3333333333333333'}});
@@ -839,5 +839,29 @@ test('service and merchant AppIDs have distinct editable fields with one combine
   const item=form.reviewRequirements(profile,options,[],{}).flatMap(g=>g.items).filter(i=>i.path==='mini_appid');
   assert.equal(item.length,1);assert.equal(item[0].complete,true);
  }
- const item=form.reviewRequirements({},options,[],{}).flatMap(g=>g.items).find(i=>i.path==='mini_appid');assert.equal(item.complete,false);
+ const item=form.reviewRequirements({},options,[],{}).flatMap(g=>g.items).find(i=>i.path==='mini_appid');assert.equal(item.complete,true);
+});
+
+test('merchant priority resolver preserves source history and empty source uses explicit default',()=>{
+ const path='business_info.sales_info.mini_program_info',profile={};
+ assert.deepEqual(form.miniProgramAppids(profile),{mini_program_appid:form.DEFAULT_MINI_PROGRAM_APPID});assert.deepEqual(profile,{});
+ form.put(profile,path,{mini_program_appid:'wxprovider',mini_program_sub_appid:'wxmerchant'});
+ assert.deepEqual(form.miniProgramAppids(profile),{mini_program_sub_appid:'wxmerchant'});
+ form.ensureMiniProgramDefault(profile,{scene:'mini'});assert.deepEqual(form.get(profile,path),{mini_program_appid:'wxprovider',mini_program_sub_appid:'wxmerchant'});
+ delete form.get(profile,path).mini_program_sub_appid;assert.deepEqual(form.miniProgramAppids(profile),{mini_program_appid:'wxprovider'});
+});
+
+test('readback accepts historical dual-ID live snapshot only while effective merchant is unchanged',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ const mini={mini_program_appid:'wxoldprovider',mini_program_sub_appid:'wxmerchant'},record={version:1,profile:{business_info:{sales_info:{mini_program_info:{...mini}}}},mini_program_live:true,mini_program_live_appids:{...mini}};
+ const before=structuredClone(record);assert.ok(f.page.createSubmitReadback(f.app,record));assert.deepEqual(record,before);
+ record.profile.business_info.sales_info.mini_program_info.mini_program_appid='wxunusedproviderchanged';assert.ok(f.page.createSubmitReadback(f.app,record));
+ record.profile.business_info.sales_info.mini_program_info.mini_program_sub_appid='wxchangedmerchant';assert.equal(f.page.createSubmitReadback(f.app,record),null);
+});
+test('readback cannot turn empty or missing historical attestation into default live identity',async()=>{
+ const f=fixture('merchant-join');await f.page.onLoad({scene:'shop1'});
+ const record={version:1,profile:{},mini_program_live:true};assert.equal(f.page.createSubmitReadback(f.app,record),null);
+ for(const snapshot of [null,{},[],{mini_program_appid:''},{mini_program_appid:'  '},{mini_program_sub_appid:null}]){
+  record.mini_program_live_appids=snapshot;assert.deepEqual(form.miniProgramSnapshotAppids(snapshot),{});assert.equal(f.page.createSubmitReadback(f.app,record),null);
+ }
 });
