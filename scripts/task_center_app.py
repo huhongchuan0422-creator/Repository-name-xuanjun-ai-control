@@ -769,9 +769,14 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     headers=None
                     if path == '/api/admin/delivery-handoff':
                         query=__import__('urllib.parse').parse.parse_qs(urlsplit(self.path).query,keep_blank_values=True)
-                        if set(query)!={'task_id'} or len(query['task_id'])!=1:raise ValueError('TASK_ID_REQUIRED')
-                        result=delivery_ledger_reader.export(query['task_id'][0])
-                        headers=[('Content-Disposition','attachment; filename="xuanjun-task-handoff.json"')]
+                        filename='xuanjun-task-handoff.json'
+                        if set(query)=={'scope'} and query['scope']==['ledger-self-observation']:
+                            result=delivery_ledger_reader.export_observations()
+                            filename='xuanjun-observation-evidence.json'
+                        elif set(query)=={'task_id'} and len(query['task_id'])==1:
+                            result=delivery_ledger_reader.export(query['task_id'][0])
+                        else:raise ValueError('EXACT_EXPORT_SCOPE_REQUIRED')
+                        headers=[('Content-Disposition','attachment; filename="'+filename+'"')]
                     else:result=delivery_ledger_reader.view()
                     self._send(200,_json_bytes(result),'application/json; charset=utf-8',headers)
                 except Exception:

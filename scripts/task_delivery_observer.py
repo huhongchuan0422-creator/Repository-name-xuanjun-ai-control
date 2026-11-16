@@ -2,13 +2,15 @@
 import os
 from datetime import datetime, timezone
 from task_delivery_ledger.core import Store, ident, parse_time
+from task_delivery_observation import ApprovedObservationReader,ObservationUnavailable
 
 class Unavailable(Exception): pass
 
 class MetadataReader(object):
     """Bound by the hosting test harness, never by an HTTP request."""
-    def __init__(self,root,namespace,writer,tenant_id):
-        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id)
+    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None):
+        if observation_reader is not None and type(observation_reader) is not ApprovedObservationReader: raise Unavailable()
+        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader
     def _store(self):
         # Store.__init__ creates marker/directories; never call it from a GET.
         marker=os.path.join(self.root,'writer.id')
@@ -18,7 +20,14 @@ class MetadataReader(object):
         store=Store.__new__(Store);store.root=__import__('pathlib').Path(self.root);store.writer=self.writer
         return store
     def view(self):
-        v=self._store().project(self.namespace);rows=[]
+        try:store=self._store()
+        except Unavailable:
+            try:observation=self.export_observations()
+            except ObservationUnavailable:raise Unavailable()
+            return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
+                    'ledger_state':'UNAVAILABLE','observations':observation,'namespace':self.namespace,
+                    'tasks':[],'conflicts':[],'pending_dependencies':[],'production_status':'NOT_IMPLEMENTED'}
+        v=store.project(self.namespace);rows=[]
         for tid,t in v['tasks'].items():
             o=v['objects'].get('task:'+tid,{})
             linked=[x for x in v['objects'].values() if x.get('task_id')==tid]
@@ -54,9 +63,14 @@ class MetadataReader(object):
                              'scope':h['scope_included'],'excluded':h['scope_excluded'],'gaps':h['unknown_items'],
                              'outgoing':h['outgoing'],'receiving':h['receiving'],'supervisor':h['supervisor'],
                              'summary':h['summary']} for h in v['handoffs'].values() if h['task_id']==tid]})
+        try: observation=self.export_observations()
+        except ObservationUnavailable: observation={'state':'UNAVAILABLE','writer_verification':'UNKNOWN','records':[]}
         return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
-                'namespace':self.namespace,'tasks':rows,'conflicts':v['conflicts'],
+                'ledger_state':'AVAILABLE_METADATA_ONLY','observations':observation,'namespace':self.namespace,'tasks':rows,'conflicts':v['conflicts'],
                 'pending_dependencies':v['pending_dependencies'],'production_status':'NOT_IMPLEMENTED'}
+    def export_observations(self):
+        if self.observation_reader is None:raise ObservationUnavailable('no collector')
+        return self.observation_reader.read()
     def export(self,task_id):
         return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
                 'handoff':self._store().handoff(self.namespace,ident(task_id))}

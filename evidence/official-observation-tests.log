@@ -1,0 +1,11 @@
+test_dedup_stale_unknown_and_anonymous_role (test_official_observation_delta.MetadataTests) ... ok
+test_source_types_and_duplicate_conflicts (test_official_observation_delta.MetadataTests) ... ok
+test_strict_fields_and_no_raw_payload (test_official_observation_delta.MetadataTests) ... ok
+test_unapproved_json_and_input_mutation_not_trusted (test_official_observation_delta.MetadataTests) ... ok
+test_real_approved_input_through_main_handler (test_official_observation_delta.OfficialRouteTests) ... ok
+test_unavailable_observation_does_not_pollute_task (test_official_observation_delta.OfficialRouteTests) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.175s
+
+OK

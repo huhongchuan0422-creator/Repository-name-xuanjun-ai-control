@@ -1,0 +1,9 @@
+test_main_handler_actual_routes_and_export (test_delivery_ledger_route.RouteTests) ... ok
+test_denied_unavailable_badquery_and_existing_routes (test_delivery_ledger_route.RouteTests) ... ok
+test_attachment_headers_use_existing_send (test_delivery_144a_delta.Integration144a) ... ok
+test_cross_tenant_store_and_session_fact_fail_closed (test_delivery_144a_delta.Integration144a) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.368s
+
+OK

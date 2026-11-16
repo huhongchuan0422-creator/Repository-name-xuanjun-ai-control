@@ -1,0 +1,21 @@
+{
+  "view_http": 200,
+  "export_http": 200,
+  "export_attachment": true,
+  "collector_ref": "main-bounded-sessions-20261116",
+  "snapshot_match": "MAIN_APPROVED_SNAPSHOT_BYTES_MATCH",
+  "issuer_verification": "UNAVAILABLE",
+  "scope": "LEDGER_IMPLEMENTATION_AND_REVIEW_ONLY",
+  "ledger_state": "UNAVAILABLE",
+  "tool_receipts": 2,
+  "role_results": 2,
+  "freshness": "STALE",
+  "global_idle": "UNKNOWN",
+  "writer_verification": "UNKNOWN",
+  "permission_verification": "UNKNOWN",
+  "handoff_completed": "UNKNOWN",
+  "business_acceptance": "UNKNOWN",
+  "task_rows": 0,
+  "source_bytes_unchanged": true,
+  "dispatch_performed": false
+}
