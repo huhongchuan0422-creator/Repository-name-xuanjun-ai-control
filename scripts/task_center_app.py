@@ -1614,7 +1614,18 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
     parser.add_argument('--mcp-dispatch-config-file')
     parser.add_argument('--mcp-development-config-file')
     parser.add_argument('--correction-observer-interval',type=int,choices=(180,300))
+    parser.add_argument('--delivery-ledger-root')
+    parser.add_argument('--delivery-ledger-namespace')
+    parser.add_argument('--delivery-ledger-writer')
     args = parser.parse_args(argv)
+    ledger_config=(args.delivery_ledger_root,args.delivery_ledger_namespace,args.delivery_ledger_writer)
+    if any(value is not None for value in ledger_config):
+        if not all(ledger_config):
+            parser.error('delivery ledger root, namespace and writer must be supplied together')
+        if delivery_ledger_reader is not None:
+            parser.error('delivery ledger reader and CLI configuration cannot be combined')
+        from task_delivery_observer import MetadataReader
+        delivery_ledger_reader=MetadataReader(*ledger_config,tenant_id=args.tenant)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
                else _read_owned_secret_file(args.test_authority_key_file,
                                              'TEST_AUTHORITY_KEY').rstrip('\r\n'))
