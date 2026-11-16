@@ -1,0 +1,237 @@
+"""Local CLI for the reusable TEST_ONLY scheduler kernel."""
+from __future__ import print_function
+
+import argparse
+import json
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(__file__))
+from reusable_task_gateway import (GatewayKernel, TestOnlyExecutor,
+                                    TestTenantAuthority)
+from task_supervisor import Supervisor
+from task_writer_fence import Fence
+from secure_file_input import read_owned_secret_file
+
+
+def demo_graph(tenant):
+    def task(task_id, output, priority, resources, dependencies=None,
+             preemptible=True, evidence='evidence-v1'):
+        return {
+            'task_id': task_id, 'node_id': 'node-' + task_id,
+            'stage': 'TEST_ONLY', 'owner': 'test-executor',
+            'entry': 'TEST_ONLY', 'checkpoint_sha256': 'a' * 64,
+            'spec_sha256': 'b' * 64, 'input_version': 'input-v1',
+            'output_version': output, 'priority': priority,
+            'preemptible': preemptible,
+            'module_id': 'xuanjun.scheduler.kernel',
+            'board_id': ('acceptance-delivery' if task_id == 'demo-b' else
+                         'research-development'),
+            'resources': resources, 'dependencies': dependencies or [],
+            'completion_evidence': [{'evidence_ref': evidence}],
+        }
+    return {
+        'graph_id': 'demo-graph', 'tenant_id': tenant,
+        'project_id': 'demo-project', 'graph_version': 'v1',
+        'tasks': [
+            task('demo-b', 'b-v1', 50, ['fake:demo-b'],
+                 evidence='evid-demo-b'),
+            task('demo-a', 'a-v1', 100, ['fake:shared'], dependencies=[{
+                'task_id': 'demo-b', 'version': 'b-v1',
+                'evidence_ref': 'evid-demo-b'}]),
+            task('demo-c', 'c-v1', 10, ['fake:shared'],
+                 preemptible=False),
+        ],
+    }
+
+
+def run_demo(gateway, authority, tenant, lock_root):
+    context = authority.issue(tenant, 'local-demo')
+    gateway.register_graph(context, demo_graph(tenant))
+    gateway.save_waiting_checkpoint(
+        context, 'demo-a', 'demo-a-prior', 'demo-a-checkpoint',
+        {'cursor': 7}, ['fake:shared'])
+    fence = Fence(gateway.supervisor, lock_root)
+    executor = TestOnlyExecutor(gateway, fence, context)
+    try:
+        valid_until = time.time() + 600
+        executor.start('demo-c', 'demo-c-attempt', ['fake:shared'],
+                       valid_until)
+        executor.start('demo-b', 'demo-b-attempt', ['fake:demo-b'],
+                       valid_until)
+        executor.progress('demo-b', 'demo-b-attempt', 'demo-b-progress',
+                          'demo-test-run')
+        executor.complete_success('demo-b', 'demo-b-attempt', 'f' * 64,
+                                  [{'evidence_ref': 'evid-demo-b'}])
+        outbox = gateway.db.execute('''SELECT outbox_id,event_id FROM outbox
+          WHERE task_id='demo-b' ''').fetchone()
+        gateway.mark_outbox_sent(context, outbox['outbox_id'],
+                                 'test-transport-receipt')
+        gateway.receive_outbox(context, outbox['outbox_id'])
+        gateway.acknowledge_event(
+            context, 'demo-b', 'demo-b-attempt', outbox['event_id'])
+        gateway.save_checkpoint(
+            context, 'demo-c', 'demo-c-attempt', 'demo-c-checkpoint',
+            {'cursor': 4}, [], 'RECONCILED', ['fake:shared'])
+        controller = {'role': 'REVOCATION_CONTROLLER',
+                      'caller_id': 'test-gateway'}
+        fence.begin_revocation('demo-c', controller)
+        fence.drain('demo-c', controller, timeout=1)
+        fence.invalidate_source_resources('demo-c', 'demo-release')
+        gateway.supervisor.complete_revocation('demo-c')
+        gateway.release_revoked_resources(
+            context, 'demo-c', 'demo-c-attempt', 'demo-c-checkpoint',
+            'demo-release')
+        grant = gateway.issue_resume_grant(
+            context, 'demo-a', 'demo-a-checkpoint', time.time() + 600)
+        executor.start('demo-a', 'demo-a-attempt', ['fake:shared'],
+                       time.time() + 600, 'demo-a-checkpoint',
+                       grant['grant_id'])
+        return gateway.projection(context)
+    finally:
+        fence.close()
+
+
+def app_demo_graph(graph_id, tenant, project, specs):
+    tasks = []
+    for task_id, board, owner, output, dependencies in specs:
+        tasks.append({
+            'task_id': task_id, 'node_id': 'node-' + task_id,
+            'stage': 'TEST_ONLY', 'owner': owner, 'entry': 'TEST_ONLY',
+            'checkpoint_sha256': 'a' * 64, 'spec_sha256': 'b' * 64,
+            'input_version': 'input-v1', 'output_version': output,
+            'priority': 40, 'preemptible': True,
+            'module_id': 'xuanjun.scheduler.kernel', 'board_id': board,
+            'resources': ['fake:' + task_id],
+            'dependencies': dependencies,
+            'completion_evidence': [{'evidence_ref': 'evid-' + task_id}],
+        })
+    return {'graph_id': graph_id, 'tenant_id': tenant,
+            'project_id': project, 'graph_version': 'v1', 'tasks': tasks}
+
+
+def run_app_demo(gateway, authority, tenant, lock_root):
+    """Create a multi-project TEST_ONLY application dataset."""
+    run_demo(gateway, authority, tenant, lock_root)
+    context = authority.issue(tenant, 'local-app-demo')
+    graphs = [
+        app_demo_graph('app-customer', tenant, 'project-customer', [
+            ('customer-failed', 'customer', 'customer-owner', 'v1', []),
+            ('finance-awaiting', 'finance', 'finance-owner', 'v1', []),
+        ]),
+        app_demo_graph('app-maintenance', tenant, 'project-maintenance', [
+            ('maintenance-source', 'maintenance', 'maintainer', 'm-v1', []),
+            ('ecosystem-waiting', 'shared-ecosystem', 'ecosystem-owner',
+             'e-v1', [{'task_id': 'maintenance-source', 'version': 'm-v1',
+                       'evidence_ref': 'evid-maintenance-source'}]),
+        ]),
+        app_demo_graph('app-operations', tenant, 'project-operations', [
+            ('operations-unknown', 'operations', 'operator', 'o-v1', []),
+        ]),
+    ]
+    for graph in graphs:
+        gateway.register_graph(context, graph)
+    fence = Fence(gateway.supervisor, lock_root)
+    executor = TestOnlyExecutor(gateway, fence, context)
+    try:
+        executor.start('customer-failed', 'customer-failed-1',
+                       ['fake:customer-failed'], time.time() + 600)
+        executor.complete_failure('customer-failed', 'customer-failed-1',
+                                  'test-customer-failure')
+        # Start without a progress fact: projection must say liveness UNKNOWN,
+        # not infer a running process from the task state.
+        executor.start('operations-unknown', 'operations-unknown-1',
+                       ['fake:operations-unknown'], time.time() + 600)
+        return gateway.projection(context)
+    finally:
+        fence.close()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--db', required=True)
+    authority_input = parser.add_mutually_exclusive_group(required=True)
+    authority_input.add_argument('--test-authority-key',
+                                 help='TEST_ONLY key, minimum 32 characters')
+    authority_input.add_argument('--test-authority-key-file',
+                                 help='owned mode-0600 TEST_ONLY key file')
+    sub = parser.add_subparsers(dest='command')
+    project = sub.add_parser('project')
+    project.add_argument('--tenant', required=True)
+    project.add_argument('--principal', default='local-viewer')
+    demo = sub.add_parser('demo')
+    demo.add_argument('--tenant', required=True)
+    demo.add_argument('--lock-root', required=True)
+    app_demo = sub.add_parser('app-demo')
+    app_demo.add_argument('--tenant', required=True)
+    app_demo.add_argument('--lock-root', required=True)
+    register = sub.add_parser('register')
+    register.add_argument('--tenant', required=True)
+    register.add_argument('--principal', default='local-registrar')
+    register.add_argument('--graph', required=True)
+    export = sub.add_parser('export-ui')
+    export.add_argument('--tenant', required=True)
+    export.add_argument('--principal', default='local-viewer')
+    export.add_argument('--output', required=True)
+    recover = sub.add_parser('recover-unstarted')
+    recover.add_argument('--tenant', required=True)
+    recover.add_argument('--principal', default='local-recovery-controller')
+    recover.add_argument('--lock-root', required=True)
+    args = parser.parse_args(argv)
+    if args.command is None:
+        parser.error('a command is required')
+    raw_key = (args.test_authority_key if args.test_authority_key is not None
+               else read_owned_secret_file(args.test_authority_key_file,
+                                           'TEST_AUTHORITY_KEY').rstrip('\r\n'))
+    if not raw_key:
+        raise ValueError('VALID_TEST_AUTHORITY_KEY_REQUIRED')
+    supervisor = Supervisor(args.db)
+    try:
+        authority = TestTenantAuthority(
+            raw_key.encode('utf-8'))
+        gateway = GatewayKernel(supervisor, authority)
+        if args.command == 'project':
+            context = authority.issue(args.tenant, args.principal)
+            value = gateway.projection(context)
+        elif args.command == 'demo':
+            value = run_demo(gateway, authority, args.tenant,
+                             os.path.realpath(args.lock_root))
+        elif args.command == 'app-demo':
+            value = run_app_demo(gateway, authority, args.tenant,
+                                 os.path.realpath(args.lock_root))
+        elif args.command == 'register':
+            context = authority.issue(args.tenant, args.principal)
+            with open(args.graph, 'r') as stream:
+                graph = json.load(stream)
+            value = gateway.register_graph(context, graph)
+        elif args.command == 'export-ui':
+            context = authority.issue(args.tenant, args.principal)
+            value = gateway.projection(context)
+            output = os.path.realpath(args.output)
+            with open(output, 'w') as stream:
+                stream.write('window.XUANJUN_TWIN_DATA = ')
+                stream.write(json.dumps(value, ensure_ascii=False,
+                                        sort_keys=True, indent=2))
+                stream.write(';\n')
+            value = {'output': output, 'schema': value['schema'],
+                     'tenant_id': value['tenant_id'],
+                     'tasks': len(value['tasks']),
+                     'anomalies': len(value['anomalies'])}
+        else:
+            context = authority.issue(args.tenant, args.principal)
+            fence = Fence(supervisor, os.path.realpath(args.lock_root))
+            try:
+                value = {'recovered': TestOnlyExecutor(
+                    gateway, fence, context).recover_incomplete_starts()}
+            finally:
+                fence.close()
+        print(json.dumps(value, ensure_ascii=False,
+                         sort_keys=True, indent=2))
+    finally:
+        supervisor.close()
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

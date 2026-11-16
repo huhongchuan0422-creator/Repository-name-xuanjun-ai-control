@@ -1,0 +1,2199 @@
+{
+  "coverage": "explicit allowlist; current tracked bytes plus individually listed untracked WIP; new paths not automatic",
+  "excluded": [
+    {
+      "path": "demos/owner-workbench-v2/data.js",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/p2_uk_swas_diagnostic.py",
+      "reason": "phone-unclassified",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_app.py",
+      "reason": "bearer",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_ad_contract.py",
+      "reason": "credential-uri",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_connection_management.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_model_orchestration.py",
+      "reason": "credential-assignment,credential-uri",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_pr122_customer_center.py",
+      "reason": "private-key",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_pr122_customer_http.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_pr122_customer_preview.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_provider_onboarding.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_result_recovery.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_app.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_full_journey.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_mcp.py",
+      "reason": "credential-uri,email-unclassified",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_mcp_http.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_runtime.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_session_auth.py",
+      "reason": "credential-assignment",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/owner-workbench-v2/data.js",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/p2_uk_swas_diagnostic.py",
+      "reason": "phone-unclassified",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_app.py",
+      "reason": "bearer",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_ad_contract.py",
+      "reason": "credential-uri",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_connection_management.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_model_orchestration.py",
+      "reason": "credential-assignment,credential-uri",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_pr122_customer_center.py",
+      "reason": "private-key",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_pr122_customer_http.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_pr122_customer_preview.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_provider_onboarding.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_result_recovery.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_app.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_full_journey.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_mcp.py",
+      "reason": "credential-uri,email-unclassified",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_mcp_http.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_runtime.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_session_auth.py",
+      "reason": "credential-assignment",
+      "source": "integration-tc-144a"
+    }
+  ],
+  "exclusions": [
+    "unlisted files",
+    "git history",
+    "bundles",
+    "memory",
+    "evidence",
+    "deliveries",
+    "logs",
+    "cache",
+    "node_modules",
+    "production configuration",
+    "credentials",
+    "customer data",
+    "private sources"
+  ],
+  "files": [
+    {
+      "path": "demos/community-admin/admin.js",
+      "sha256": "d507305b716c0c289ab269b6d297f17a6db2ea63d878a5002fcbc04c5354dad4",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-admin/admin.test.mjs",
+      "sha256": "f6b34b8a34112db2710b0dcd742263b769479e2788c6a69ddcd65a8e3bc0e3dc",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-admin/index.html",
+      "sha256": "582b8b7f8d3c8e3335cc7fda6aa36d3efd94fc0ce41c7f6a5e6fa532f74a4d58",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/app.js",
+      "sha256": "ed862322232314a34123e2eb1338c991a90dd657a812a3d09c8e3770592b8ada",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/app.test.mjs",
+      "sha256": "0bacc3564bdf3c8052bb28362a8fb8cc7b34318ad3674dd1e3122d2d82218081",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/index.html",
+      "sha256": "5ccb2c1eebc59f20c995454e67feeed0ac61d325d04116b642a8a35b3c14d7d2",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/merchant.html",
+      "sha256": "ee530264a42634791b3fe5bd8a99171da651815449b0414c47c97872bb0701e8",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/merchant.js",
+      "sha256": "c8e94abe541e64da5ca3e4924600c45e9c0994aff347aaa62840cb0d7dd85758",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/merchant.test.mjs",
+      "sha256": "0e7fa28a442195df1ce9cf17814328729dcf56be5e062ca31d1f053d32461ea3",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/platform.html",
+      "sha256": "9ad0b9dee6af83e3025d3c39115819227433549635232d176db8e7e3d784fc29",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/platform.js",
+      "sha256": "0be8997f3dd4ae6951b373931296da664d9e378c01edad46c4bd87a304a8be38",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-local-e2e/platform.test.mjs",
+      "sha256": "8cda6c876913703b19e4b7245692e95008cf8480ce43c4d3dbf8d0ecd3f57825",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-payment/app.js",
+      "sha256": "e2c3ba1ed3da8abc4179b3000534b557b8bdaa8422203dae1240496669effd7e",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-payment/demo-client.js",
+      "sha256": "dffa21be158f92ed9080da72a7be2484a414166158c510b38a11230f8aee006c",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-payment/demo-client.test.mjs",
+      "sha256": "18f3fad7779be8247ddbdc1012098be36f9dc3e3abfb5fbbd9c5682b150b3330",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-payment/demo.test.mjs",
+      "sha256": "eda751e660e235ac2d67d766f322f3daffe9550eac2a2c0fc5768de34f02a7b1",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-payment/index.html",
+      "sha256": "9c388ccfb179014cb8731c3615ac5b93a7be2bfbbdfa451bc83925fe1cf0234b",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/owner-workbench-v2/app.js",
+      "sha256": "06682fd9863f12e8cd4ea5ce0e22c7ec15dc697ae0c8c9ae955bfadd007b6a7b",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/owner-workbench-v2/index.html",
+      "sha256": "9af8f332d4f8137e12fc5c5f53a166206a75182e3757a0e5ee35b2e4931943da",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/owner-workbench-v2/styles.css",
+      "sha256": "be1158c8d7bc1c387bfacf293ff0f9004c0536da63df54180b4a1eba07917de8",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/owner-workbench-v2/tests/model-service-boundary.test.cjs",
+      "sha256": "a812cf81a6356651d5d47abada186eaba6d6f9a44f69c832196b36893fd9bdb9",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/owner-workbench-v2/tests/provider-credential-clear.test.cjs",
+      "sha256": "feccd930db48e2431c45ee6674a06309fb60fb28357f2e8f4c4fc2a794a74f8d",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/owner-workbench-v2/tests/workbench.test.cjs",
+      "sha256": "9c9e247efdc1c99d070c052c414f0c021f8729505e35f798bfd34efe5ff7d00a",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/admin.html",
+      "sha256": "0d53bd37eb9608d67a11cece84c388bee3a6a76a89626580e03a47089b216c7e",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/admin.js",
+      "sha256": "85ccf91c3741118196432595a3af0a1f41fa6dc031784e0af8fbac1d5cac51e6",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/app.js",
+      "sha256": "1e1073409f9e74a2afc1c08a035a09e955a6cecf0ec4dfa34d84e441ccfd9445",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/digital-twin-data.js",
+      "sha256": "3b355d90f1d8ab13b7fc95423b5a6d9f62171c43bf0634b8c02c622840cc5d16",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/index.html",
+      "sha256": "801d35f6ae013e777f2290dc1eca5bdab52401033cf336e30602c729dbc5dd90",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/login.html",
+      "sha256": "1512d42002b9730a7c671f5926999948300a61adbccc8b37bbc03985d5d6e491",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/login.js",
+      "sha256": "242e7d25156fcf9cbbc710de79fd4855f370952b6f3528b20a30ec69e8cd547f",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/oauth-callback.html",
+      "sha256": "fab10d614c87b26ad350fdb4563f0eb70ada8c7fd1a353e78029c1c3ec32c49e",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/task-center-digital-twin/styles.css",
+      "sha256": "7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/codex_execution_adapter.py",
+      "sha256": "a80ece5275aa07e4e16b6e9430b2cab6384ee34539208bf575535a23e86261cf",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_ad_contract.py",
+      "sha256": "7337bbf3670be158d0f226f1090417e0d99fc2f87623b80a289309b28bde5e8e",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_ad_store.py",
+      "sha256": "1ce139611b5260d6e7849d1b88a166b9a67ff2b541eb24c101ae5cf757a40503",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_checkout.py",
+      "sha256": "32b6301d4a8cb6103a1727ddea0ea733b9fb24c960a0205cafb20fe9953ec312",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_checkout_read_integration.py",
+      "sha256": "65b1b42d8b99d4bbce6d00e80d39f3d3d2cea7c44fb3415b756f2caa2d3de519",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_checkout_refund_preview_read.py",
+      "sha256": "01a22ba569b11dbf70b2fe2b73ae05eacfc41b0bfb5c347aaa86bbb8c030f53e",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_demo_api.py",
+      "sha256": "e5fa3c8b7db2fc6bbc122c7c155b55c0f474e141111099e97376918863891245",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_demo_bootstrap.py",
+      "sha256": "25bb11bb886381b4cf8a55ac9f006080cc263ef1f6e2927a80d3dc289c18656e",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_development_watch.py",
+      "sha256": "fa12d97076df6691a9826b354a884c066de48a340b6b5bd9518f6dadc7a77432",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_merchant_contract.py",
+      "sha256": "54dab9a201bc1eacd12242a63ed1dcc57fd7e0525aeccbbcb8d061995bec5244",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_merchant_store.py",
+      "sha256": "a69e30cd4241e09f1fdc264a50b429ff2016e442abe3f8dd383259f4c9de9ec0",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_order_store.py",
+      "sha256": "3e35ef684b442433fdc99029f7121824ff4d7bddce6f0236f9b732f43301e838",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_refund_preview_store.py",
+      "sha256": "ae4d268a792158fce7f245faebff38f2b4378e8a2f399f8d6d178c2febb708c6",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_storefront_snapshot.py",
+      "sha256": "0ae406fc60a62f497c78891143cf25500a082ca9704126defc8b3d0f1ddfd544",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/community_ui_contracts.py",
+      "sha256": "9bd45cbde393e5874611519d04b9e1f89187a4822b81049a2c1eebf47178fff5",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/connection_management.py",
+      "sha256": "9fa988b435b9fec3328e7900bb9f105a9e4393b599c4cb1d4c72dfc18cb77ad3",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/development_authority.py",
+      "sha256": "36d087677b60b04f7d473c43e28cd4f856216c494598391da8775ff7e2033fdd",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/development_authority_provider.py",
+      "sha256": "cadd53a716cde72cf581c7ce755946ebbf244ab639b657f89dfee2f375061c05",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/development_authority_reader.py",
+      "sha256": "30ef598bcfaefb5b31ad61512e0c120b894dae3fc4f755123a47c9d48aed90c1",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/development_authority_release.py",
+      "sha256": "408006d22a77b03583471470de4941e1c08fd951f934dc8b2ad8b3493f28fd55",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/development_authority_runtime.py",
+      "sha256": "163cb2b44d4c22c7071b8d8867dd5d9565e7e0c0c04a110dee567fe06e8b45b3",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/development_entry_intake.py",
+      "sha256": "bc283bd4059f581920066edd9128eea320ccd5c1f363aa122802f6b312dc7f97",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/development_identity_adapter.py",
+      "sha256": "db30de33f08fbd4b8eb2943090be40100180347ac37dd3412218cb95f95b83b5",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/digital_twin_projection.py",
+      "sha256": "0fd451e2daacc7999908f584eb07f6a36395bd725dc443f5db0694568d00e12a",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/digital_twin_supervision.py",
+      "sha256": "55900d9255365fd7083d08f5964d085fef22b69e221b4ad33f23ce871740d06b",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/domestic-runner-preflight.sh",
+      "sha256": "7893edba2c5a105f8d331bb0fb3e71d0a5e749d1752930fb5c6f6988740a44a9",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/entry_review_gate.py",
+      "sha256": "c0f2959876b3320d5349cbdd49ba3836a8ef36d4b181f9bb20b096833d1ded94",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/execution_policy_gateway.py",
+      "sha256": "34fcfb94533d46f4e1d243b1a52b633a3fab7ec2d3518b8d91ab7782dab8fa07",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/feature_compliance_check.py",
+      "sha256": "3b261180e5cd145cbce0b530e179d7bac27ced36dab2614f1c0be06cf255fbe1",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/korea-binance-preflight.sh",
+      "sha256": "955d5e4681edece0b1d433c2969336986da909c8be8a6cede6dc9ab5d3dcc161",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/legacy_authority_migration.py",
+      "sha256": "9c7ade7995e2cb7e46d08cb542edb164c0960d2c0c5b1ab3e0a425a7f0dccba8",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/local_development_executor.py",
+      "sha256": "dcf1ff2bc1785afa15bf2735ae5f29c98aa50be0b53319f1e1874d006f6ce500",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/mcp_development_closure.py",
+      "sha256": "23c02f07b723a5e58ae86ed88a5f25136f9c79541b875c307b8e994320110314",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/model_orchestration.py",
+      "sha256": "5ce63846c05d9a98d3242ba8f845220b8728548a398e85cedde74b40eea3dcf9",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/model_scheduler_runtime.py",
+      "sha256": "72fcfeef699e96a5645b76221709fb9724e37134f9b1706119b47955e6f02cc3",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/native_syntax_gate.py",
+      "sha256": "0b3bbc6f0a6f45a64d3fae23bfd0ea624c935f4ab1abc3ffae3e278781f4f0d7",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/native_syntax_intake.py",
+      "sha256": "6bb174676598927619ecbec2e1d38ead69b8d50e1e21810d1b91a7595c6e3204",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/p2_swas_receipt_validator.py",
+      "sha256": "f2897ff21fdfa301048d205105c6d964740112ccc85aa03778758b96ceac1575",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/p2_uk_readonly_diagnostic.py",
+      "sha256": "8751402afbe40bf9df0d10ef461a3217b1a9aaf2c278c3077edb3e038ff2e646",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_activity_evidence.py",
+      "sha256": "a4934c9c78036c5da1bf7035438d639bf1b532cfe5b87d0b30ba47726a7157df",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_change_authority.py",
+      "sha256": "060f3669a2a9bc341ca9594cb16a0dc75e20b662bcc7f41d318094d8b5edcf9b",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_changes.py",
+      "sha256": "d5cfe2150cb1490c886fa96d2d7015df390f74446cc0aa2cc7b46dcf4f416cd4",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_core.py",
+      "sha256": "c27354f5c288a58f275411653ee7295937c256745f5d036f141f6dd87f764c39",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_delivery_source.py",
+      "sha256": "5c84508d9e72b6fa1d57b49ce3d1c0984011e3e2fced5022e94d4dc7600f56c9",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_edit_jobs.py",
+      "sha256": "1aa4a0f2d0ef220e567e2eab1a8a12f218739c3890f967e8a7ab5b5aceaaa763",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_evidence.py",
+      "sha256": "e4cfa96df6e1c340c2d3f75a2a64b75edcb1e664ed4663ccec3e1f2ca582a3dd",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_http.py",
+      "sha256": "72822ce89b3b6c818a9a17155eb53c94d702ddd6d8e4b2a4b33088abe4f5be9a",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_identity.py",
+      "sha256": "c78833fb121c4c719e9825fdeff165894762c326a88a2244227145986df475e7",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_ops.py",
+      "sha256": "d469510959b5dbe1b00a3a3ef166cdd357ac768da065e486fc76efe239f5e753",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_preview.py",
+      "sha256": "dbfdcf51dec880dee75db1ce6e5d91741cc0faa33860b70dc8df83caec59cd00",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_privacy.py",
+      "sha256": "99ba0b6810ab6eca07fbbdcc5e921970d783e49262c93102632f1d44417acad4",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_profile.py",
+      "sha256": "b23d8bb8c9d355d4a557ec38bd624d0f768430638398dccc3463a463c7042042",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_providers.py",
+      "sha256": "0bef5c4a58c1df563e5662f11d516057fbd22e322066c86c8b75f78beb698d81",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_publication_worker.py",
+      "sha256": "dfc2e567046a01af90db189adb293871127ffbd5310a288a13dd3dec4192707d",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_small_edit.py",
+      "sha256": "ce8845881bcfd2064186126e4943dac0396c1f8c831f5a348b554a3f76513bc4",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/pr122_customer_source.py",
+      "sha256": "3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/project_delivery_contract.py",
+      "sha256": "616476fd83c8f6747edbdb3eca139165e41f2002684e336ac11412bcffa0eb13",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/provider_onboarding.py",
+      "sha256": "a0604836bc358078d88054a2c8e78526e3fa375c01c409b93965c040473df544",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/reusable_scheduler_cli.py",
+      "sha256": "8ae67eceb2a5df452da2722b889671e325f740cf168e08c3db8cbccf2a84e3d6",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/reusable_task_gateway.py",
+      "sha256": "729531e6f464041ef1554247fbe6db067c95ffe91b6b01d0899fa172efeed7f8",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/run_r5_scoped_tests.py",
+      "sha256": "b94dfeb5efaaa6f7d74b4eec472e7296120609dc7a72fff175777fc4144485ae",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/runner-preflight.sh",
+      "sha256": "71a81e43c54e12b59b30c36900f9114ba948fc48126a83be4d014a4e0154e63f",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/secure_file_input.py",
+      "sha256": "adfe73744c90b0b60b9fc8d14dd76536cd209ebd6478e5726827a55d66180361",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_execution_contract.py",
+      "sha256": "355e7f7efbbcb322b7d7ef0a2dc64e2eee63331b0274e2307154f7b29ad99c86",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp.py",
+      "sha256": "a99789744b7d83e90c4d1867ff196c3b68aa90a63448d91429df4b2a0310b732",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp_auth.py",
+      "sha256": "4fed531ccbd6cc88461e5c52d79ccf868e398f26e6f33923d47e6840a1ade501",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp_completion.py",
+      "sha256": "fb7dc13614d8a421b400fbca5510cdab1606bd5b02e440b201e70f8670d41a8c",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp_development.py",
+      "sha256": "6eb88621e415708a95b7671e01ddebcb9148cd9ae074b19dfa795a7a336d3b4d",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp_dispatch_host.py",
+      "sha256": "e3f5dfe5462c9f11026e00d44cc24d7bacc41ffa45c991b40a17216598b16445",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp_free_model_gate.py",
+      "sha256": "c7c16ea2eb0ec33dad29aa4d5743b88acc96f1d34b5c72cc658eb36f3372cfe7",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp_result_recovery.py",
+      "sha256": "64771ef74e19719ba264f19f6a4ec332eefb3642e9a8de0364bdace1c448ded7",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_mcp_service.py",
+      "sha256": "3461b28e31a6322385893f5c4c865b409d94731b508dd9ad145b60d0634dd03f",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_real_blackbox.py",
+      "sha256": "18a67f97de6d65cc35c0673ad1d6ca04668d5680a4d537bb592f6a81e9d59e95",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_session_auth.py",
+      "sha256": "e8052075120d65cb210f826a94b16efaf9b3abb034797fa9f6acc94cfaec5061",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_center_test_identity_cli.py",
+      "sha256": "e3c7489b6e172822f679479cf41f0520710460c1f9678955a55e1769ee67cf8e",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_supervisor.py",
+      "sha256": "ed57bb5eec0eee77278e9d36863d718777c7c57d76ef5f7a6b1ccd05536584e0",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_supervisor_runtime.py",
+      "sha256": "4aea67d277d32820fd31e85ef83601beb3bd18d129ff714ddbcb97b0b606942e",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_supervisor_runtime_entry.py",
+      "sha256": "a4edfd98f4acbc59b3e54f9d3a5d6fec2710878b85c78fde08f9f6f9cbafbde6",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/task_writer_fence.py",
+      "sha256": "c749cb3542e8ab0e872b0b9b4c4a73c3fe47b8d70eec1870544d1bf8ecbeae20",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/tokyo-readonly-discovery.sh",
+      "sha256": "afdd175a9f72f210c6b966a26c1e7ae84701e4e3d0134b3def45b9abaa348283",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/uk-dev-preflight.sh",
+      "sha256": "a958668d02143f7380cea5f1e5222a6dff9c90b8036b08ab86751acc334b685c",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/uk-external-runner-watchdog.py",
+      "sha256": "dbc39bdde11b5c85f731c0d3a93b5e4a4029413199878c8bd9ef32c937dc05c9",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/uk-stage1-foundation-audit.sh",
+      "sha256": "8e7b01457d223bc84522c8e0a286065921be78a79bc9bdbc65d55ca480ae8783",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/unified_admin_projection.py",
+      "sha256": "e27c7f9f8c23c5fc16ea1820f34442dd75bff98b0d5dda2af44ea08425e972f2",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/v27-batch-readonly.sh",
+      "sha256": "bc3464bbef13b021f173f0e8e7965193ae4b71393de1935c5bb071b0e5b1f008",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/pr122_customer_change_fixture.py",
+      "sha256": "4c4cf971ceb93a78d39ec39f68b1382fdd636edd71e426ca24371ad65cbfe99a",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/task_center_digital_twin.test.cjs",
+      "sha256": "93e6fa2fc94755e77d3af8937b414bd5ea1b96588f8c62bca3f0940bb7fd1b5b",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_authority_key_file.py",
+      "sha256": "6563b39708aca20b4379203d19d52b741f491a68382cdb24c86c75104a84599a",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_authority_security_regressions.py",
+      "sha256": "e6339887523b551ea5cd903e1024f22003292728d913be2c1414feac1fcbb43d",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_codex_execution_adapter.py",
+      "sha256": "b538575d733ae6301d579639d6e4ad56dd91465e24fabcf1d4e9b2305ee7d02e",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_ad_store.py",
+      "sha256": "88d740e5a9e781d103f71ffeb7ad1625b3b1b35e9d6527cbcb4126f97af3f379",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_checkout.py",
+      "sha256": "c9951f37d5e68c583d572e7de7937eb6dd669fc4c6ab5d072a58706dde229abb",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_demo_api.py",
+      "sha256": "dbad2bc5ae15865cb698637e0e2f95c440e2883b3442ad5a8a3b92a87fc13fcb",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_merchant_contract.py",
+      "sha256": "af60176fdf8a3b44df608287935c6101958c6223869eb7158f465bf1e4d323f7",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_merchant_store.py",
+      "sha256": "a371a9f69f34dd538f5d9b6a2a1bcd268acbab5db60b1f7c4a4efcfd7471b070",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_order_store.py",
+      "sha256": "05e2c0196a2db028961513185a91f23f8d7c014262b4c7abe869fe2911602ba5",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_preview_entry_registration.py",
+      "sha256": "2d8ee0b038bfc80f3ce516bc6d6730cb3a24cbd853e9442cc8042b29628c6f06",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_refund_preview_store.py",
+      "sha256": "c7a7c16740d000d01ba78a5fcc2f44c1e05bf2a1eebb6aec4058932aa213698f",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_storefront_snapshot.py",
+      "sha256": "0a8daf4c42b78f0037191cf9d59ae3fa61248678b0d63bc218c96b00bdeba486",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_community_ui_contracts.py",
+      "sha256": "78fa66a35401f31cda55f310a7f01defc8f5f2972a1b50d826396353e87223c2",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_correction_observer.py",
+      "sha256": "b35788f6907f47e7235555dd1c462d4b090ba3deeb147be935da9ea58fb962f1",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_correction_rules.py",
+      "sha256": "b8a444b245b17188cd3dc8a8d21a7abddabe43e96d0c11d30cf62e9676e6f2d2",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_development_authority.py",
+      "sha256": "54881792f9c665ee1339aeb7f8b7a8eabbb2eb1f3e07fcccd57a9905dbf441f0",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_development_authority_operational.py",
+      "sha256": "95e0528d3579cf48eab874bb752dbdbc31b6d048787bd6b869567fde667fc890",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_development_entry_intake.py",
+      "sha256": "f85d3e624fd93ff6bf2aaee7b97efa7100e88c69aa2a42c2ee20627721e16426",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_digital_twin_projection.py",
+      "sha256": "5c9d78decc10d8a56f03015b51c2ffee42d6b9f5a1ce051ec4410337767f9ee5",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_digital_twin_supervision.py",
+      "sha256": "cfbd4b6a4d2657d20d136f953c4de679a42bff30fe9f2921581ac34a5de47267",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_dispatch_contract.py",
+      "sha256": "4dc7f70027669e55d4f8fbca3ee00e385da2ab2ec4fe9ce5f584273f3fd8a203",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_entry_review_gate.py",
+      "sha256": "55158203bf90343ec6c169e6f6ece46b14e4838f2b7ec97d014508441476d1fc",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_execution_policy_gateway.py",
+      "sha256": "b95a073b5cd3f8141ce3288c1ee9ab9d5bd614265a9428c44fc29a3ea5c4db6a",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_feature_compliance_check.py",
+      "sha256": "9097c2d3943b60f6916191c080d6ad9de467c9e2aaafcabfbdc14edbca336f0f",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_legacy_authority_migration.py",
+      "sha256": "385c803d7caef39bfa645ab14ca94f297c7b0cfaea7d3c417a6bac44217075fa",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_local_development_executor.py",
+      "sha256": "38f0907b4c7ba9cc368347b56ba35ffd49ee8a1671062e71ac9837e7a12d9d63",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_mcp_completion.py",
+      "sha256": "5268c63a87d0e19b6e2c9c24397c16007a8999f27b0fda58bd2fc3002b4167c7",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_mcp_development_bridge.py",
+      "sha256": "9b113be546e96f6a653af617bff89b44374966085470cb8f203ed9f520913479",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_mcp_development_closure.py",
+      "sha256": "0ef1e959e4c76bc4bffa9489d0f32939ad99ae5b31784f9705799a9fc448ba4f",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_mcp_dispatch_host.py",
+      "sha256": "f1e12fa7b677ebbaba86e2240db32c71ed7d947f3489035e39b05238bb1fb9cf",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_native_syntax_gate.py",
+      "sha256": "543d100d85761b9761f093a7af848de4b4d08a23d4aaebdf2f8e8ac550f07704",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_native_syntax_intake.py",
+      "sha256": "d728c214de64b46918f37c30930bdd3c3f64094d9d81ff60d89f5adf67117229",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_p2_swas_receipt_validator.py",
+      "sha256": "19a1b6319ac8403103a00059e07124a2b3bca34f38b0ad3d26ace3a719975702",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_p2_uk_readonly_diagnostic.py",
+      "sha256": "e33d08ee97f07909fa3a1f94722aa61090187ddce2bc664023ebd8472e0259fc",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_p2_uk_swas_diagnostic.py",
+      "sha256": "aaa38fa5554d88e357cc7785bf1565f97a2ad7db77d97a5b744518d4b0737fa2",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_project_delivery_contract.py",
+      "sha256": "1227c6c362bffebfe7306d70d96a472f99839397b2a9c05ad62dba649cf663ee",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_registered_dispatch.py",
+      "sha256": "73fe1829179458a66f7e5eafb6916721eb25928420a878acabc82771cb20438d",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_reusable_scheduler_cli.py",
+      "sha256": "3f3cdfb595363acac821e899076a87a58f5a0d6b820852a2cc2214dda01bdebb",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_reusable_task_gateway.py",
+      "sha256": "d3738d53cfa2e45e60f1574119e2b859d8a5b1793e57dd58e59e253c68abffd4",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_active_ad_integration.py",
+      "sha256": "f1f78e4d745a3bd269e45d9528a2a3af839c28f09c6cf5a16cad2817e1231dc7",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_browser_e2e.py",
+      "sha256": "d8ea0f2d0df5316d9f9fbb842db85b9b7a77d29e8148d9ec423252fc629ab544",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_checkout_read_integration.py",
+      "sha256": "9458538ea4aa531a6465e397dbc52f51c1d209bcb4cd0838ab071669d8be11d1",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_checkout_refund_preview_read.py",
+      "sha256": "6f03f6c5a32cb6b68dccec6842d86498cecd647cb7e95731e75319dc24d3979a",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_default_bootstrap_browser.py",
+      "sha256": "52034c72945fcbde95d6a9e2f1c27594fe1306b22197040c71dedc88ac7323aa",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_local_stack.py",
+      "sha256": "3d04afc3e0d8637975f983acf59997ea03a62d2fadc9b5c3bbd6601cfc4d10bf",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_owned_cleanup.py",
+      "sha256": "630d86a0f2850e1c1253b2d0ee7f30d849d283f435d1649127245972b70ebd43",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_phase1_smoke.py",
+      "sha256": "479dbb45428b89fb94f292c31973b6df878eef3999b1e84e59b5b3548027f6b3",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_storefront_browser_e2e.py",
+      "sha256": "5cf9450b6f1a6d593539f019b6536507986e956d4e58a4dae816e180c17b98d0",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_stage5_storefront_http.py",
+      "sha256": "7531ccfebc60708c54fcbed50e590436999fca924640e07349f9cbaf6028b5a5",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_execution_contract.py",
+      "sha256": "15d8239da35b799e0d5f09d0375b133ba86509600a3f45e2e4e305a859fe7f7b",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_mcp_free_model_gate.py",
+      "sha256": "f340d2172087c786fe01444808a6f3cc10d1ef9fa0b5eb5be4fc1d1b46ffe58a",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_mcp_service.py",
+      "sha256": "4d887b18c6333d036f09e6437a5569b30296ac6232469100f3df6503ef1d6e02",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_center_real_blackbox.py",
+      "sha256": "5f9021054852d2e0c10459136a302ed79827915b81db2f7af4d180646ea18edd",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_supervisor.py",
+      "sha256": "e401f3540571d30ed31be53c0ea33edc5bc8287658c43c05974201f89cbc9b48",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_supervisor_runtime.py",
+      "sha256": "d3958624bb9ddbb7ca8df0758dae5bb2b448c29361bd92d67fb6fa01e92fdb35",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_task_writer_fence.py",
+      "sha256": "20896b9a7868c8a86eb8196fdc8b53e145cdaf841616c77c2430fd51379bfd0a",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_unified_admin_projection.py",
+      "sha256": "e86897f64472df5f67b5e9e6c90c64956b7eea6ee5ae076c979c222f915fff9e",
+      "source": "task-center"
+    },
+    {
+      "path": "scripts/p3_receipt_consumption_candidate.py",
+      "sha256": "2bbde13679a195c9aa89dbcb3f9892dec59fd9b58b46be4a6725ebad32dfaa8c",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/development_scene_delta.test.cjs",
+      "sha256": "c1c5b6a6cad2bdf23c60f8095b1b5acdded9738c81461b69dad64477b9b1a5a9",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_authority_release_sign_documents.py",
+      "sha256": "e1b0cee947cec08cffae9a4a475d1192f09d226fb36156fcf71aa47be685caca",
+      "source": "task-center"
+    },
+    {
+      "path": "tests/test_p3_receipt_consumption_candidate.py",
+      "sha256": "f228fc7aa2fdc53f9ea7cee761c2c1826b33e4dd49087142e321a3d03cd068bd",
+      "source": "task-center"
+    },
+    {
+      "path": "demos/community-admin/admin.js",
+      "sha256": "d507305b716c0c289ab269b6d297f17a6db2ea63d878a5002fcbc04c5354dad4",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-admin/admin.test.mjs",
+      "sha256": "f6b34b8a34112db2710b0dcd742263b769479e2788c6a69ddcd65a8e3bc0e3dc",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-admin/index.html",
+      "sha256": "582b8b7f8d3c8e3335cc7fda6aa36d3efd94fc0ce41c7f6a5e6fa532f74a4d58",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/app.js",
+      "sha256": "ed862322232314a34123e2eb1338c991a90dd657a812a3d09c8e3770592b8ada",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/app.test.mjs",
+      "sha256": "0bacc3564bdf3c8052bb28362a8fb8cc7b34318ad3674dd1e3122d2d82218081",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/index.html",
+      "sha256": "5ccb2c1eebc59f20c995454e67feeed0ac61d325d04116b642a8a35b3c14d7d2",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/merchant.html",
+      "sha256": "ee530264a42634791b3fe5bd8a99171da651815449b0414c47c97872bb0701e8",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/merchant.js",
+      "sha256": "c8e94abe541e64da5ca3e4924600c45e9c0994aff347aaa62840cb0d7dd85758",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/merchant.test.mjs",
+      "sha256": "0e7fa28a442195df1ce9cf17814328729dcf56be5e062ca31d1f053d32461ea3",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/platform.html",
+      "sha256": "9ad0b9dee6af83e3025d3c39115819227433549635232d176db8e7e3d784fc29",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/platform.js",
+      "sha256": "0be8997f3dd4ae6951b373931296da664d9e378c01edad46c4bd87a304a8be38",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-local-e2e/platform.test.mjs",
+      "sha256": "8cda6c876913703b19e4b7245692e95008cf8480ce43c4d3dbf8d0ecd3f57825",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-payment/app.js",
+      "sha256": "e2c3ba1ed3da8abc4179b3000534b557b8bdaa8422203dae1240496669effd7e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-payment/demo-client.js",
+      "sha256": "dffa21be158f92ed9080da72a7be2484a414166158c510b38a11230f8aee006c",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-payment/demo-client.test.mjs",
+      "sha256": "18f3fad7779be8247ddbdc1012098be36f9dc3e3abfb5fbbd9c5682b150b3330",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-payment/demo.test.mjs",
+      "sha256": "eda751e660e235ac2d67d766f322f3daffe9550eac2a2c0fc5768de34f02a7b1",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/community-payment/index.html",
+      "sha256": "9c388ccfb179014cb8731c3615ac5b93a7be2bfbbdfa451bc83925fe1cf0234b",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/owner-workbench-v2/app.js",
+      "sha256": "06682fd9863f12e8cd4ea5ce0e22c7ec15dc697ae0c8c9ae955bfadd007b6a7b",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/owner-workbench-v2/index.html",
+      "sha256": "9af8f332d4f8137e12fc5c5f53a166206a75182e3757a0e5ee35b2e4931943da",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/owner-workbench-v2/styles.css",
+      "sha256": "be1158c8d7bc1c387bfacf293ff0f9004c0536da63df54180b4a1eba07917de8",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/owner-workbench-v2/tests/model-service-boundary.test.cjs",
+      "sha256": "a812cf81a6356651d5d47abada186eaba6d6f9a44f69c832196b36893fd9bdb9",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/owner-workbench-v2/tests/provider-credential-clear.test.cjs",
+      "sha256": "feccd930db48e2431c45ee6674a06309fb60fb28357f2e8f4c4fc2a794a74f8d",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/owner-workbench-v2/tests/workbench.test.cjs",
+      "sha256": "9c9e247efdc1c99d070c052c414f0c021f8729505e35f798bfd34efe5ff7d00a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/admin.html",
+      "sha256": "60c82106c6b08fc18034ac3547698294fbeee3233433f4d20d18adf2c313481c",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/admin.js",
+      "sha256": "655a7e565484515cbbccdaf6e4522653a81007af4c56d6ee205bc776bd9fd0a5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/app.js",
+      "sha256": "ae688d217ad28f9c226a798fbc508d3d5b812dd79dd0cbaf8f4ca8a6bf6ec287",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/delivery-ledger.html",
+      "sha256": "fc783a5e0d80da88b6c5365d7caa90caeef0f878182b15cd83a543468cb666a8",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/delivery-ledger.js",
+      "sha256": "817dc09bb98384c7b63c405b24446d1e1a14676d1e3645294d6dab17e62afedc",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/digital-twin-data.js",
+      "sha256": "3b355d90f1d8ab13b7fc95423b5a6d9f62171c43bf0634b8c02c622840cc5d16",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/index.html",
+      "sha256": "801d35f6ae013e777f2290dc1eca5bdab52401033cf336e30602c729dbc5dd90",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/login.html",
+      "sha256": "1512d42002b9730a7c671f5926999948300a61adbccc8b37bbc03985d5d6e491",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/login.js",
+      "sha256": "54eb331dcaa098db5a1a2ba02f25de969bc168b59499361fe5978413089291bd",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/oauth-callback.html",
+      "sha256": "fab10d614c87b26ad350fdb4563f0eb70ada8c7fd1a353e78029c1c3ec32c49e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/research-workbench/index.html",
+      "sha256": "d13ce92e34403a26eb12aff76ac827e8be38a39c92ae6ba2e2651cd4dbe5eecf",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/research-workbench/preview.js",
+      "sha256": "be4ed31f1d9244c837acdf47b5c249e46d6f97008dd948309cb2c98a9019735b",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/research-workbench/public-projection.js",
+      "sha256": "60625fed226b5daced47a5ce9c79ce3cf5a24546d4d9cfdbc2bd7f9c51caf543",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/research-workbench/styles.css",
+      "sha256": "7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/research-workbench/workbench.js",
+      "sha256": "444a1bf2ea76c9b795c0e3e9190b3ddabf316b964dcf6277684395687599b31d",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/styles.css",
+      "sha256": "7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/task-center.html",
+      "sha256": "d129e1472a495fdd4b1a9e25d7e10ed32850de5b2cd1e9f1ef51675879c53cc5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/task-center.js",
+      "sha256": "963010fd39cd07e41f8b004b3c09320785c132b41235bf5158213b80e50feda9",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/codex_execution_adapter.py",
+      "sha256": "a80ece5275aa07e4e16b6e9430b2cab6384ee34539208bf575535a23e86261cf",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_ad_contract.py",
+      "sha256": "7337bbf3670be158d0f226f1090417e0d99fc2f87623b80a289309b28bde5e8e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_ad_store.py",
+      "sha256": "1ce139611b5260d6e7849d1b88a166b9a67ff2b541eb24c101ae5cf757a40503",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_checkout.py",
+      "sha256": "32b6301d4a8cb6103a1727ddea0ea733b9fb24c960a0205cafb20fe9953ec312",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_checkout_read_integration.py",
+      "sha256": "65b1b42d8b99d4bbce6d00e80d39f3d3d2cea7c44fb3415b756f2caa2d3de519",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_checkout_refund_preview_read.py",
+      "sha256": "01a22ba569b11dbf70b2fe2b73ae05eacfc41b0bfb5c347aaa86bbb8c030f53e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_demo_api.py",
+      "sha256": "e5fa3c8b7db2fc6bbc122c7c155b55c0f474e141111099e97376918863891245",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_demo_bootstrap.py",
+      "sha256": "25bb11bb886381b4cf8a55ac9f006080cc263ef1f6e2927a80d3dc289c18656e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_development_watch.py",
+      "sha256": "fa12d97076df6691a9826b354a884c066de48a340b6b5bd9518f6dadc7a77432",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_merchant_contract.py",
+      "sha256": "54dab9a201bc1eacd12242a63ed1dcc57fd7e0525aeccbbcb8d061995bec5244",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_merchant_store.py",
+      "sha256": "a69e30cd4241e09f1fdc264a50b429ff2016e442abe3f8dd383259f4c9de9ec0",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_order_store.py",
+      "sha256": "3e35ef684b442433fdc99029f7121824ff4d7bddce6f0236f9b732f43301e838",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_refund_preview_store.py",
+      "sha256": "ae4d268a792158fce7f245faebff38f2b4378e8a2f399f8d6d178c2febb708c6",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_storefront_snapshot.py",
+      "sha256": "0ae406fc60a62f497c78891143cf25500a082ca9704126defc8b3d0f1ddfd544",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/community_ui_contracts.py",
+      "sha256": "9bd45cbde393e5874611519d04b9e1f89187a4822b81049a2c1eebf47178fff5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/connection_management.py",
+      "sha256": "60074fe50a2d051091ff0677b90396ca93be60e1923833c9cf8e3e1f57e20042",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/development_authority.py",
+      "sha256": "36d087677b60b04f7d473c43e28cd4f856216c494598391da8775ff7e2033fdd",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/development_authority_provider.py",
+      "sha256": "cadd53a716cde72cf581c7ce755946ebbf244ab639b657f89dfee2f375061c05",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/development_authority_reader.py",
+      "sha256": "30ef598bcfaefb5b31ad61512e0c120b894dae3fc4f755123a47c9d48aed90c1",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/development_authority_release.py",
+      "sha256": "5dab2e8322e3fa885fdb39d56edaa0cacdd0a0bcfd995e00ad99e07b6e1f8845",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/development_authority_runtime.py",
+      "sha256": "163cb2b44d4c22c7071b8d8867dd5d9565e7e0c0c04a110dee567fe06e8b45b3",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/development_entry_intake.py",
+      "sha256": "bc283bd4059f581920066edd9128eea320ccd5c1f363aa122802f6b312dc7f97",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/development_identity_adapter.py",
+      "sha256": "db30de33f08fbd4b8eb2943090be40100180347ac37dd3412218cb95f95b83b5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/digital_twin_projection.py",
+      "sha256": "0fd451e2daacc7999908f584eb07f6a36395bd725dc443f5db0694568d00e12a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/digital_twin_supervision.py",
+      "sha256": "55900d9255365fd7083d08f5964d085fef22b69e221b4ad33f23ce871740d06b",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/domestic-runner-preflight.sh",
+      "sha256": "7893edba2c5a105f8d331bb0fb3e71d0a5e749d1752930fb5c6f6988740a44a9",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/entry_review_gate.py",
+      "sha256": "a32e7755db2c9c34118f71b3876e6cfa4edc12f86ee0bc34351182599ee7a5f5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/execution_policy_gateway.py",
+      "sha256": "34fcfb94533d46f4e1d243b1a52b633a3fab7ec2d3518b8d91ab7782dab8fa07",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/feature_compliance_check.py",
+      "sha256": "3b261180e5cd145cbce0b530e179d7bac27ced36dab2614f1c0be06cf255fbe1",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/korea-binance-preflight.sh",
+      "sha256": "955d5e4681edece0b1d433c2969336986da909c8be8a6cede6dc9ab5d3dcc161",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/legacy_authority_migration.py",
+      "sha256": "8968c7e9f133d687684c8dcf5b6dd72ab75e2397ee862ad0835d629554395901",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/local_development_executor.py",
+      "sha256": "123dd44d70c836ecc052f26f5b2907be0b54ba1a70cfffa3f4b5a5113cfcc8d6",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/mcp_development_closure.py",
+      "sha256": "23c02f07b723a5e58ae86ed88a5f25136f9c79541b875c307b8e994320110314",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/model_orchestration.py",
+      "sha256": "60ab13c9347239eb6808d64445000f510fbee346a87238a0138ffb3fe97b0f61",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/model_scheduler_runtime.py",
+      "sha256": "72fcfeef699e96a5645b76221709fb9724e37134f9b1706119b47955e6f02cc3",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/native_syntax_gate.py",
+      "sha256": "0b3bbc6f0a6f45a64d3fae23bfd0ea624c935f4ab1abc3ffae3e278781f4f0d7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/native_syntax_intake.py",
+      "sha256": "6bb174676598927619ecbec2e1d38ead69b8d50e1e21810d1b91a7595c6e3204",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/p2_swas_receipt_validator.py",
+      "sha256": "f2897ff21fdfa301048d205105c6d964740112ccc85aa03778758b96ceac1575",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/p2_uk_readonly_diagnostic.py",
+      "sha256": "8751402afbe40bf9df0d10ef461a3217b1a9aaf2c278c3077edb3e038ff2e646",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_activity_evidence.py",
+      "sha256": "a4934c9c78036c5da1bf7035438d639bf1b532cfe5b87d0b30ba47726a7157df",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_change_authority.py",
+      "sha256": "060f3669a2a9bc341ca9594cb16a0dc75e20b662bcc7f41d318094d8b5edcf9b",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_changes.py",
+      "sha256": "d5cfe2150cb1490c886fa96d2d7015df390f74446cc0aa2cc7b46dcf4f416cd4",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_core.py",
+      "sha256": "c27354f5c288a58f275411653ee7295937c256745f5d036f141f6dd87f764c39",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_delivery_source.py",
+      "sha256": "5c84508d9e72b6fa1d57b49ce3d1c0984011e3e2fced5022e94d4dc7600f56c9",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_edit_jobs.py",
+      "sha256": "1aa4a0f2d0ef220e567e2eab1a8a12f218739c3890f967e8a7ab5b5aceaaa763",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_evidence.py",
+      "sha256": "e4cfa96df6e1c340c2d3f75a2a64b75edcb1e664ed4663ccec3e1f2ca582a3dd",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_http.py",
+      "sha256": "72822ce89b3b6c818a9a17155eb53c94d702ddd6d8e4b2a4b33088abe4f5be9a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_identity.py",
+      "sha256": "c78833fb121c4c719e9825fdeff165894762c326a88a2244227145986df475e7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_ops.py",
+      "sha256": "d469510959b5dbe1b00a3a3ef166cdd357ac768da065e486fc76efe239f5e753",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_preview.py",
+      "sha256": "dbfdcf51dec880dee75db1ce6e5d91741cc0faa33860b70dc8df83caec59cd00",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_privacy.py",
+      "sha256": "99ba0b6810ab6eca07fbbdcc5e921970d783e49262c93102632f1d44417acad4",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_profile.py",
+      "sha256": "b23d8bb8c9d355d4a557ec38bd624d0f768430638398dccc3463a463c7042042",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_providers.py",
+      "sha256": "0bef5c4a58c1df563e5662f11d516057fbd22e322066c86c8b75f78beb698d81",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_publication_worker.py",
+      "sha256": "dfc2e567046a01af90db189adb293871127ffbd5310a288a13dd3dec4192707d",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_small_edit.py",
+      "sha256": "ce8845881bcfd2064186126e4943dac0396c1f8c831f5a348b554a3f76513bc4",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/pr122_customer_source.py",
+      "sha256": "3e8d531ede69577b72b6ee9089fdc8f481b2f91578f19e0e44d1841c168f3471",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/producer_http_contract.py",
+      "sha256": "52673857af86fe712fe3449f1744ab3ed3dbcd38e10b744775e6e10e29e4c165",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/producer_http_runner.py",
+      "sha256": "ecca53ddfa680b064b76ca6824c1d468f3dd3bbc4c3120b3c1c45561405f676e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/producer_tree_delta.py",
+      "sha256": "f06fa33bb32c1007ef71d07de0d6f9e4ef153e368dfef406b8a164f2e8ab5eee",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/project_delivery_contract.py",
+      "sha256": "616476fd83c8f6747edbdb3eca139165e41f2002684e336ac11412bcffa0eb13",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/provider_onboarding.py",
+      "sha256": "a0604836bc358078d88054a2c8e78526e3fa375c01c409b93965c040473df544",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/reusable_scheduler_cli.py",
+      "sha256": "8ae67eceb2a5df452da2722b889671e325f740cf168e08c3db8cbccf2a84e3d6",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/reusable_task_gateway.py",
+      "sha256": "729531e6f464041ef1554247fbe6db067c95ffe91b6b01d0899fa172efeed7f8",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/run_r5_scoped_tests.py",
+      "sha256": "b94dfeb5efaaa6f7d74b4eec472e7296120609dc7a72fff175777fc4144485ae",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/runner-preflight.sh",
+      "sha256": "71a81e43c54e12b59b30c36900f9114ba948fc48126a83be4d014a4e0154e63f",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/secure_file_input.py",
+      "sha256": "adfe73744c90b0b60b9fc8d14dd76536cd209ebd6478e5726827a55d66180361",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_execution_contract.py",
+      "sha256": "355e7f7efbbcb322b7d7ef0a2dc64e2eee63331b0274e2307154f7b29ad99c86",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp.py",
+      "sha256": "a99789744b7d83e90c4d1867ff196c3b68aa90a63448d91429df4b2a0310b732",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp_auth.py",
+      "sha256": "4fed531ccbd6cc88461e5c52d79ccf868e398f26e6f33923d47e6840a1ade501",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp_completion.py",
+      "sha256": "fb7dc13614d8a421b400fbca5510cdab1606bd5b02e440b201e70f8670d41a8c",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp_development.py",
+      "sha256": "fe008ec79659dff6b8e15bebeb4cdefff1a5d3904ddf249187e00466f5a75490",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp_dispatch_host.py",
+      "sha256": "077134000459662965c6ebd76f528a971d7404220ac6e8304e4d07fa069b74e3",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp_free_model_gate.py",
+      "sha256": "c7c16ea2eb0ec33dad29aa4d5743b88acc96f1d34b5c72cc658eb36f3372cfe7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp_result_recovery.py",
+      "sha256": "64771ef74e19719ba264f19f6a4ec332eefb3642e9a8de0364bdace1c448ded7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_mcp_service.py",
+      "sha256": "3461b28e31a6322385893f5c4c865b409d94731b508dd9ad145b60d0634dd03f",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_real_blackbox.py",
+      "sha256": "18a67f97de6d65cc35c0673ad1d6ca04668d5680a4d537bb592f6a81e9d59e95",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_session_auth.py",
+      "sha256": "e8052075120d65cb210f826a94b16efaf9b3abb034797fa9f6acc94cfaec5061",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_center_test_identity_cli.py",
+      "sha256": "e3c7489b6e172822f679479cf41f0520710460c1f9678955a55e1769ee67cf8e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_delivery_backup_receipt.py",
+      "sha256": "ce78a42a82c407089c81603d9d35c30671ade7ed6cb761162c557c06bc3bff1e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_delivery_ledger/__init__.py",
+      "sha256": "a2d2b8a163ae9430cc08378f73790d02d030ebe4997761b4a553bdea262d0f09",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_delivery_ledger/core.py",
+      "sha256": "2fd86fb43484b094556235b4d8d75c7d62dafbdc64b3fc0d574da7a07f7d5616",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_delivery_ledger/handoffs.py",
+      "sha256": "8c0a878ebd2b1ee33068d8aae1e6662f34004feebefe314ec5ee15cb2aed7b0e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_delivery_observation.py",
+      "sha256": "e1304cf7de873a56544ffeb4d99c2348ac232c4c6b0c3bde7459bcfc05146106",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_delivery_observer.py",
+      "sha256": "957d0aa7d6c2e79c32f0c18bc14da85d7f2cd57c612b06e3926c907f439c979a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_supervisor.py",
+      "sha256": "40950fe0c4d363eaa810044120c6e295f34ce36e0835bb03808ca11631e07429",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_supervisor_runtime.py",
+      "sha256": "4aea67d277d32820fd31e85ef83601beb3bd18d129ff714ddbcb97b0b606942e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_supervisor_runtime_entry.py",
+      "sha256": "a4edfd98f4acbc59b3e54f9d3a5d6fec2710878b85c78fde08f9f6f9cbafbde6",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/task_writer_fence.py",
+      "sha256": "6a1d5fd1e2a9362b507f3424e9fd1530ed2d8c7bf87cb24a06a6b319d9b7d90c",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/tokyo-readonly-discovery.sh",
+      "sha256": "afdd175a9f72f210c6b966a26c1e7ae84701e4e3d0134b3def45b9abaa348283",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/uk-dev-preflight.sh",
+      "sha256": "a958668d02143f7380cea5f1e5222a6dff9c90b8036b08ab86751acc334b685c",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/uk-external-runner-watchdog.py",
+      "sha256": "dbc39bdde11b5c85f731c0d3a93b5e4a4029413199878c8bd9ef32c937dc05c9",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/uk-stage1-foundation-audit.sh",
+      "sha256": "8e7b01457d223bc84522c8e0a286065921be78a79bc9bdbc65d55ca480ae8783",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/unified_admin_projection.py",
+      "sha256": "e27c7f9f8c23c5fc16ea1820f34442dd75bff98b0d5dda2af44ea08425e972f2",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "scripts/v27-batch-readonly.sh",
+      "sha256": "bc3464bbef13b021f173f0e8e7965193ae4b71393de1935c5bb071b0e5b1f008",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/development_ledger_delta.test.cjs",
+      "sha256": "4ad6db82b51c12c657c78edd1fb09d22491df398b484de15fb84ff181639a193",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/pr122_customer_change_fixture.py",
+      "sha256": "4c4cf971ceb93a78d39ec39f68b1382fdd636edd71e426ca24371ad65cbfe99a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/task_center_digital_twin.test.cjs",
+      "sha256": "f29c9a0698607c44979e7aeffc84cc707a81c98febca022f59d04af11b86195d",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_authority_key_file.py",
+      "sha256": "6563b39708aca20b4379203d19d52b741f491a68382cdb24c86c75104a84599a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_authority_security_regressions.py",
+      "sha256": "e6339887523b551ea5cd903e1024f22003292728d913be2c1414feac1fcbb43d",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_backup_receipt_delta.py",
+      "sha256": "726ff82035c3b052ea94a5be215b3a5141f0c8f9aea3e73675599120c453dfe8",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_backup_reference_delta.py",
+      "sha256": "8e0ff8141925771e9805526d2a24cb377dbe73c9726b2ef32ad29c4272361bb4",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_codex_execution_adapter.py",
+      "sha256": "b538575d733ae6301d579639d6e4ad56dd91465e24fabcf1d4e9b2305ee7d02e",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_ad_store.py",
+      "sha256": "88d740e5a9e781d103f71ffeb7ad1625b3b1b35e9d6527cbcb4126f97af3f379",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_checkout.py",
+      "sha256": "c9951f37d5e68c583d572e7de7937eb6dd669fc4c6ab5d072a58706dde229abb",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_demo_api.py",
+      "sha256": "dbad2bc5ae15865cb698637e0e2f95c440e2883b3442ad5a8a3b92a87fc13fcb",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_merchant_contract.py",
+      "sha256": "af60176fdf8a3b44df608287935c6101958c6223869eb7158f465bf1e4d323f7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_merchant_store.py",
+      "sha256": "a371a9f69f34dd538f5d9b6a2a1bcd268acbab5db60b1f7c4a4efcfd7471b070",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_order_store.py",
+      "sha256": "05e2c0196a2db028961513185a91f23f8d7c014262b4c7abe869fe2911602ba5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_preview_entry_registration.py",
+      "sha256": "2d8ee0b038bfc80f3ce516bc6d6730cb3a24cbd853e9442cc8042b29628c6f06",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_refund_preview_store.py",
+      "sha256": "c7a7c16740d000d01ba78a5fcc2f44c1e05bf2a1eebb6aec4058932aa213698f",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_storefront_snapshot.py",
+      "sha256": "0a8daf4c42b78f0037191cf9d59ae3fa61248678b0d63bc218c96b00bdeba486",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_community_ui_contracts.py",
+      "sha256": "78fa66a35401f31cda55f310a7f01defc8f5f2972a1b50d826396353e87223c2",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_contract_registration_delta.py",
+      "sha256": "0dc5d0f6e7985763724c32dd218456df62a5ea58004dff2094881f22f576680f",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_correction_observer.py",
+      "sha256": "b35788f6907f47e7235555dd1c462d4b090ba3deeb147be935da9ea58fb962f1",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_correction_rules.py",
+      "sha256": "b8a444b245b17188cd3dc8a8d21a7abddabe43e96d0c11d30cf62e9676e6f2d2",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_delivery_144a_delta.py",
+      "sha256": "6a5c942e0bb31af224c6906bf7c0d0f7cfb76ae045981de0562075cecbcb1902",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_delivery_ledger_route.py",
+      "sha256": "2310d41a7c25b5b505f43b8240371ae2646a63447bcc73070fcd5a8a480efd37",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_development_authority.py",
+      "sha256": "54881792f9c665ee1339aeb7f8b7a8eabbb2eb1f3e07fcccd57a9905dbf441f0",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_development_authority_operational.py",
+      "sha256": "95e0528d3579cf48eab874bb752dbdbc31b6d048787bd6b869567fde667fc890",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_development_entry_intake.py",
+      "sha256": "f85d3e624fd93ff6bf2aaee7b97efa7100e88c69aa2a42c2ee20627721e16426",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_development_handoff_readback.py",
+      "sha256": "5e7d75f068316b25c1276ff001b09d6e4ad35dba76415395f3a25e391f240c69",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_development_reader_startup_delta.py",
+      "sha256": "0f5f1c5f17eebe1426f939ddfb86052a09b3243b7955a748d799c6eef5392e76",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_digital_twin_projection.py",
+      "sha256": "5c9d78decc10d8a56f03015b51c2ffee42d6b9f5a1ce051ec4410337767f9ee5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_digital_twin_supervision.py",
+      "sha256": "cfbd4b6a4d2657d20d136f953c4de679a42bff30fe9f2921581ac34a5de47267",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_dispatch_authenticated_actor.py",
+      "sha256": "b09a454389744bc5b1ce13b72ded2a3dce7d446bf274eba1c56bd617cc2625c5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_dispatch_contract.py",
+      "sha256": "4dc7f70027669e55d4f8fbca3ee00e385da2ab2ec4fe9ce5f584273f3fd8a203",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_dispatch_contract_host_surface.py",
+      "sha256": "8f5bd7571c95f41bf4004610588f6b9893db03fcff67515bd5db94f82f9ff3bc",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_entry_review_gate.py",
+      "sha256": "55158203bf90343ec6c169e6f6ece46b14e4838f2b7ec97d014508441476d1fc",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_execution_binding_delta.py",
+      "sha256": "8c9bb4c500d27e6255cccdae4cf76d348adfaf2ddf81c206f1320c47c520716a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_execution_intent_delta.py",
+      "sha256": "4b2a36ba5e4bb7d9702ddd9414e46d63bc0e6da893d36c5f9c5fa3ec82cf1628",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_execution_policy_gateway.py",
+      "sha256": "b95a073b5cd3f8141ce3288c1ee9ab9d5bd614265a9428c44fc29a3ea5c4db6a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_execution_recovery_delta.py",
+      "sha256": "c689f82bc4db9e3b152da89230b732e0f7a8ddabbb34063edf67114fdfebbcc7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_feature_compliance_check.py",
+      "sha256": "9097c2d3943b60f6916191c080d6ad9de467c9e2aaafcabfbdc14edbca336f0f",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_handoff_attempt_delta.py",
+      "sha256": "b5e92c55c7046e20a97d9fde2da3c7fa1074880fd1ac182bb52cd1aa5f9ebefc",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_handoff_verifier_delta.py",
+      "sha256": "e19056dc1d9c9e7340d40b2a03bd5e21f58331007d11368941c8c6e70b0a2edc",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_host_surface_r2.py",
+      "sha256": "3729a527749b2c20086028aef01b4a7e815a9723a8b6d29b94c70bcb231494bf",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_legacy_authority_migration.py",
+      "sha256": "8ec02c3eddec7cf9e6cb4d5847473cf944f3bc56efce93355386dbd247b00b7f",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_loader_provider_delta.py",
+      "sha256": "aa1c6275a09094a5e20d977441911c8da56892fdfe363551422c8b75ceb08353",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_local_development_executor.py",
+      "sha256": "38f0907b4c7ba9cc368347b56ba35ffd49ee8a1671062e71ac9837e7a12d9d63",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_mcp_completion.py",
+      "sha256": "5268c63a87d0e19b6e2c9c24397c16007a8999f27b0fda58bd2fc3002b4167c7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_mcp_development_bridge.py",
+      "sha256": "9b113be546e96f6a653af617bff89b44374966085470cb8f203ed9f520913479",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_mcp_development_closure.py",
+      "sha256": "0ef1e959e4c76bc4bffa9489d0f32939ad99ae5b31784f9705799a9fc448ba4f",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_mcp_dispatch_host.py",
+      "sha256": "6c90c58724eb16034d48229f0217dbb3b4e38b9e866377c25f468d6532a98428",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_native_syntax_gate.py",
+      "sha256": "543d100d85761b9761f093a7af848de4b4d08a23d4aaebdf2f8e8ac550f07704",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_native_syntax_intake.py",
+      "sha256": "d728c214de64b46918f37c30930bdd3c3f64094d9d81ff60d89f5adf67117229",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_official_observation_delta.py",
+      "sha256": "e920339a908c5955a60dabc8d7600c27623de76c9d80736c123d2eef4f5c910c",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_p2_swas_receipt_validator.py",
+      "sha256": "19a1b6319ac8403103a00059e07124a2b3bca34f38b0ad3d26ace3a719975702",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_p2_uk_readonly_diagnostic.py",
+      "sha256": "e33d08ee97f07909fa3a1f94722aa61090187ddce2bc664023ebd8472e0259fc",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_p2_uk_swas_diagnostic.py",
+      "sha256": "aaa38fa5554d88e357cc7785bf1565f97a2ad7db77d97a5b744518d4b0737fa2",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_producer_contract_binding_delta.py",
+      "sha256": "9ba9565da0117311afd020e467eb69f7d9f95fe31274e56b00749991b7ca3fb8",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_producer_execution_admission.py",
+      "sha256": "885a3e4a54bff2b48bc50bedd69d3c6ddcbef498652a1ac98f1fe0651a1208ec",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_producer_executor_delta.py",
+      "sha256": "7a6b6bcf4297fd47c625c53a6c261bbe5bd74b3257354051bfdc6044e6018904",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_project_delivery_contract.py",
+      "sha256": "1227c6c362bffebfe7306d70d96a472f99839397b2a9c05ad62dba649cf663ee",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_public_projection_metadata_delta.py",
+      "sha256": "6e845bc8e94ed6a15d9be51714e9d608b4d6c08fbe2977302891aef6d925949c",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_public_snapshot_consistency_delta.py",
+      "sha256": "e9673f52911b5fe6ddea832a6b7cba142546be497c18b47c9e23d66e0de00618",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_registered_dispatch.py",
+      "sha256": "73fe1829179458a66f7e5eafb6916721eb25928420a878acabc82771cb20438d",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_research_workbench_assets_delta.py",
+      "sha256": "6de1b232dca4958547e65ab2b4f203c3c1d5c3ebc4098f6e8f21a05a5b1c3300",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_reusable_scheduler_cli.py",
+      "sha256": "3f3cdfb595363acac821e899076a87a58f5a0d6b820852a2cc2214dda01bdebb",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_reusable_task_gateway.py",
+      "sha256": "d3738d53cfa2e45e60f1574119e2b859d8a5b1793e57dd58e59e253c68abffd4",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_scoped_cancel_authority.py",
+      "sha256": "c2c534270603b1d80128445730af17271178fe54ee8b773cd5cfae703e31c8e4",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_active_ad_integration.py",
+      "sha256": "f1f78e4d745a3bd269e45d9528a2a3af839c28f09c6cf5a16cad2817e1231dc7",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_browser_e2e.py",
+      "sha256": "d8ea0f2d0df5316d9f9fbb842db85b9b7a77d29e8148d9ec423252fc629ab544",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_checkout_read_integration.py",
+      "sha256": "9458538ea4aa531a6465e397dbc52f51c1d209bcb4cd0838ab071669d8be11d1",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_checkout_refund_preview_read.py",
+      "sha256": "6f03f6c5a32cb6b68dccec6842d86498cecd647cb7e95731e75319dc24d3979a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_default_bootstrap_browser.py",
+      "sha256": "52034c72945fcbde95d6a9e2f1c27594fe1306b22197040c71dedc88ac7323aa",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_local_stack.py",
+      "sha256": "3d04afc3e0d8637975f983acf59997ea03a62d2fadc9b5c3bbd6601cfc4d10bf",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_owned_cleanup.py",
+      "sha256": "630d86a0f2850e1c1253b2d0ee7f30d849d283f435d1649127245972b70ebd43",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_phase1_smoke.py",
+      "sha256": "479dbb45428b89fb94f292c31973b6df878eef3999b1e84e59b5b3548027f6b3",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_storefront_browser_e2e.py",
+      "sha256": "5cf9450b6f1a6d593539f019b6536507986e956d4e58a4dae816e180c17b98d0",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_stage5_storefront_http.py",
+      "sha256": "7531ccfebc60708c54fcbed50e590436999fca924640e07349f9cbaf6028b5a5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_startup_http_delta.py",
+      "sha256": "a19029ff799496df15a2abb321f8806a1f947dec7ab23954921547d0552ef3ea",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_startup_provider_delta.py",
+      "sha256": "e7dd4151f3fda7006cd85b76cca15cee6dbd04d54c15b5e0fc2a90f30ba5b4ef",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_execution_contract.py",
+      "sha256": "15d8239da35b799e0d5f09d0375b133ba86509600a3f45e2e4e305a859fe7f7b",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_mcp_free_model_gate.py",
+      "sha256": "f340d2172087c786fe01444808a6f3cc10d1ef9fa0b5eb5be4fc1d1b46ffe58a",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_mcp_service.py",
+      "sha256": "4d887b18c6333d036f09e6437a5569b30296ac6232469100f3df6503ef1d6e02",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_center_real_blackbox.py",
+      "sha256": "5f9021054852d2e0c10459136a302ed79827915b81db2f7af4d180646ea18edd",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_supervisor.py",
+      "sha256": "19b8e978180b988c897cebbf8ac038136fe6d87cbd078705c38b613b641085d5",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_supervisor_runtime.py",
+      "sha256": "d3958624bb9ddbb7ca8df0758dae5bb2b448c29361bd92d67fb6fa01e92fdb35",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_task_writer_fence.py",
+      "sha256": "5d722db5093e0aa47c60c65f7b023032e3531bb575d43777c1571814828e1e80",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "tests/test_unified_admin_projection.py",
+      "sha256": "e86897f64472df5f67b5e9e6c90c64956b7eea6ee5ae076c979c222f915fff9e",
+      "source": "integration-tc-144a"
+    }
+  ],
+  "note": "Limited pattern checks do not prove absence of secrets or customer data.",
+  "version": 2
+}

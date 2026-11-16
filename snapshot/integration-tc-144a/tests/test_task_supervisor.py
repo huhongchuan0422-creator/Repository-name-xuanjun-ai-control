@@ -1,0 +1,774 @@
+from __future__ import print_function
+
+import os
+import shutil
+import sqlite3
+import tempfile
+import threading
+import unittest
+
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+from task_supervisor import Supervisor, UNKNOWN
+
+
+class SupervisorTests(unittest.TestCase):
+    def setUp(self):
+        handle, self.path = tempfile.mkstemp()
+        os.close(handle)
+        self.now = 1000.0
+        self.s = Supervisor(self.path, lambda: self.now)
+
+    def tearDown(self):
+        try:
+            self.s.close()
+        except Exception:
+            pass
+        if os.path.exists(self.path):
+            os.unlink(self.path)
+
+    def registration(self, task='t1', deps=None):
+        self.s.register(dict(task_id=task, parent_task_id='parent', stage='dev',
+            owner='developer', entry='WORK', checkpoint_sha256='a'*64,
+            spec_sha256='b'*64, next_action='implement',
+            dependencies=deps or [], completion_conditions=['tests'],
+            progress_deadline=1900, receipt_deadline=1100,
+            started_deadline=1200, terminal_deadline=3000,
+            handoff_deadline=1800), now=self.now)
+
+    def claim(self, task='t1', attempt='a1'):
+        self.s.claim(task, attempt, 'developer', 'WORK', 'run1', 'session1',
+                     'lease1', 1, 1, now=self.now)
+
+
+    def development_contract(self, task='t1'):
+        return dict(
+            task_id=task,spec_sha256='b'*64,checkpoint_sha256='a'*64,
+            target_repository='owner/repo',target_base_sha='c'*40,
+            entry='WORK',developer={'issuer':'native','subject':'developer'},
+            allowed_files=['src/f.py'],
+            trusted_reviewers=[
+                {'issuer':'native','subject':'qa','key_id':'qa','role':'QA'},
+                {'issuer':'native','subject':'security','key_id':'sec',
+                 'role':'SECURITY'}])
+
+    def test_development_contract_is_canonical_idempotent_and_conflicting(self):
+        self.registration()
+        contract=self.development_contract()
+        first=self.s.register_development_contract('t1',contract)
+        second=self.s.register_development_contract('t1',contract)
+        self.assertFalse(first['duplicate']);self.assertTrue(second['duplicate'])
+        changed=dict(contract);changed['target_base_sha']='d'*40
+        with self.assertRaisesRegex(ValueError,'DEVELOPMENT_CONTRACT_CONFLICT'):
+            self.s.register_development_contract('t1',changed)
+
+    def test_failed_development_completion_never_unlocks_dependency(self):
+        self.registration('t1')
+        self.registration('child',['t1'])
+        self.s.register_development_contract(
+            't1',self.development_contract())
+        caller={'caller_id':'writer','run_id':'run1',
+                'session_id':'session1','gateway_id':'gateway1'}
+        self.s.claim_writer('t1','a1','developer','WORK',caller,
+                            'lease1','provider1',['fake:development/source'],
+                            1700)
+        receipt=dict(
+            schema=1,entry='WORK',execution_path='WORK_NATIVE',task_id='t1',
+            spec_sha256='b'*64,checkpoint_sha256='a'*64,
+            target_repository='owner/repo',target_base_sha='c'*40,
+            code_commit='d'*40,event='CODE_READY',attempt_id='a1',
+            lease_id='lease1',fence=1,epoch=1,caller_id='writer',
+            run_id='run1',session_id='session1',gateway_id='gateway1',
+            lock_provider_id='provider1',source_comment_id=1,
+            status='RECEIPT_VALIDATED_NOT_ADMITTED',
+            native_identity='CLAIMED_NOT_VERIFIED',quota_attribution='UNKNOWN',
+            authority_effect='NONE',
+            required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE')
+        candidate=self.s.bind_development_candidate(
+            receipt,{'src/f.py':'e'*64})
+        with self.assertRaisesRegex(
+                ValueError,'CANONICAL_DEVELOPMENT_REVIEW_REQUIRED'):
+            self.s.complete_development_candidate(
+                't1','missing-reviewed-event','complete')
+        self.assertNotEqual(self.s._task('t1')['state'],'SUCCESS')
+        self.assertNotIn('child',[x['task_id'] for x in self.s.ready()])
+
+
+    def test_ready_fair_scan_and_dependencies(self):
+        self.registration('b')
+        self.registration('a', ['b'])
+        self.assertEqual([x['task_id'] for x in self.s.ready()], ['b'])
+
+    def test_single_writer_cas_and_duplicate_event(self):
+        self.registration(); self.claim()
+        with self.assertRaises(ValueError): self.claim(attempt='a2')
+        one = self.s.record('t1','a1','e1','STARTED',1001)
+        two = self.s.record('t1','a1','e1','STARTED',1001)
+        self.assertFalse(one['duplicate']); self.assertTrue(two['duplicate'])
+
+    def test_heartbeat_does_not_refresh_progress(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','hb','HEARTBEAT',1200)
+        self.assertIsNone(self.s._task('t1')['last_real_progress_at'])
+
+    def test_real_progress_requires_bound_evidence(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','p0','PROGRESS',1002,'HEARTBEAT','x')
+        self.s.record('t1','a1','p1','PROGRESS',1003,'TEST_RUN','run/42')
+        self.assertEqual(self.s._task('t1')['last_real_progress_at'],1003)
+
+    def test_5_10_15_recovery_is_bounded_and_no_takeover(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.assertEqual(self.s.scan(1302)[0]['action'],'CHECK_RECEIPT_AND_PROGRESS')
+        self.assertEqual(self.s.scan(1602)[0]['action'],'RECONCILE_AND_RESUME_SAME_ATTEMPT')
+        action=self.s.scan(1902)[0]
+        self.assertEqual(action['action'],'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
+        self.assertFalse(action['takeover_allowed'])
+
+    def test_terminal_outbox_survives_restart_and_deduplicates(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        payload=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+        self.s.record('t1','a1','done','TERMINAL',1002,payload=payload)
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        due=self.s.due_outbox(1002)
+        self.assertEqual(len(due),1)
+        self.assertTrue(self.s.record('t1','a1','done','TERMINAL',1002,
+                                      payload=payload)['duplicate'])
+
+    def test_lost_completion_notification_retries_bounded(self):
+        self.registration(); self.claim()
+        payload=dict(state='FAILURE',artifact_sha256=UNKNOWN,
+            writer_stopped=UNKNOWN,effects_reconciled=UNKNOWN,next_action='inspect',
+            completion_evidence=[])
+        self.s.record('t1','a1','done','TERMINAL',1002,payload=payload)
+        item=self.s.due_outbox(1002)[0]
+        expected=[1032,1092,1212,1452]
+        now=1002
+        for index,next_at in enumerate(expected,1):
+            result=self.s.outbox_result(item['outbox_id'],False,now,'offline')
+            self.assertEqual(result['attempts'],index)
+            self.assertEqual(result['next_attempt_at'],next_at)
+            now=next_at
+        last=self.s.outbox_result(item['outbox_id'],False,now,'offline')
+        self.assertTrue(last['dead_lettered'])
+        self.assertEqual(self.s._task('t1')['state'],'HOLD')
+        self.assertEqual(self.s.due_outbox(now + 999999),[])
+
+    def test_receiver_without_ack_cannot_release_responsibility(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        bad=dict(receiver_accepted=True,old_writer_stopped=False,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','ackbad','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),bad)
+        self.assertEqual(self.s._task('t1')['state'],'HANDOFF_PENDING')
+
+    def test_exact_handoff_allows_new_claim_only_after_reconciliation(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        self.s.claim('t1','a2','qa','WORK','run2','session2','lease2',2,2,1004)
+        self.assertEqual(self.s._task('t1')['attempt_id'],'a2')
+
+    def test_handoff_ack_exact_replay_survives_attempt_clear(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        first=self.s.record('t1','a1','ack-replay','HANDOFF_ACKNOWLEDGED',
+                            1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        replay=self.s.record('t1','a1','ack-replay','HANDOFF_ACKNOWLEDGED',
+                             1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        self.assertFalse(first['duplicate'])
+        self.assertTrue(replay['duplicate'])
+        self.assertEqual(self.s._task('t1')['state'],'READY')
+
+    def test_v2_normal_open_is_zero_write_then_explicit_migration(self):
+        self.registration()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'authority_recovery_evidence','revocation_drains',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_digest','resource_scope_json',
+                           'authority_caller_id','authority_lock_provider_id',
+                           'authority_gateway_id',
+                           'authority_session_id','authority_run_id',
+                           'authority_valid_until','authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2')
+            db.commit()
+        finally:
+            db.close()
+        sidecars=[self.path+x for x in ('-wal','-shm','-journal')]
+        before_stat=os.stat(self.path)
+        with open(self.path,'rb') as stream:
+            before=stream.read()
+        before_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                            if os.path.exists(p) else None) for p in sidecars}
+        with self.assertRaisesRegex(ValueError,'HOLD_MIGRATION_REQUIRED'):
+            Supervisor(self.path,lambda:self.now)
+        after_stat=os.stat(self.path)
+        with open(self.path,'rb') as stream:
+            self.assertEqual(before,stream.read())
+        self.assertEqual((before_stat.st_ino,before_stat.st_size,
+                          before_stat.st_mtime_ns),
+                         (after_stat.st_ino,after_stat.st_size,
+                          after_stat.st_mtime_ns))
+        after_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                           if os.path.exists(p) else None) for p in sidecars}
+        self.assertEqual(before_sidecars,after_sidecars)
+        Supervisor.offline_migrate_v2_to_v3(self.path,lambda:self.now)
+        self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s._task('t1')['authority_state'],'NONE')
+        self.assertEqual(self.s._task('t1')['state'],'READY')
+
+    def test_v2_active_attempt_migrates_to_unknown_hold(self):
+        self.registration(); self.claim()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'authority_recovery_evidence','revocation_drains',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_digest','resource_scope_json',
+                           'authority_caller_id','authority_lock_provider_id',
+                           'authority_gateway_id',
+                           'authority_session_id','authority_run_id',
+                           'authority_valid_until','authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2')
+            db.commit()
+        finally:
+            db.close()
+        Supervisor.offline_migrate_v2_to_v3(self.path,lambda:self.now)
+        self.s=Supervisor(self.path,lambda:self.now)
+        task=self.s._task('t1')
+        self.assertEqual(task['authority_state'],UNKNOWN)
+        self.assertEqual(task['state'],'HOLD')
+
+    def test_v1_normal_open_is_zero_write_hold(self):
+        self.registration()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            db.execute('PRAGMA user_version=1')
+            db.commit()
+        finally:
+            db.close()
+        sidecars=[self.path+x for x in ('-wal','-shm','-journal')]
+        before_stat=os.stat(self.path)
+        before_bytes=open(self.path,'rb').read()
+        before_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                            if os.path.exists(p) else None) for p in sidecars}
+        with self.assertRaisesRegex(ValueError,'HOLD_MIGRATION_REQUIRED'):
+            Supervisor(self.path,lambda:self.now)
+        after_stat=os.stat(self.path)
+        self.assertEqual(before_bytes,open(self.path,'rb').read())
+        self.assertEqual((before_stat.st_ino,before_stat.st_size,
+                          before_stat.st_mtime_ns),
+                         (after_stat.st_ino,after_stat.st_size,
+                          after_stat.st_mtime_ns))
+        after_sidecars={p:(os.path.exists(p), os.stat(p).st_mtime_ns
+                           if os.path.exists(p) else None) for p in sidecars}
+        self.assertEqual(before_sidecars,after_sidecars)
+        self.s=Supervisor.__new__(Supervisor); self.s.db=None
+
+    def test_v2_migration_failpoints_rollback_and_restart_cleanly(self):
+        self.registration()
+        self.s.close()
+        db=sqlite3.connect(self.path)
+        try:
+            for table in ('writer_reconcile_evidence','writer_receipts',
+                          'writer_operations','resource_invalidation_receipts',
+                          'authority_recovery_evidence','revocation_drains',
+                          'resource_claims'):
+                db.execute('DROP TABLE '+table)
+            for column in ('last_trusted_time','coverage_digest',
+                           'receiver_ack_sha256','receiver_ack_json',
+                           'resource_scope_digest','resource_scope_json',
+                           'authority_caller_id','authority_lock_provider_id',
+                           'authority_gateway_id','authority_session_id',
+                           'authority_run_id','authority_valid_until',
+                           'authority_state'):
+                db.execute('ALTER TABLE tasks DROP COLUMN '+column)
+            db.execute('PRAGMA user_version=2');db.commit()
+        finally:
+            db.close()
+        original=open(self.path,'rb').read()
+
+        class FailingSupervisor(Supervisor):
+            migration_fail_at=None
+
+        for point in ('after_task_alter','after_fence_tables',
+                      'after_authority_mapping','after_user_version'):
+            handle,path=tempfile.mkstemp();os.close(handle)
+            try:
+                with open(path,'wb') as stream: stream.write(original)
+                FailingSupervisor.migration_fail_at=point
+                with self.assertRaises(RuntimeError):
+                    FailingSupervisor.offline_migrate_v2_to_v3(path)
+                db=sqlite3.connect(path)
+                try:
+                    self.assertEqual(db.execute(
+                        'PRAGMA user_version').fetchone()[0],2)
+                    columns=[row[1] for row in
+                             db.execute('PRAGMA table_info(tasks)')]
+                    self.assertNotIn('authority_state',columns)
+                    self.assertIsNone(db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE name='writer_operations'"
+                    ).fetchone())
+                finally:
+                    db.close()
+                FailingSupervisor.migration_fail_at=None
+                FailingSupervisor.offline_migrate_v2_to_v3(path)
+                good=Supervisor(path,lambda:self.now);good.close()
+            finally:
+                if os.path.exists(path): os.unlink(path)
+        self.s=Supervisor.__new__(Supervisor); self.s.db=None
+
+    def test_missing_foreign_key_is_rejected(self):
+        path=self.path+'.fk'
+        good=Supervisor(path,lambda:self.now);good.close()
+        db=sqlite3.connect(path)
+        try:
+            db.execute('PRAGMA foreign_keys=OFF')
+            db.execute('ALTER TABLE writer_receipts RENAME TO writer_receipts_old')
+            db.execute('''CREATE TABLE writer_receipts(
+              operation_id TEXT PRIMARY KEY,receipt_json TEXT NOT NULL,
+              receipt_sha256 TEXT NOT NULL,created_at REAL NOT NULL)''')
+            db.execute('''INSERT INTO writer_receipts
+              SELECT * FROM writer_receipts_old''')
+            db.execute('DROP TABLE writer_receipts_old')
+            db.commit()
+        finally:
+            db.close()
+        with self.assertRaisesRegex(ValueError,'SUPERVISOR_FOREIGN_KEY_MISMATCH'):
+            Supervisor(path,lambda:self.now)
+        os.unlink(path)
+
+    def test_unknown_database_rejected_without_journal_mutation(self):
+        handle,path=tempfile.mkstemp(); os.close(handle)
+        try:
+            db=sqlite3.connect(path)
+            db.execute('CREATE TABLE foreign_data(value TEXT)')
+            db.execute('PRAGMA application_id=1234')
+            db.execute('PRAGMA journal_mode=DELETE')
+            db.commit(); db.close()
+            with self.assertRaises(ValueError):
+                Supervisor(path,lambda:self.now)
+            check=sqlite3.connect(path)
+            try:
+                self.assertEqual(check.execute(
+                    'PRAGMA journal_mode').fetchone()[0].lower(),'delete')
+                self.assertIsNone(check.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='tasks'"
+                ).fetchone())
+            finally:
+                check.close()
+        finally:
+            os.unlink(path)
+
+    def test_malformed_auxiliary_schema_fails_at_initialization(self):
+        handle,path=tempfile.mkstemp(); os.close(handle)
+        try:
+            good=Supervisor(path,lambda:self.now); good.close()
+            db=sqlite3.connect(path)
+            db.execute('PRAGMA foreign_keys=OFF')
+            db.execute('DROP TABLE events')
+            db.execute('CREATE TABLE events(x TEXT)')
+            db.execute('PRAGMA journal_mode=DELETE')
+            db.commit(); db.close()
+            with self.assertRaises(ValueError):
+                Supervisor(path,lambda:self.now)
+        finally:
+            os.unlink(path)
+
+    def test_future_schema_version_fails_closed(self):
+        handle,path=tempfile.mkstemp(); os.close(handle)
+        try:
+            good=Supervisor(path,lambda:self.now); good.close()
+            db=sqlite3.connect(path)
+            db.execute('PRAGMA journal_mode=DELETE')
+            db.execute('PRAGMA user_version=999')
+            db.commit(); db.close()
+            with self.assertRaises(ValueError):
+                Supervisor(path,lambda:self.now)
+            check=sqlite3.connect(path)
+            try:
+                self.assertEqual(check.execute(
+                    'PRAGMA user_version').fetchone()[0],999)
+                self.assertEqual(check.execute(
+                    'PRAGMA journal_mode').fetchone()[0].lower(),'delete')
+            finally:
+                check.close()
+        finally:
+            os.unlink(path)
+
+    def test_two_connections_serialize_ack_and_old_terminal(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002)
+        barrier=threading.Barrier(2); results=[]
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        terminal=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+
+        def acknowledge():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                worker.record('t1','a1','ack-race',
+                    'HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION',
+                    'proof:'+('a'*64),good)
+                results.append('ack')
+            except ValueError:
+                results.append('ack-rejected')
+            finally:
+                worker.close()
+
+        def finish_old_attempt():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                worker.record('t1','a1','terminal-race','TERMINAL',
+                              1003,payload=terminal)
+                results.append('terminal')
+            except ValueError:
+                results.append('terminal-rejected')
+            finally:
+                worker.close()
+
+        one=threading.Thread(target=acknowledge)
+        two=threading.Thread(target=finish_old_attempt)
+        one.start(); two.start(); one.join(5); two.join(5)
+        self.assertFalse(one.is_alive()); self.assertFalse(two.is_alive())
+        self.assertEqual(len([r for r in results
+                             if not r.endswith('rejected')]),1)
+        row=self.s._task('t1')
+        self.assertIn(row['state'],('READY','SUCCESS'))
+        committed=self.s.db.execute("""SELECT event_id FROM events
+          WHERE event_id IN ('ack-race','terminal-race')""").fetchall()
+        self.assertEqual(len(committed),1)
+
+    def test_two_connections_serialize_terminal_and_l3_scan(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        barrier=threading.Barrier(2); results=[]
+        terminal=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+
+        def finish():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                worker.record('t1','a1','terminal-vs-scan','TERMINAL',
+                              1002,payload=terminal)
+                results.append('terminal')
+            except ValueError:
+                results.append('terminal-rejected')
+            finally:
+                worker.close()
+
+        def escalate():
+            worker=Supervisor(self.path,lambda:self.now)
+            try:
+                barrier.wait()
+                actions=worker.scan(1902)
+                results.append('scan' if actions else 'scan-empty')
+            finally:
+                worker.close()
+
+        one=threading.Thread(target=finish)
+        two=threading.Thread(target=escalate)
+        one.start(); two.start(); one.join(5); two.join(5)
+        self.assertFalse(one.is_alive()); self.assertFalse(two.is_alive())
+        self.assertIn(self.s._task('t1')['state'],('SUCCESS','HOLD'))
+        self.assertTrue(
+            ('terminal' in results and 'scan-empty' in results)
+            or ('terminal-rejected' in results and 'scan' in results))
+
+    def test_ack_commit_blocks_old_attempt_before_new_claim(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','handoff','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack-first','HANDOFF_ACKNOWLEDGED',
+                      1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        other=Supervisor(self.path,lambda:self.now)
+        terminal=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+        try:
+            with self.assertRaises(ValueError):
+                other.record('t1','a1','late-terminal','TERMINAL',
+                             1004,payload=terminal)
+        finally:
+            other.close()
+        self.assertIsNone(self.s.db.execute(
+            "SELECT 1 FROM events WHERE event_id='late-terminal'").fetchone())
+
+    def test_unknown_side_effects_preserved_in_visible_hold(self):
+        self.registration(); self.claim()
+        payload=dict(state='CAPABILITY_UNAVAILABLE',artifact_sha256=UNKNOWN,
+            writer_stopped=UNKNOWN,effects_reconciled=UNKNOWN,
+            next_action='owner-visible hold',completion_evidence=[])
+        self.s.record('t1','a1','u','TERMINAL',1002,payload=payload)
+        row=self.s._task('t1')
+        self.assertEqual(row['state'],'CAPABILITY_UNAVAILABLE')
+        self.assertEqual(row['effects_reconciled'],UNKNOWN)
+
+    def test_normal_exit_without_receipt_becomes_visible_hold_action(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        action=self.s.scan(1902)[0]
+        self.assertEqual(action['action'],'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
+        self.assertTrue(action['requires_effect_reconciliation'])
+        self.assertEqual(self.s._task('t1')['state'],'HOLD')
+
+    def test_old_writer_cannot_resume_after_ack_and_new_attempt(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        self.s.claim('t1','a2','qa','WORK','run2','session2','lease2',2,2,1004)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','zombie','PROGRESS',1005,
+                          'SOURCE_COMMIT','deadbeef')
+
+    def test_heartbeat_cannot_delay_ten_or_fifteen_minute_actions(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','hb','HEARTBEAT',1290)
+        self.assertEqual(self.s.scan(1602)[0]['action'],
+                         'RECONCILE_AND_RESUME_SAME_ATTEMPT')
+        self.s.record('t1','a1','hb2','HEARTBEAT',1295)
+        self.assertEqual(self.s.scan(1902)[0]['action'],
+                         'VISIBLE_HOLD_OR_CONTROLLED_REASSIGN')
+
+    def test_ready_scan_does_not_starve_later_eligible_task(self):
+        for index in range(101):
+            self.registration('blocked-%03d' % index, ['missing'])
+        self.registration('eligible')
+        self.assertEqual([row['task_id'] for row in self.s.ready(1)],
+                         ['eligible'])
+
+    def test_fence_and_epoch_must_increase_after_handoff(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,
+                      'PHASE_EXECUTION','proof:'+('a'*64),good)
+        with self.assertRaises(ValueError):
+            self.s.claim('t1','a2','qa','WORK','run2','session2',
+                         'lease2',1,1,1004)
+
+    def test_unclaimed_or_unsafe_success_cannot_unlock_dependency(self):
+        self.registration('parent')
+        unsafe=dict(state='SUCCESS',artifact_sha256='c'*64,
+            writer_stopped=False,effects_reconciled=False,next_action='handoff',
+            completion_evidence=['tests'])
+        with self.assertRaises(ValueError):
+            self.s.record('parent',UNKNOWN,'fake','TERMINAL',1001,payload=unsafe)
+        self.claim('parent')
+        with self.assertRaises(ValueError):
+            self.s.record('parent','a1','unsafe','TERMINAL',1002,payload=unsafe)
+
+    def test_delayed_exact_replay_remains_idempotent(self):
+        self.registration(); self.claim()
+        first=self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','hb','HEARTBEAT',1002)
+        replay=self.s.record('t1','a1','start','STARTED',1001)
+        self.assertFalse(first['duplicate'])
+        self.assertTrue(replay['duplicate'])
+
+    def test_recovery_generation_prevents_outbox_collision_after_progress(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        first=self.s.scan(1302)[0]
+        self.now=1303
+        self.s.record('t1','a1','progress','PROGRESS',1303,
+                      'SOURCE_COMMIT','commit:abc',
+                      {'next_progress_deadline':2000})
+        second=self.s.scan(1604)[0]
+        self.assertNotEqual(first['outbox_event_id'],
+                            second['outbox_event_id'])
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        ids=[row['event_id'] for row in self.s.due_outbox(1604)]
+        self.assertIn(first['outbox_event_id'],ids)
+        self.assertIn(second['outbox_event_id'],ids)
+
+    def test_handoff_rejects_empty_new_identity(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        bad=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','ack-empty','HANDOFF_ACKNOWLEDGED',
+                          1003,'PHASE_EXECUTION','proof:'+('a'*64),bad)
+        self.assertEqual(self.s._task('t1')['state'],'HANDOFF_PENDING')
+
+    def test_future_or_reordered_event_is_rejected(self):
+        self.registration(); self.claim()
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','future','STARTED',2000)
+        self.s.record('t1','a1','start','STARTED',1001)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','old','HEARTBEAT',1000)
+
+    def test_supervisor_liveness_never_claims_process_verified(self):
+        with self.assertRaises(ValueError):
+            self.s.supervisor_heartbeat('uk-supervisor','pid:42','d'*64,2000)
+        self.s.supervisor_heartbeat('uk-supervisor','pid:42','d'*64,1000)
+        self.assertEqual(self.s.supervisor_health(1001)[0]['state'],
+                         'FRESH_RECORD_NOT_PROCESS_VERIFIED')
+
+    def test_event_id_reuse_with_different_bytes_is_rejected(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','start','HEARTBEAT',1001)
+
+    def test_assigned_responsibility_is_bound_to_claim(self):
+        self.registration()
+        with self.assertRaises(ValueError):
+            self.s.claim('t1','a1','other','WORK','run1','session1',
+                         'lease1',1,1,now=self.now)
+
+    def test_deadlines_trigger_even_before_generic_age(self):
+        self.registration()
+        action = self.s.scan(1100)[0]
+        self.assertEqual(action['action'],'CHECK_RECEIPT_AND_PROGRESS')
+        self.assertEqual(action['attempt_id'],UNKNOWN)
+
+    def test_supervision_action_and_hold_survive_restart(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.scan(1302); self.s.scan(1602); self.s.scan(1902)
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s._task('t1')['state'],'HOLD')
+        events=[r['event_id'] for r in self.s.db.execute(
+            "SELECT event_id FROM events WHERE kind='SUPERVISION_ACTION'")]
+        self.assertEqual(len(events),3)
+        self.assertEqual(len(self.s.due_outbox(1902)),3)
+
+    def test_supervisor_liveness_survives_restart(self):
+        self.s.supervisor_heartbeat('uk-supervisor','pid:42','d'*64,1000)
+        self.s.close(); self.s=Supervisor(self.path,lambda:self.now)
+        self.assertEqual(self.s.supervisor_health(1200)[0]['state'],
+                         'FRESH_RECORD_NOT_PROCESS_VERIFIED')
+        self.assertEqual(self.s.supervisor_health(1400)[0]['state'],
+                         'SUPERVISOR_UNAVAILABLE')
+
+    def test_real_progress_resets_recovery_budget(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.scan(1302)
+        self.assertEqual(self.s._task('t1')['recovery_level'],1)
+        self.now=1303
+        self.s.record('t1','a1','p','PROGRESS',1303,
+                      'SOURCE_COMMIT','commit:abc',
+                      {'next_progress_deadline':2000})
+        self.assertEqual(self.s._task('t1')['recovery_level'],0)
+        self.assertEqual(self.s._task('t1')['progress_deadline'],2000)
+
+    def test_late_handoff_requires_fresh_attempt_deadlines(self):
+        self.registration(); self.claim()
+        self.s.record('t1','a1','start','STARTED',1001)
+        self.s.record('t1','a1','h','HANDOFF_REQUESTED',1002)
+        good=dict(receiver_accepted=True,old_writer_stopped=True,
+            old_fence_invalidated=True,effects_reconciled=True,
+            new_owner='qa',new_entry='WORK',
+            lease_id='lease1',fence=1,epoch=1)
+        self.s.record('t1','a1','ack','HANDOFF_ACKNOWLEDGED',1003,'PHASE_EXECUTION','proof:'+('a'*64),good)
+        with self.assertRaises(ValueError):
+            self.s.claim('t1','a2','qa','WORK','run2','session2',
+                         'lease2',2,2,now=4000)
+        deadlines=dict(progress_deadline=5000,receipt_deadline=4100,
+            started_deadline=4200,terminal_deadline=6000,handoff_deadline=5500)
+        self.s.claim('t1','a2','qa','WORK','run2','session2',
+                     'lease2',2,2,now=4000,deadlines=deadlines)
+        task=self.s._task('t1')
+        self.assertEqual(task['recovery_level'],0)
+        self.assertEqual(task['writer_stopped'],UNKNOWN)
+
+    def test_terminal_artifact_hash_is_strict(self):
+        self.registration(); self.claim()
+        bad=dict(state='SUCCESS',artifact_sha256='not-a-hash',
+            writer_stopped=True,effects_reconciled=True,next_action='handoff',
+            completion_evidence=['tests'])
+        with self.assertRaises(ValueError):
+            self.s.record('t1','a1','bad','TERMINAL',1002,payload=bad)
+
+    def test_quota_unavailable_is_terminal_durable_and_not_fake_running(self):
+        self.registration(); self.claim()
+        payload=dict(state='CAPABILITY_UNAVAILABLE',artifact_sha256=UNKNOWN,
+            writer_stopped=True,effects_reconciled=True,
+            next_action='OWNER_VISIBLE_QUOTA_HOLD',completion_evidence=[])
+        self.s.record('t1','a1','quota','TERMINAL',1002,payload=payload)
+        self.assertEqual(self.s._task('t1')['state'],'CAPABILITY_UNAVAILABLE')
+        self.assertEqual(len(self.s.due_outbox(1002)),1)
+
+
+def load_tests(loader, tests, pattern):
+    # Stable source-fencing aggregation: both supervisor workflows execute the
+    # dedicated fencing suite at the current HEAD.
+    try:
+        from tests import test_task_writer_fence as fence_tests
+        from tests import test_entry_review_gate as review_tests
+    except ImportError:
+        import test_task_writer_fence as fence_tests
+        import test_entry_review_gate as review_tests
+    tests.addTests(loader.loadTestsFromModule(fence_tests))
+    tests.addTests(loader.loadTestsFromTestCase(
+        review_tests.CanonicalCompletionTests))
+    return tests
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -1,0 +1,335 @@
+from __future__ import print_function
+
+import copy
+import os
+import sys
+import unittest
+
+ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+
+from mcp_development_closure import (HOLD, PROVEN, UNKNOWN,
+                                     admission_for_real_task,
+                                     evaluate_closure)
+
+
+class MCPDevelopmentClosureTests(unittest.TestCase):
+    def snapshot(self):
+        return {
+          'tenant_id': 'tenant-a', 'idempotency_key': 'real-task-1',
+          'task': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'attempt_id': 'attempt-1', 'authority_caller_id': 'writer-1',
+            'run_id': 'run-1', 'session_id': 'session-1',
+            'fence': 7, 'epoch': 9, 'state': 'SUCCESS',
+            'authority_state': 'REVOKED',
+            'authority_valid_until': 200},
+          'assignment': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'attempt_id': 'attempt-1', 'role_id': 'developer',
+            'principal_id': 'ai-1', 'state': 'ASSIGNED'},
+          'role_instance': {'instance_id': 'ai-1',
+                            'current_request_id': 'request-1'},
+          'model_request': {'tenant_id': 'tenant-a', 'request_id': 'request-1',
+            'task_id': 'task-1', 'attempt_id': 'attempt-1',
+            'role_id': 'developer', 'provider_id': 'provider-1',
+            'model_id': 'model-1', 'state': 'SUCCEEDED'},
+          'model_request_binding': {'request_id': 'request-1',
+            'connection_id': 'connection-1', 'connection_config_version': 3,
+            'provider_config_version': 4, 'model_config_version': 5,
+            'writer_principal': 'writer-1', 'writer_fence': 7,
+            'writer_epoch': 9},
+          'execution_intent': {'tenant_id': 'tenant-a', 'intent_id': 'intent-1',
+            'task_id': 'task-1', 'attempt_id': 'attempt-1',
+            'request_id': 'request-1', 'connection_id': 'connection-1',
+            'connection_config_version': 3, 'provider_id': 'provider-1',
+            'provider_config_version': 4, 'model_id': 'model-1',
+            'model_config_version': 5,
+            'writer_principal': 'writer-1', 'writer_fence': 7,
+            'writer_epoch': 9, 'state': 'SUCCEEDED', 'execution_id': 'exec-1',
+            'session_id': 'session-1', 'thread_id': 'thread-1',
+            'turn_id': 'turn-1'},
+          'execution_events': [
+            {'tenant_id': 'tenant-a', 'intent_id': 'intent-1',
+             'event_id': 'sent-1', 'event_kind': 'SENT_INTENT', 'accepted': 1},
+            {'tenant_id': 'tenant-a', 'intent_id': 'intent-1',
+             'event_id': 'ack-1', 'event_kind': 'RUNNING', 'accepted': 1}],
+          'process_receipt': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'attempt_id': 'attempt-1', 'run_id': 'run-1',
+            'receipt_id': 'process-receipt-1',
+            'session_id': 'session-1', 'process_id': 'pid-123',
+            'writer_epoch': 9, 'state': 'STARTED',
+            'source_kind': 'TRUSTED_PROCESS_OBSERVER', 'observed_at': 110},
+          'ai_call_receipt': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'attempt_id': 'attempt-1', 'request_id': 'request-1',
+            'role_id': 'developer', 'writer_epoch': 9,
+            'source_kind': 'LIVE_PROVIDER_RECEIPT',
+            'receipt_id': 'provider-receipt-1',
+            'provider_request_id': 'provider-1', 'response_sha256': 'a'*64},
+          'checklist': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'attempt_id': 'attempt-1', 'content_sha256': 'b'*64,
+            'all_required_passed': 1, 'has_unexecuted': 0},
+          'candidate': {'tenant_id': 'tenant-a', 'candidate_id': 'candidate-1',
+            'task_id': 'task-1', 'attempt_id': 'attempt-1',
+            'artifact_sha256': 'c'*64, 'checklist_sha256': 'b'*64,
+            'submitted_by': 'ai-1', 'accepted_by': 'acceptor-1',
+            'state': 'ACCEPTED'},
+          'reviews': [
+            {'tenant_id': 'tenant-a', 'candidate_id': 'candidate-1',
+             'task_id': 'task-1', 'attempt_id': 'attempt-1',
+             'artifact_sha256': 'c'*64, 'checklist_sha256': 'b'*64,
+             'review_id': 'qa-1', 'review_kind': 'QA', 'reviewer': 'qa-1',
+             'decision': 'QA_PASSED'},
+            {'tenant_id': 'tenant-a', 'candidate_id': 'candidate-1',
+             'task_id': 'task-1', 'attempt_id': 'attempt-1',
+             'artifact_sha256': 'c'*64, 'checklist_sha256': 'b'*64,
+             'review_id': 'security-1', 'review_kind': 'SECURITY',
+             'reviewer': 'security-1', 'decision': 'SECURITY_PASSED'}],
+          'terminal_receipt': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'attempt_id': 'attempt-1', 'state': 'SUCCESS',
+            'receipt_id': 'terminal-receipt-1',
+            'artifact_sha256': 'c'*64, 'authority_state': 'REVOKED'},
+          'connection': {'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'request_id': 'request-1', 'connection_id': 'connection-1',
+            'connection_config_version': 3, 'provider_id': 'provider-1',
+            'provider_config_version': 4, 'model_id': 'model-1',
+            'model_config_version': 5, 'purpose': 'CODEX_EXECUTION',
+            'status': 'ACTIVE'},
+          'quota': {'quota_state': 'AVAILABLE',
+            'tenant_id': 'tenant-a', 'task_id': 'task-1',
+            'request_id': 'request-1', 'connection_id': 'connection-1',
+            'connection_config_version': 3, 'provider_id': 'provider-1',
+            'provider_config_version': 4, 'model_id': 'model-1',
+            'model_config_version': 5, 'verified_at': 90,
+            'provider_price_state': 'KNOWN_FREE',
+            'model_price_state': 'KNOWN_FREE',
+            'quota_source': 'EXISTING_SUBSCRIPTION_INCLUDED'},
+        }
+
+    def test_complete_chain_requires_same_identity_and_every_stage(self):
+        value = evaluate_closure(self.snapshot(), observed_at=100)
+        self.assertEqual(value['verdict'], PROVEN)
+        self.assertTrue(all(item['status'] == PROVEN
+                            for item in value['stages'].values()))
+        self.assertEqual(len(value['receipt_sha256']), 64)
+
+    def test_sent_ack_and_model_success_do_not_fake_process_or_live_call(self):
+        value = self.snapshot()
+        value.pop('process_receipt'); value.pop('ai_call_receipt')
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['SENT']['status'], PROVEN)
+        self.assertEqual(result['stages']['ACK']['status'], PROVEN)
+        self.assertEqual(result['stages']['PROCESS_STARTED']['status'], UNKNOWN)
+        self.assertEqual(result['stages']['REAL_AI_CALL']['status'], UNKNOWN)
+        self.assertEqual(result['verdict'], UNKNOWN)
+
+    def test_unknown_or_empty_remote_identity_is_not_ack(self):
+        for invalid in (UNKNOWN, ''):
+            value = self.snapshot()
+            value['execution_intent']['execution_id'] = invalid
+            value['execution_intent']['thread_id'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ACK']['status'], UNKNOWN, invalid)
+
+    def test_unknown_or_empty_process_evidence_is_not_started(self):
+        for field in ('receipt_id', 'process_id'):
+            for invalid in (UNKNOWN, '', True):
+                value = self.snapshot(); value['process_receipt'][field] = invalid
+                result = evaluate_closure(value, observed_at=100)
+                self.assertEqual(result['stages']['PROCESS_STARTED']['status'],
+                                 UNKNOWN, (field, invalid))
+
+    def test_unknown_or_empty_provider_evidence_is_not_real_call(self):
+        for field in ('receipt_id', 'provider_request_id'):
+            for invalid in (UNKNOWN, '', True):
+                value = self.snapshot(); value['ai_call_receipt'][field] = invalid
+                result = evaluate_closure(value, observed_at=100)
+                self.assertEqual(result['stages']['REAL_AI_CALL']['status'],
+                                 UNKNOWN, (field, invalid))
+        value = self.snapshot(); value['ai_call_receipt']['response_sha256'] = UNKNOWN
+        self.assertEqual(evaluate_closure(value, observed_at=100)[
+          'stages']['REAL_AI_CALL']['status'], UNKNOWN)
+
+    def test_process_receipt_cannot_self_assert_another_run(self):
+        value = self.snapshot(); value['process_receipt']['run_id'] = 'other-run'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['PROCESS_STARTED']['status'], UNKNOWN)
+
+    def test_unknown_canonical_run_holds_instead_of_trusting_receipt(self):
+        value = self.snapshot(); value['task']['run_id'] = UNKNOWN
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['verdict'], HOLD)
+        self.assertIn('MISSING_RUN_ID', result['integrity_holds'])
+
+    def test_intent_session_mismatch_holds_process_chain(self):
+        value = self.snapshot(); value['execution_intent']['session_id'] = 'other-session'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['verdict'], HOLD)
+        self.assertIn('INTENT_SESSION_MISMATCH', result['integrity_holds'])
+
+    def test_fixture_call_never_counts_as_real_provider_evidence(self):
+        value = self.snapshot()
+        value['ai_call_receipt']['source_kind'] = 'TEST_FIXTURE'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['REAL_AI_CALL']['status'], UNKNOWN)
+
+    def test_writer_epoch_or_attempt_mismatch_holds_whole_chain(self):
+        for mutation in ('epoch', 'attempt'):
+            value = self.snapshot()
+            if mutation == 'epoch':
+                value['execution_intent']['writer_epoch'] = 8
+            else:
+                value['assignment']['attempt_id'] = 'old-attempt'
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['verdict'], HOLD)
+            self.assertTrue(all(item['status'] == HOLD
+                                for item in result['stages'].values()))
+
+    def test_request_and_role_instance_cannot_be_spliced(self):
+        value = self.snapshot(); value['model_request']['request_id'] = 'other'
+        self.assertEqual(evaluate_closure(value, observed_at=100)['verdict'], HOLD)
+        value = self.snapshot(); value['role_instance']['instance_id'] = 'other-ai'
+        self.assertEqual(evaluate_closure(value, observed_at=100)['verdict'], HOLD)
+        value = self.snapshot(); value['role_instance']['current_request_id'] = 'other'
+        self.assertEqual(evaluate_closure(value, observed_at=100)['verdict'], HOLD)
+
+    def test_old_or_expired_writer_is_hold(self):
+        value = self.snapshot(); value['task']['state'] = 'RUNNING'
+        value.pop('terminal_receipt')
+        self.assertEqual(evaluate_closure(value, observed_at=100)['verdict'], HOLD)
+        value = self.snapshot(); value['task']['state'] = 'RUNNING'
+        value['task']['authority_state'] = 'VALID'; value.pop('terminal_receipt')
+        self.assertEqual(evaluate_closure(value, observed_at=200)['verdict'], HOLD)
+
+    def test_reviewers_and_acceptor_must_be_independent(self):
+        value = self.snapshot(); value['reviews'][0]['reviewer'] = 'ai-1'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'], UNKNOWN)
+        self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+        value = self.snapshot(); value['candidate']['accepted_by'] = 'qa-1'
+        self.assertEqual(evaluate_closure(value, observed_at=100)[
+          'stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_review_kind_decisions_cannot_be_reversed(self):
+        value = self.snapshot()
+        value['reviews'][0]['decision'] = 'SECURITY_PASSED'
+        value['reviews'][1]['decision'] = 'QA_PASSED'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'], UNKNOWN)
+        self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_review_cannot_splice_candidate_artifact_or_checklist(self):
+        for field, replacement in (('candidate_id', 'candidate-old'),
+                                   ('attempt_id', 'attempt-old'),
+                                   ('artifact_sha256', 'd'*64),
+                                   ('checklist_sha256', 'e'*64)):
+            value = self.snapshot(); value['reviews'][0][field] = replacement
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'],
+                             UNKNOWN, field)
+
+    def test_review_missing_explicit_binding_is_unknown(self):
+        for field in ('task_id', 'attempt_id', 'artifact_sha256',
+                      'checklist_sha256'):
+            value = self.snapshot(); value['reviews'][0].pop(field)
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'],
+                             UNKNOWN, field)
+
+    def test_review_identity_fields_must_be_known_and_nonempty(self):
+        for field in ('review_id', 'reviewer'):
+            for invalid in (None, '', UNKNOWN):
+                value = self.snapshot(); value['reviews'][0][field] = invalid
+                result = evaluate_closure(value, observed_at=100)
+                self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'],
+                                 UNKNOWN, (field, invalid))
+                self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_reviewer_and_acceptor_must_be_distinct(self):
+        value = self.snapshot(); value['reviews'][0]['reviewer'] = 'acceptor-1'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'], UNKNOWN)
+        self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_acceptor_must_be_known_and_nonempty(self):
+        for invalid in (None, '', UNKNOWN):
+            value = self.snapshot(); value['candidate']['accepted_by'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN,
+                             invalid)
+
+    def test_unknown_or_empty_terminal_receipt_is_not_acceptance(self):
+        for invalid in (UNKNOWN, ''):
+            value = self.snapshot(); value['terminal_receipt']['receipt_id'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN,
+                             invalid)
+
+    def test_unknown_or_empty_event_and_candidate_ids_fail_closed(self):
+        for invalid in (UNKNOWN, ''):
+            value = self.snapshot(); value['execution_events'][0]['event_id'] = invalid
+            self.assertEqual(evaluate_closure(value, observed_at=100)[
+              'stages']['SENT']['status'], UNKNOWN)
+            value = self.snapshot(); value['candidate']['candidate_id'] = invalid
+            result = evaluate_closure(value, observed_at=100)
+            self.assertEqual(result['stages']['ARTIFACT_SUBMITTED']['status'], UNKNOWN)
+
+    def test_acceptance_requires_canonical_terminal_artifact(self):
+        value = self.snapshot(); value['terminal_receipt']['artifact_sha256'] = 'd'*64
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['INDEPENDENT_REVIEW']['status'], PROVEN)
+        self.assertEqual(result['stages']['ACCEPTED']['status'], UNKNOWN)
+
+    def test_real_task_admission_does_not_claim_execution(self):
+        value = self.snapshot(); value['task']['state'] = 'RUNNING'
+        value['task']['authority_state'] = 'VALID'
+        result = admission_for_real_task(value, observed_at=100)
+        self.assertEqual(result['status'], PROVEN)
+        self.assertIn('REAL_AI_CALL', result['does_not_prove'])
+        value['quota']['quota_state'] = UNKNOWN
+        held = admission_for_real_task(value, observed_at=100)
+        self.assertEqual(held['status'], HOLD)
+        self.assertIn('ATTRIBUTABLE_QUOTA_AVAILABLE_REQUIRED', held['holds'])
+
+    def test_admission_rejects_cross_tenant_connection_and_quota(self):
+        for section in ('connection', 'quota'):
+            value = self.snapshot(); value['task']['state'] = 'RUNNING'
+            value['task']['authority_state'] = 'VALID'
+            value[section]['tenant_id'] = 'tenant-b'
+            held = admission_for_real_task(value, observed_at=100)
+            self.assertEqual(held['status'], HOLD, section)
+            self.assertIn(section.upper() + '_EVIDENCE_IDENTITY_MISMATCH',
+                          held['holds'])
+
+    def test_admission_rejects_wrong_connection_config_request_or_task(self):
+        cases = (('connection', 'connection_id', 'other-connection'),
+                 ('connection', 'connection_config_version', 99),
+                 ('quota', 'provider_config_version', 99),
+                 ('quota', 'request_id', 'other-request'),
+                 ('connection', 'task_id', 'other-task'),
+                 ('execution_intent', 'model_config_version', 99))
+        for section, field, replacement in cases:
+            value = self.snapshot(); value['task']['state'] = 'RUNNING'
+            value['task']['authority_state'] = 'VALID'
+            value[section][field] = replacement
+            held = admission_for_real_task(value, observed_at=100)
+            self.assertEqual(held['status'], HOLD, (section, field))
+
+    def test_admission_missing_destination_binding_fails_closed(self):
+        for section, field in (('model_request_binding', 'model_config_version'),
+                               ('execution_intent', 'model_id'),
+                               ('connection', 'request_id'),
+                               ('quota', 'verified_at')):
+            value = self.snapshot(); value['task']['state'] = 'RUNNING'
+            value['task']['authority_state'] = 'VALID'
+            value[section].pop(field)
+            held = admission_for_real_task(value, observed_at=100)
+            self.assertEqual(held['status'], HOLD, (section, field))
+
+    def test_late_event_from_other_intent_is_not_ack(self):
+        value = self.snapshot()
+        value['execution_events'][1]['intent_id'] = 'old-intent'
+        result = evaluate_closure(value, observed_at=100)
+        self.assertEqual(result['stages']['ACK']['status'], UNKNOWN)
+
+
+if __name__ == '__main__':
+    unittest.main()
