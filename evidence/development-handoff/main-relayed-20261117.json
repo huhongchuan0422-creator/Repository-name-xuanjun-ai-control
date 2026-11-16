@@ -1,0 +1,49 @@
+{
+  "source": "main转述受控会话记录及接收文件；非权限证书",
+  "scope": "开发交接事实；非生产效果",
+  "repository": "project-task-center-blackbox",
+  "branch": "candidate/tc-workbench-resources-20261115",
+  "entry": "#board/research-development → /api/admin/delivery-ledger",
+  "runtime_version": "UNKNOWN",
+  "online_permission": "UNKNOWN",
+  "next_action": "沿候选续接；三方同版验收及浏览器未完成",
+  "records": [
+    {
+      "phase": "交出",
+      "role": "65bd → 0a91",
+      "commit": "7d471afafb10bc4e327132cdc02bd945d0f04069",
+      "tree": "bec99fdaa9214b61eba2e5e84c12b0020db9689e",
+      "message_ref": "5f25aa09-4b95-4463-a5ca-5f3badcc24b7",
+      "run_ref": "2c6723e2-6854-4e09-b715-e80c720401eb",
+      "timestamp_ms": 1794846300397,
+      "basis": "main实读sessions_history；停写并交出此版本"
+    },
+    {
+      "phase": "接收",
+      "role": "0a91",
+      "commit": "7d471afafb10bc4e327132cdc02bd945d0f04069",
+      "file_ref": "deliveries/task-delivery-ledger-354-20261116/candidate-received-20261117.md",
+      "message_ref": "UNKNOWN",
+      "basis": "实际接收文件；未声称接收后续所有版本"
+    },
+    {
+      "phase": "后续结果",
+      "role": "0a91",
+      "commit": "3bd2517f96a736cb6db636121bc4db4a0b248677",
+      "message_ref": "f8091e43-3557-40f2-8eb9-65dcfab94dea",
+      "run_ref": "e480aaa6-8fe8-4551-a4cf-9899471998ab",
+      "timestamp_ms": 1794847488502,
+      "basis": "main实读sessions_history；报告该版本已推送"
+    },
+    {
+      "phase": "独立监督",
+      "role": "ca518",
+      "base": "70d834b199dce05370bcf46d9b97fb590db0f932",
+      "commit": "3bd2517f96a736cb6db636121bc4db4a0b248677",
+      "message_ref": "53e107a4-43f2-41e5-a3bc-bb86fd789953",
+      "run_ref": "e0b172f2-e621-4588-9498-bc8cf1410715",
+      "timestamp_ms": 1794847579560,
+      "basis": "main实读sessions_history；此差异独审通过，浏览器未验收"
+    }
+  ]
+}
