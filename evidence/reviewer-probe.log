@@ -1,0 +1,2 @@
+cross_tenant_assembly_rejected: TEST_METADATA_SESSION_TENANT_MISMATCH
+attachment: original probe stops at rejected assembly; independently exercised actual _send in integration-tests.log

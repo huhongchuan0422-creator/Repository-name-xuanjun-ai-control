@@ -84,6 +84,8 @@ ASSETS = {
     '/login.html': ('login.html', 'text/html; charset=utf-8'),
     '/login.js': ('login.js', 'application/javascript; charset=utf-8'),
     '/oauth-callback.html': ('oauth-callback.html', 'text/html; charset=utf-8'),
+    '/delivery-ledger.html': ('delivery-ledger.html', 'text/html; charset=utf-8'),
+    '/delivery-ledger.js': ('delivery-ledger.js', 'application/javascript; charset=utf-8'),
     '/task-center.html': ('task-center.html', 'text/html; charset=utf-8'),
     '/task-center.js': ('task-center.js', 'application/javascript; charset=utf-8'),
     '/research-workbench/': ('research-workbench/index.html', 'text/html; charset=utf-8'),
@@ -440,7 +442,14 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
-                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None):
+                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None):
+    from task_delivery_observer import MetadataReader
+    if delivery_ledger_reader is not None and type(delivery_ledger_reader) is not MetadataReader:
+        raise ValueError('EXACT_TEST_METADATA_READER_REQUIRED')
+    if delivery_ledger_reader is not None and delivery_ledger_reader.tenant_id!=tenant_id:
+        raise ValueError('TEST_METADATA_TENANT_MISMATCH')
+    if delivery_ledger_reader is not None and session_store is not None and session_store.tenant_id!=tenant_id:
+        raise ValueError('TEST_METADATA_SESSION_TENANT_MISMATCH')
     mcp_dispatch_config=validate_dispatch_config(mcp_dispatch_config)
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
@@ -748,6 +757,28 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         'NOT_IMPLEMENTED'}),
                         'application/json; charset=utf-8')
                 return
+            if path in ('/api/admin/delivery-ledger','/api/admin/delivery-handoff','/api/admin/delivery-observer'):
+                if not self._delivery_admin_allowed():
+                    self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),'application/json; charset=utf-8');return
+                from task_delivery_observer import observer_status
+                if path == '/api/admin/delivery-observer':
+                    self._send(200,_json_bytes(observer_status()),'application/json; charset=utf-8');return
+                if delivery_ledger_reader is None:
+                    self._send(503,_json_bytes({'state':'UNAVAILABLE','writer_verification':'UNKNOWN'}),'application/json; charset=utf-8');return
+                try:
+                    headers=None
+                    if path == '/api/admin/delivery-handoff':
+                        query=__import__('urllib.parse').parse.parse_qs(urlsplit(self.path).query,keep_blank_values=True)
+                        if set(query)!={'task_id'} or len(query['task_id'])!=1:raise ValueError('TASK_ID_REQUIRED')
+                        result=delivery_ledger_reader.export(query['task_id'][0])
+                        headers=[('Content-Disposition','attachment; filename="xuanjun-task-handoff.json"')]
+                    else:result=delivery_ledger_reader.view()
+                    self._send(200,_json_bytes(result),'application/json; charset=utf-8',headers)
+                except Exception:
+                    self._send(503,_json_bytes({'state':'UNAVAILABLE','writer_verification':'UNKNOWN'}),'application/json; charset=utf-8')
+                return
+            if path in ('/delivery-ledger.html','/delivery-ledger.js') and not self._delivery_admin_allowed():
+                self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),'application/json; charset=utf-8');return
             if path == '/api/admin/model-control':
                 if not self._admin_allowed():
                     self._send(403, _json_bytes({'error':'ADMIN_REQUIRED'}),
@@ -1282,6 +1313,15 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 self._send(400,_json_bytes({'error':type(exc).__name__,
                   'detail':str(exc)}),'application/json; charset=utf-8')
 
+        def _delivery_admin_allowed(self):
+            # Scope this tenant binding to the new surfaces; preserve legacy behavior.
+            if session_store is not None:
+                if session_store.tenant_id != tenant_id:return False
+                session=self._session()
+                return bool(session is not None and session.get('tenant_id')==tenant_id and
+                            'TASK_CENTER_ADMIN' in session.get('roles',[]))
+            return self._admin_allowed()
+
         def _admin_allowed(self):
             session=self._session()
             if session is not None:
@@ -1456,7 +1496,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None):
+                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if mcp_development_host is not None:
@@ -1517,7 +1557,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 identity_provider,session_store,outbound_enabled,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
-                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host)
+                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None

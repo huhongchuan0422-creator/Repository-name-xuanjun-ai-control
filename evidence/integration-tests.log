@@ -1,0 +1,13 @@
+test_144a_public_projection_and_workbench_assets (test_delivery_144a_delta.Integration144a) ... ok
+test_attachment_headers_use_existing_send (test_delivery_144a_delta.Integration144a) ... ok
+test_cross_tenant_store_and_session_fact_fail_closed (test_delivery_144a_delta.Integration144a) ... ok
+test_corrupt_event_denied_preserved (test_delivery_ledger_route.RouteTests) ... ok
+test_denied_unavailable_badquery_and_existing_routes (test_delivery_ledger_route.RouteTests) ... ok
+test_existing_session_role_and_tenant_boundary (test_delivery_ledger_route.RouteTests) ... ok
+test_historical_354_example_is_not_current_evidence (test_delivery_ledger_route.RouteTests) ... ok
+test_main_handler_actual_routes_and_export (test_delivery_ledger_route.RouteTests) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.813s
+
+OK

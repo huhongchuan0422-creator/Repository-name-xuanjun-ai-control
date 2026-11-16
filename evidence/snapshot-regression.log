@@ -1,0 +1,9 @@
+test_concurrent_wal_writer_cannot_mix_counts_and_source_time (test_public_snapshot_consistency_delta.PublicSnapshotConsistency) ... ok
+test_public_read_does_not_change_database_or_wal (test_public_snapshot_consistency_delta.PublicSnapshotConsistency) ... ok
+test_empty_missing_time_and_source_failure (test_public_projection_metadata_delta.PublicProjectionMetadataDelta) ... ok
+test_public_only_stable_snapshot_and_unknown_freshness (test_public_projection_metadata_delta.PublicProjectionMetadataDelta) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.125s
+
+OK

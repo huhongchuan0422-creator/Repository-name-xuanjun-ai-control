@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "namespace": "pilot354",
+  "event_id": "history-354-20261112",
+  "task_id": "pilot-354",
+  "attempt_id": "observation-1",
+  "idempotency_key": "history-354-20261112",
+  "producer": "ledger-writer",
+  "type": "register",
+  "occurred_at": "2026-11-12T10:41:00+08:00",
+  "observed_at": "2026-11-16T10:47:00+08:00",
+  "source": "handoff-dot-20261112",
+  "evidence": "historical-dot-handoff-354-712f88d3",
+  "result": "HISTORICAL_NOT_CURRENT",
+  "data": {
+    "kind": "task",
+    "id": "pilot-354",
+    "schema_version": 1,
+    "source": "historical-dot-handoff-354-712f88d3",
+    "occurred_at": "2026-11-12T10:41:00+08:00",
+    "observed_at": "2026-11-16T10:47:00+08:00",
+    "validity": "HISTORICAL",
+    "state": "UNKNOWN",
+    "goal": "独立354试点",
+    "writer_role_id": "UNKNOWN",
+    "blocker": "当前源码、运行环境和接件状态未知",
+    "next_action": "原负责人提供脱敏身份及接件事实",
+    "source_refs": [
+      "historical-dot-handoff-354-712f88d3"
+    ],
+    "acceptance": "UNKNOWN",
+    "instruction_ref": "UNKNOWN",
+    "dependencies": [],
+    "code_refs": [],
+    "deploy_refs": []
+  },
+  "validity": "HISTORICAL",
+  "causation": "NONE",
+  "sanitization": "MANUAL_REDACTED"
+}
