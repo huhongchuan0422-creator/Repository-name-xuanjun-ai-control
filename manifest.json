@@ -1215,7 +1215,7 @@
     },
     {
       "path": "demos/task-center-digital-twin/app.js",
-      "sha256": "e20859d038ff2866b7961ce2af8f8824735731f98d397a86f164053d4d0191e0",
+      "sha256": "ca0c1488bcebc1b8107900cc575ec633c4c159f1885745ad188e2bbfd6279948",
       "source": "integration-tc-144a"
     },
     {
@@ -1685,7 +1685,7 @@
     },
     {
       "path": "scripts/task_delivery_backup_receipt.py",
-      "sha256": "ce78a42a82c407089c81603d9d35c30671ade7ed6cb761162c557c06bc3bff1e",
+      "sha256": "f7c862278bb5a7a74fae6edd9db0674ec1ddbdfddb7add5d801698322ad07fe9",
       "source": "integration-tc-144a"
     },
     {
@@ -1710,7 +1710,7 @@
     },
     {
       "path": "scripts/task_delivery_observer.py",
-      "sha256": "2102b13368835ea4f9ea86e9be3e57d0b192eaa0a6947762107dc6f290327bfb",
+      "sha256": "b2e05717d81826882432271311b61312d6e1f3bc0108b5005c74140045c86da9",
       "source": "integration-tc-144a"
     },
     {

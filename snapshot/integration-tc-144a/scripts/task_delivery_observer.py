@@ -3,20 +3,27 @@ import os
 from datetime import datetime, timezone
 from task_delivery_ledger.core import Store, ident, parse_time
 from task_delivery_observation import ApprovedObservationReader,ObservationUnavailable
-from task_delivery_backup_receipt import unavailable as backup_unavailable
+from task_delivery_backup_receipt import unavailable as backup_unavailable,LocalBackupReceiptReader
 
 class Unavailable(Exception): pass
 
 class MetadataReader(object):
     """Bound by the hosting test harness, never by an HTTP request."""
-    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None,handoff_verifier=None,backup_observation_reader=None):
+    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None,handoff_verifier=None,backup_observation_reader=None,local_backup_reader=None):
         if observation_reader is not None and type(observation_reader) is not ApprovedObservationReader: raise Unavailable()
         if backup_observation_reader is not None and (type(backup_observation_reader) is not ApprovedObservationReader or backup_observation_reader.collector_ref!='main-backup-observation-20261117'): raise Unavailable()
-        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader;self.handoff_verifier=handoff_verifier;self.backup_observation_reader=backup_observation_reader
+        if local_backup_reader is not None and type(local_backup_reader) is not LocalBackupReceiptReader: raise Unavailable()
+        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader;self.handoff_verifier=handoff_verifier;self.backup_observation_reader=backup_observation_reader;self.local_backup_reader=local_backup_reader
     def _backup(self):
-        if self.backup_observation_reader is None:return backup_unavailable()
-        try:return self.backup_observation_reader.read()
-        except ObservationUnavailable:return backup_unavailable()
+        snapshot=backup_unavailable()
+        if self.backup_observation_reader is not None:
+            try:snapshot=self.backup_observation_reader.read()
+            except ObservationUnavailable:pass
+        if self.local_backup_reader is None:return snapshot
+        try:result=self.local_backup_reader.read()
+        except ObservationUnavailable:result=backup_unavailable();result['local_receipt_configured']=True
+        if snapshot.get('state')=='OBSERVED_METADATA_ONLY':result['static_snapshot']=snapshot
+        return result
     def _store(self):
         # Store.__init__ creates marker/directories; never call it from a GET.
         marker=os.path.join(self.root,'writer.id')
@@ -31,7 +38,7 @@ class MetadataReader(object):
             backup=self._backup()
             try:observation=self.export_observations()
             except ObservationUnavailable:
-                if backup.get('state')!='OBSERVED_METADATA_ONLY':raise Unavailable()
+                if backup.get('state')!='OBSERVED_METADATA_ONLY' and 'static_snapshot' not in backup:raise Unavailable()
                 observation={'state':'UNAVAILABLE','writer_verification':'UNKNOWN','records':[]}
             return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
                     'ledger_state':'UNAVAILABLE','observations':observation,'namespace':self.namespace,
