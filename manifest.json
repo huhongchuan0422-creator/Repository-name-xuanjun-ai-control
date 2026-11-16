@@ -1900,7 +1900,7 @@
     },
     {
       "path": "tests/test_development_reader_startup_delta.py",
-      "sha256": "0f5f1c5f17eebe1426f939ddfb86052a09b3243b7955a748d799c6eef5392e76",
+      "sha256": "9defc2dea8c911f9d29a5a6d0923d9f68ae530902dcc5a464f389d39771cd833",
       "source": "integration-tc-144a"
     },
     {
