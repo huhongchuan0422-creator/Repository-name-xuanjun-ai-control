@@ -169,7 +169,7 @@ class Store:
             e=load(p); offline_policy(e,self.writer,namespace,p.stem)
             items.append(e)
         return sorted(items,key=lambda e:(parse_time(e['observed_at']),e['event_id']))
-    def project(self,namespace):
+    def project(self,namespace,verifier=None):
         events=self.events(namespace); processing,cycles=causal_order(events); all_events={e['event_id']:e for e in events}
         seen={}; objects={}; tasks={}; conflicts=[]; pending=[]; registered={}; object_ids={}; phase_events={}; phase_rank={}; object_head={}
         for e in processing:
@@ -211,9 +211,9 @@ class Store:
         # History is observation-ordered, independent of replay evaluation order.
         for task in tasks.values(): task['history'].sort(key=lambda e:(parse_time(e['observed_at']),e['event_id']))
         from .handoffs import project_handoffs
-        return {'schema_version':1,'namespace':namespace,'objects':objects,'tasks':tasks,'conflicts':conflicts,'pending_dependencies':pending,'writer_verification':'UNKNOWN','handoffs':project_handoffs([event for task in tasks.values() for event in task['history']])}
-    def handoff(self,namespace,task_id):
-        return handoff(self,namespace,task_id)
+        return {'schema_version':1,'namespace':namespace,'objects':objects,'tasks':tasks,'conflicts':conflicts,'pending_dependencies':pending,'writer_verification':'UNKNOWN','handoffs':project_handoffs([event for task in tasks.values() for event in task['history']],verifier=verifier)}
+    def handoff(self,namespace,task_id,verifier=None):
+        return handoff(self,namespace,task_id,verifier=verifier)
     def publish_view(self,namespace,expected):
         ident(namespace); p=self.root/'views'/(namespace+'.json'); lock=self.root/'views'/(namespace+'.lock')
         # Local projection CAS only, not a business lease. Crash leaves lock for operator recovery.
@@ -227,13 +227,13 @@ class Store:
             os.replace(tmp,p); return digest(data)
         finally: os.unlink(lock)
 
-def handoff(store,namespace,task_id=None):
+def handoff(store,namespace,task_id=None,verifier=None):
     # A caller-supplied mutable projection is never an authority or export source.
     # Store.project rebuilds from the configured store and checks each event's
     # producer against store.writer via events()/offline_policy().
     if not isinstance(store,Store) or task_id is None: raise LedgerError('store context required')
     ident(namespace); ident(task_id)
-    view=store.project(namespace)
+    view=store.project(namespace,verifier=verifier)
     task=view['tasks'].get(task_id)
     if task is None: raise LedgerError('unknown task')
     objs={k:v for k,v in view['objects'].items() if v.get('task_id')==task_id or (v.get('kind')=='task' and v.get('id')==task_id)}

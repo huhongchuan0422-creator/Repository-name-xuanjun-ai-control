@@ -9,9 +9,9 @@ class Unavailable(Exception): pass
 
 class MetadataReader(object):
     """Bound by the hosting test harness, never by an HTTP request."""
-    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None):
+    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None,handoff_verifier=None):
         if observation_reader is not None and type(observation_reader) is not ApprovedObservationReader: raise Unavailable()
-        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader
+        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader;self.handoff_verifier=handoff_verifier
     def _store(self):
         # Store.__init__ creates marker/directories; never call it from a GET.
         marker=os.path.join(self.root,'writer.id')
@@ -28,7 +28,7 @@ class MetadataReader(object):
             return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
                     'ledger_state':'UNAVAILABLE','observations':observation,'namespace':self.namespace,
                     'tasks':[],'conflicts':[],'pending_dependencies':[],'backup':backup_unavailable(),'production_status':'NOT_IMPLEMENTED'}
-        v=store.project(self.namespace);rows=[]
+        v=store.project(self.namespace,verifier=self.handoff_verifier);rows=[]
         for tid,t in v['tasks'].items():
             o=v['objects'].get('task:'+tid,{})
             linked=[x for x in v['objects'].values() if x.get('task_id')==tid]
@@ -74,7 +74,7 @@ class MetadataReader(object):
         return self.observation_reader.read()
     def export(self,task_id):
         return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
-                'handoff':self._store().handoff(self.namespace,ident(task_id))}
+                'handoff':self._store().handoff(self.namespace,ident(task_id),verifier=self.handoff_verifier)}
 
 def observer_status():
     # Existing P2/P3 normalize() is TEST_ONLY and lacks actual transport proof.
