@@ -1705,12 +1705,12 @@
     },
     {
       "path": "scripts/task_delivery_observation.py",
-      "sha256": "e1304cf7de873a56544ffeb4d99c2348ac232c4c6b0c3bde7459bcfc05146106",
+      "sha256": "2d4a79fb4e393e1de0f03a040d206a9a6dbf60daa22c4d12e1c9b2928ee98cb6",
       "source": "integration-tc-144a"
     },
     {
       "path": "scripts/task_delivery_observer.py",
-      "sha256": "957d0aa7d6c2e79c32f0c18bc14da85d7f2cd57c612b06e3926c907f439c979a",
+      "sha256": "2102b13368835ea4f9ea86e9be3e57d0b192eaa0a6947762107dc6f290327bfb",
       "source": "integration-tc-144a"
     },
     {
