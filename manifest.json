@@ -1215,7 +1215,7 @@
     },
     {
       "path": "demos/task-center-digital-twin/app.js",
-      "sha256": "ca0c1488bcebc1b8107900cc575ec633c4c159f1885745ad188e2bbfd6279948",
+      "sha256": "40fb1dcb41514154e76a978678ab068c6811ef6fae41a55cc0fc534a35c150ee",
       "source": "integration-tc-144a"
     },
     {
@@ -1765,7 +1765,7 @@
     },
     {
       "path": "tests/development_ledger_delta.test.cjs",
-      "sha256": "4ad6db82b51c12c657c78edd1fb09d22491df398b484de15fb84ff181639a193",
+      "sha256": "0c811c12435d0672c3a26135f5c605fbf4384e61d81f2b6870c6445e451c436a",
       "source": "integration-tc-144a"
     },
     {
