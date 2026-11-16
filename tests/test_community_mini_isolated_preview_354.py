@@ -64,8 +64,29 @@ https.get=(url,opts,cb)=>{assert.equal(url,helper.BASE+'/community/health');requ
             shutil.copytree(ROOT/'clients/community-mini',frozen/'clients/community-mini')
             for name in ('scripts/community_mini_isolated_preview_354.cjs','scripts/community_mini_key.cjs','deploy/community-preview/endpoint.cjs','deploy/community-preview/endpoint-profiles.json'):
                 target=frozen/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/name,target)
+            # The deployed helper remains pinned. Current-source execution is an
+            # explicitly synthetic fixture confined to this temporary directory.
+            helper_path=ROOT/'scripts/community_mini_isolated_preview_354.cjs'
+            original_helper=helper_path.read_bytes()
+            negative=subprocess.run(['node','-e',
+                "const assert=require('node:assert/strict');"
+                "const h=require('./scripts/community_mini_isolated_preview_354.cjs');"
+                "const {verifySource}=require('./deploy/community-preview/endpoint.cjs');"
+                "assert.throws(()=>verifySource('./clients/community-mini',h.HASHES),/PREPARED_SOURCE_CHANGED/);"],
+                cwd=ROOT,text=True,capture_output=True)
+            self.assertEqual(negative.returncode,0,negative.stdout+'\n'+negative.stderr)
+            fixture_helper=frozen/'scripts/community_mini_isolated_preview_354.cjs'
+            fixture_manifest=subprocess.run(['node','-e',
+                "console.log(JSON.stringify(require('./deploy/community-preview/endpoint.cjs').sourceManifest('./clients/community-mini')))"],
+                cwd=frozen,text=True,capture_output=True,check=True).stdout.strip()
+            fixture_text=fixture_helper.read_text()
+            start=fixture_text.index('const HASHES=')+len('const HASHES=')
+            end=fixture_text.index(';',start)
+            fixture_helper.write_text(fixture_text[:start]+fixture_manifest+fixture_text[end:])
+            self.assertEqual(helper_path.read_bytes(),original_helper)
             script='const CURRENT_ROOT='+json.dumps(str(ROOT))+';\n'+script
             result=subprocess.run(['node','-e',script],cwd=frozen,text=True,capture_output=True)
+        self.assertEqual(helper_path.read_bytes(),original_helper)
         self.assertEqual(result.returncode,0,result.stdout+'\n'+result.stderr)
         self.assertIn('OFFLINE_PREVIEW_BOUNDARY_CHECKS=',result.stdout)
 
