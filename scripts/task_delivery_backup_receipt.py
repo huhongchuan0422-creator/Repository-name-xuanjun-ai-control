@@ -22,8 +22,14 @@ def map_report(record):
     if not isinstance(record,dict) or set(record)!=REQUIRED or type(record['schema_version']) is not int or record['schema_version']!=1:raise BackupReceiptError('invalid metadata')
     for k in ('project_ref','receipt_id','source_ref','base_ref','result_ref','manifest_ref','restore_ref'):
         try:
-            ident(record[k])
-            if k not in ('base_ref','result_ref'):safe(record[k],'list_item')
+            value=ident(record[k])
+            if k in ('base_ref','result_ref') and re.fullmatch(r'[0-9a-fA-F]+',value):
+                # A bare hexadecimal value claims object identity: accept only
+                # full lowercase Git SHA-1 or SHA-256, never an ambiguous prefix.
+                if not re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})',value):
+                    raise LedgerError('invalid full object reference')
+            else:
+                safe(value,'list_item')
         except (LedgerError,TypeError):raise BackupReceiptError('invalid reference')
     try:
         observed=parse_time(record['observed_at'])
