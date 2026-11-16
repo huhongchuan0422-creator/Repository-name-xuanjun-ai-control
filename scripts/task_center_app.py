@@ -1589,7 +1589,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise
 
 
-def main(argv=None, *, execution_provider=None):
+def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
     authority = parser.add_mutually_exclusive_group(required=True)
@@ -1669,7 +1669,8 @@ def main(argv=None, *, execution_provider=None):
                            if args.mcp_dispatch_config_file else None),
                          mcp_development_host=(load_development_host(args.mcp_development_config_file, execution_provider=execution_provider)
                            if args.mcp_development_config_file else None),
-                         correction_observer_interval=args.correction_observer_interval)
+                         correction_observer_interval=args.correction_observer_interval,
+                         delivery_ledger_reader=delivery_ledger_reader)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)

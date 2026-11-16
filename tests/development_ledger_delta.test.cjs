@@ -8,6 +8,7 @@ const ledger={mode:'TEST_ONLY',ledger_state:'AVAILABLE_METADATA_ONLY',source_tru
  let called=[];const result=await ui.loadDevelopmentLedger((url,opts)=>{called.push([url,opts]);return Promise.resolve({ok:true,json:()=>Promise.resolve(ledger)});});
  assert.strictEqual(result,ledger);assert.strictEqual(called[0][0],'api/admin/delivery-ledger');assert.strictEqual(called[0][1].credentials,'same-origin');
  const html=ui.render(data,route,null,result);assert.match(html,/任务与三方交接资料/);assert.match(html,/有缺项/);assert.match(html,/&lt;unsafe&gt;/);assert.doesNotMatch(html,/SECRET_OTHER|<unsafe>/);assert.match(html,/不构成实际接件/);
+ assert.match(html,/研发任务中心事实/);assert.match(html,/三方交接未从此来源确认/);assert.match(html,/接件记录时间 UNKNOWN/);
  assert.match(ui.render(data,route,null,null),/台账不可用或无权访问/);
  assert.match(ui.render(data,route,null,{...ledger,ledger_state:'UNAVAILABLE'}),/台账不可用；不代表没有任务/);
  assert.doesNotMatch(ui.render(data,ui.parseRoute('#overview'),null,ledger),/任务与三方交接资料/);
