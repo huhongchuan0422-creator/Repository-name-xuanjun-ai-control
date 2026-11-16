@@ -70,7 +70,7 @@ def project_handoffs(events, verifier=None, now=None):
         ps=[e for e in proposals if e['data']['handoff_version']==version]
         p=ps[0]; d=p['data']; snap=d['snapshot_data']; inc=d['scope_included']; exc=d['scope_excluded']
         version_conflict=len(ps)!=1
-        same=[e for e in es if e['data']['handoff_version']==version and e['data']['snapshot_digest']==d['snapshot_digest'] and (e is p or e['data'].get('proposal_event_id')==p['event_id'])]
+        same=[e for e in es if e['attempt_id']==p['attempt_id'] and e['data']['handoff_version']==version and e['data']['snapshot_digest']==d['snapshot_digest'] and (e is p or e['data'].get('proposal_event_id')==p['event_id'])]
         # Resolve exact causal events, not latest conversational summaries.
         byid={e['event_id']:e for e in same}
         def last(kind):
