@@ -1,7 +1,7 @@
 {
-  "checked_at": "2026-11-16T03:13:00.760955+00:00",
+  "checked_at": "2026-11-16T11:30:18.390782+00:00",
   "branch": "feature/chatgpt-community-wechat-sp-offline-20261017",
-  "head_sha": "1aa4a3c7b065fa90efeb82a6ceba56a3d4cf3d58",
+  "head_sha": "d7d3d28f7a66406c7a0b25241951268d08e837b8",
   "current_module": "最终候选需求交叉追踪与外部接线证据核对（阶段仍为PARTIAL）",
   "phases": {
     "1": {
