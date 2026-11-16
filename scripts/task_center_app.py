@@ -1617,15 +1617,25 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
     parser.add_argument('--delivery-ledger-root')
     parser.add_argument('--delivery-ledger-namespace')
     parser.add_argument('--delivery-ledger-writer')
+    parser.add_argument('--delivery-observation-file')
+    parser.add_argument('--delivery-observation-collector')
     args = parser.parse_args(argv)
     ledger_config=(args.delivery_ledger_root,args.delivery_ledger_namespace,args.delivery_ledger_writer)
+    observation_config=(args.delivery_observation_file,args.delivery_observation_collector)
+    if any(value is not None for value in observation_config):
+        if not all(observation_config) or not all(ledger_config):
+            parser.error('delivery observation file and collector require complete delivery ledger configuration')
     if any(value is not None for value in ledger_config):
         if not all(ledger_config):
             parser.error('delivery ledger root, namespace and writer must be supplied together')
         if delivery_ledger_reader is not None:
             parser.error('delivery ledger reader and CLI configuration cannot be combined')
         from task_delivery_observer import MetadataReader
-        delivery_ledger_reader=MetadataReader(*ledger_config,tenant_id=args.tenant)
+        observation_reader=None
+        if all(observation_config):
+            from task_delivery_observation import ApprovedObservationReader
+            observation_reader=ApprovedObservationReader(*observation_config)
+        delivery_ledger_reader=MetadataReader(*ledger_config,tenant_id=args.tenant,observation_reader=observation_reader)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
                else _read_owned_secret_file(args.test_authority_key_file,
                                              'TEST_AUTHORITY_KEY').rstrip('\r\n'))
