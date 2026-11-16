@@ -7,7 +7,8 @@ root. HTTP requests cannot supply a path or alter this allowlist.
 import hashlib,json,re,uuid
 
 APPROVED_SNAPSHOTS={'main-bounded-sessions-20261116':'cefceddce48f4f810a26dc2c708aacd62ac1b26f16b5258df9eac7bd65537537',
-                    'main-development-handoff-20261117':'cddee07f04affca65f5507b7f286cd0bb22f0a1a71cc8cc16ec166f11ee7cf40'}
+                    'main-development-handoff-20261117':'cddee07f04affca65f5507b7f286cd0bb22f0a1a71cc8cc16ec166f11ee7cf40',
+                    'main-backup-observation-20261117':'f74730fecb36c2d7744973764d600937a1f57ad7ae51132aaa2b4fd573f18265'}
 SESSION=re.compile(r'^agent:[a-z0-9-]+:subagent:[a-f0-9-]{36}$')
 NAME=re.compile(r'^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$')
 class ObservationUnavailable(Exception):pass
@@ -30,6 +31,16 @@ class ApprovedObservationReader(object):
             with open(self.path,'rb') as f:raw=f.read(65537)
             if len(raw)>65536 or hashlib.sha256(raw).hexdigest()!=APPROVED_SNAPSHOTS[self.collector_ref]:raise ObservationUnavailable('unapproved snapshot')
             document=json.loads(raw.decode('utf8'))
+            if self.collector_ref=='main-backup-observation-20261117':
+                job=document['job'];backup=document['backup'];runs=document['runs']
+                return {'state':'OBSERVED_METADATA_ONLY','source_observation_verified':'MAIN_RELAYED_SNAPSHOT_BYTES_MATCH',
+                        'provider_verification':'UNKNOWN','freshness':'snapshot-not-live',
+                        'backup_observation':{'observed_at':document['observedAtUtc'],
+                            'schedule_enabled':job['enabled'],'interval_ms':job['everyMs'],
+                            'latest_run_at_ms':runs[0]['runAtMs'],'latest_run_status':runs[0]['completionStatus'],
+                            'backup_at':backup['timeUtc'],'backup_status':backup['status'],
+                            'files':backup['files'],'excluded_count':backup['excludedCount'],
+                            'changed':backup['changed'],'remote_verified_reported':backup['remoteVerified']}}
             if self.collector_ref=='main-development-handoff-20261117':
                 return {'state':'OBSERVED_METADATA_ONLY','source_observation_verified':'MAIN_RELAYED_SNAPSHOT_BYTES_MATCH',
                         'verification_scope':'MAIN_RELAY_NOT_API_ISSUER_OR_IDENTITY',
