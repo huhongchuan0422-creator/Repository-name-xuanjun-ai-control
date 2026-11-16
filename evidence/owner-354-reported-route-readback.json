@@ -1,0 +1,15 @@
+{
+  "view_http": 200,
+  "export_http": 200,
+  "registration_source": "OWNER_REPORTED_NOT_VERIFIED",
+  "event_count": 4,
+  "validity": "HISTORICAL",
+  "source_trust": "UNAVAILABLE",
+  "writer_verification": "UNKNOWN",
+  "received": "UNKNOWN",
+  "handoff_count": 0,
+  "backup_state": "UNAVAILABLE",
+  "backup_schedule_enabled": "UNKNOWN",
+  "ledger_unchanged_during_read": true,
+  "source_unchanged": true
+}

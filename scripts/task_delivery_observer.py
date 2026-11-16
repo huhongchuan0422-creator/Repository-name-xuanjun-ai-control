@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timezone
 from task_delivery_ledger.core import Store, ident, parse_time
 from task_delivery_observation import ApprovedObservationReader,ObservationUnavailable
+from task_delivery_backup_receipt import unavailable as backup_unavailable
 
 class Unavailable(Exception): pass
 
@@ -26,7 +27,7 @@ class MetadataReader(object):
             except ObservationUnavailable:raise Unavailable()
             return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
                     'ledger_state':'UNAVAILABLE','observations':observation,'namespace':self.namespace,
-                    'tasks':[],'conflicts':[],'pending_dependencies':[],'production_status':'NOT_IMPLEMENTED'}
+                    'tasks':[],'conflicts':[],'pending_dependencies':[],'backup':backup_unavailable(),'production_status':'NOT_IMPLEMENTED'}
         v=store.project(self.namespace);rows=[]
         for tid,t in v['tasks'].items():
             o=v['objects'].get('task:'+tid,{})
@@ -67,7 +68,7 @@ class MetadataReader(object):
         except ObservationUnavailable: observation={'state':'UNAVAILABLE','writer_verification':'UNKNOWN','records':[]}
         return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
                 'ledger_state':'AVAILABLE_METADATA_ONLY','observations':observation,'namespace':self.namespace,'tasks':rows,'conflicts':v['conflicts'],
-                'pending_dependencies':v['pending_dependencies'],'production_status':'NOT_IMPLEMENTED'}
+                'pending_dependencies':v['pending_dependencies'],'backup':backup_unavailable(),'production_status':'NOT_IMPLEMENTED'}
     def export_observations(self):
         if self.observation_reader is None:raise ObservationUnavailable('no collector')
         return self.observation_reader.read()

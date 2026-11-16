@@ -8,7 +8,7 @@ function observationView(ob){observations.textContent='';var h=document.createEl
  line(observations,'范围','仅台账自身，不代表独立354业务');line(observations,'来源核对','协调方提供的固定快照；非身份或权限认证');line(observations,'新鲜度 / 全域空闲',text(ob.freshness)+' / '+text(ob.global_idle));
  ob.records.forEach(function(r){var p=document.createElement('p');p.textContent=text(r.role_label)+' · '+(r.observation_kind==='TOOL_RESULT_OBSERVED'?'观察到工具执行回执':'观察到角色结果回执')+' · '+text(r.record_timestamp_ms)+' · '+text(r.message_ref)+' · '+text(r.freshness);observations.appendChild(p);});
  line(observations,'实际接件 / 开始 / 业务完成','UNKNOWN / UNKNOWN / UNKNOWN');var a=document.createElement('a');a.href='api/admin/delivery-handoff?scope=ledger-self-observation';a.textContent='导出观察资料（非交接确认）';observations.appendChild(a);}
-function render(data){area.textContent='';status.textContent='本地资料 · Writer 身份 UNKNOWN · 非业务验收';observationView(data.observations);
+function render(data){area.textContent='';status.textContent='本地资料 · Writer 身份 UNKNOWN · 非业务验收';observationView(data.observations);line(observations,'源码备份回执',data.backup&&data.backup.state||'UNAVAILABLE');line(observations,'五分钟检查','目标频率；是否启用 UNKNOWN');
  if(!data.tasks.length){area.textContent=data.ledger_state==='UNAVAILABLE'?'任务台账不可用；不代表没有任务。':'暂无登记资料；不代表没有任务。';return;}
  data.tasks.forEach(function(t){var card=document.createElement('article');card.className='card';var title=document.createElement('h2');title.textContent=text(t.task_id);card.appendChild(title);
  line(card,'目标',t.goal);line(card,'负责人',t.writer);line(card,'资料有效性',t.validity);line(card,'资料状态',t.state);
