@@ -12,6 +12,7 @@ const ledger={mode:'TEST_ONLY',ledger_state:'AVAILABLE_METADATA_ONLY',source_tru
  assert.match(html,/研发任务中心事实/);assert.match(html,/三方交接未从此来源确认/);assert.match(html,/接件记录时间 尚未确认/);
  assert.match(ui.render(data,route,null,null),/台账暂不可用或无权查看/);
  assert.match(ui.render(data,route,null,{...ledger,ledger_state:'UNAVAILABLE'}),/台账不可用；不代表没有任务/);
+ const handoffSource=require('../evidence/development-handoff/main-relayed-20261117.json');const handoffHtml=ui.render(data,route,null,{...ledger,observations:{development_handoff:handoffSource}});assert.match(handoffHtml,/来源消息时间 1794846300397/);assert.match(handoffHtml,/交接实际发生时间未核实/);assert.doesNotMatch(handoffHtml,/记录时间 1794846300397/);
  const done={...ledger,tasks:[{...ledger.tasks[0],handoffs:[{...ledger.tasks[0].handoffs[0],status:'交接完成(范围)'}]}]};assert.match(ui.render(data,route,null,done),/资料显示交接完成，真实性尚待核实/);
  const twin={observed_at:null,records:{ai_instances:[{role_id:'role',role_instance_id:'UNKNOWN',task_ids:['dev-1'],run_id:'UNKNOWN',session_id:'UNKNOWN'}],tasks:[{task_id:'dev-1',attempt_id:'attempt-1',state:'READY',artifact_sha256:'UNKNOWN'}],evidence:[]}};const twinText=ui.render(data,route,twin,ledger).replace(/<[^>]*>/g,'');assert.doesNotMatch(twinText,/TEST_ONLY|UNKNOWN|UNAVAILABLE|Writer|READY|RUNNING/);assert.match(twinText,/资料是否为最新尚未确认/);
  assert.doesNotMatch(ui.render(data,ui.parseRoute('#overview'),null,ledger),/任务与三方交接资料/);
