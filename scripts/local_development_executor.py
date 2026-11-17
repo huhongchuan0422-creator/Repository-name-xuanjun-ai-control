@@ -241,9 +241,16 @@ class LocalDevelopmentExecutor:
             raise ValueError('EXECUTION_WRITER_BINDING_MISMATCH')
         if contract.get('producer_http_test_sha256') != REFERENCE_SHA256:
             raise ValueError('PINNED_PRODUCER_TEST_REQUIRED')
-        if self.execution_provider is None:
-            return {'execution_state':'NOT_CONNECTED','execution_evidence_verified':False,
-                    'next_action':'WAIT_CONTROLLED_EXECUTION_PROVIDER'}
+        provider=self.execution_provider
+        if provider is None:
+            # Preserve the installed runner while recording intent before any
+            # side effect; without a query capability retries must reconcile.
+            from producer_http_runner import run_producer_http
+            def provider(intent, source):
+                observation=run_producer_http(source)
+                if observation['result']!={'state':'PASS','detail':'HTTP_PUBLIC_CONTRACT'}:
+                    raise ValueError('PRODUCER_HTTP_TEST_NOT_PASSED')
+                return dict(observation, intent_sha256=hashlib.sha256(canonical(intent).encode()).hexdigest())
         candidate=self.supervisor.development_candidate(task_id,candidate_event_id)
         if self._git('rev-parse','refs/heads/'+self.profile['branch'])!=binding['code_commit']:
             raise ValueError('CANDIDATE_SOURCE_READBACK_CHANGED')
@@ -274,14 +281,14 @@ class LocalDevelopmentExecutor:
         # Only the host-injected provider may query the original invocation.
         # MCP callers cannot supply a receipt, or assert that execution never began.
         if old is not None:
-            query=getattr(self.execution_provider,'query',None)
+            query=getattr(provider,'query',None)
             if not callable(query):raise ValueError('EXECUTION_INTENT_ALREADY_EXISTS_RECONCILE')
             observation=query(intent)
             if observation is None:
                 return {'execution_state':'UNKNOWN','execution_evidence_verified':False,
                         'next_action':'RECONCILE_ORIGINAL_EXECUTION'}
         else:
-            observation=self.execution_provider(intent,raw)
+            observation=provider(intent,raw)
         if (not isinstance(observation,dict) or set(observation)!={'intent_sha256','result','test_reference_sha256','source_sha256','artifact_sha256'}
             or observation['intent_sha256']!=intent_digest
             or observation['result']!={'state':'PASS','detail':'HTTP_PUBLIC_CONTRACT'}

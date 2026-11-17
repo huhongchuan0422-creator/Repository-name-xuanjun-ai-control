@@ -51,6 +51,15 @@ class RecoveryDelta(unittest.TestCase):
         self.assertFalse(result['execution_evidence_verified'])
         self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,1))
         self.assertEqual((self.count('DEVELOPMENT_EXECUTION_INTENT'),self.count('DEVELOPMENT_EXECUTION')),(1,0))
+    def test_missing_provider_never_replays_existing_intent(self):
+        self.timeout()
+        candidate=self.f.s.db.execute("SELECT event_id FROM events WHERE kind='DEVELOPMENT_CANDIDATE'").fetchone()[0]
+        self.f.adapter.execution_provider=None
+        with patch('producer_http_runner.run_producer_http') as old_runner:
+            with self.assertRaisesRegex(ValueError,'EXECUTION_INTENT_ALREADY_EXISTS_RECONCILE'):
+                self.f.adapter._run_producer_http_acceptance('demo-b','attempt-b',candidate,self.f.ticket,self.f.caller)
+            old_runner.assert_not_called()
+        self.assertEqual((self.provider.execute_calls,self.count('DEVELOPMENT_EXECUTION')),(1,0))
     def test_bad_query_receipt_rejected(self):
         self.timeout()
         for field in ('wrong_intent','wrong_source','wrong_test'):

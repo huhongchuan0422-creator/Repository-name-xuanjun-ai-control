@@ -1,0 +1,1230 @@
+--- a/scripts/task_center_app.py
++++ b/scripts/task_center_app.py
+@@ -86,6 +86,12 @@
+     '/oauth-callback.html': ('oauth-callback.html', 'text/html; charset=utf-8'),
+     '/task-center.html': ('task-center.html', 'text/html; charset=utf-8'),
+     '/task-center.js': ('task-center.js', 'application/javascript; charset=utf-8'),
++    '/research-workbench/': ('research-workbench/index.html', 'text/html; charset=utf-8'),
++    '/research-workbench/index.html': ('research-workbench/index.html', 'text/html; charset=utf-8'),
++    '/research-workbench/styles.css': ('research-workbench/styles.css', 'text/css; charset=utf-8'),
++    '/research-workbench/workbench.js': ('research-workbench/workbench.js', 'application/javascript; charset=utf-8'),
++    '/research-workbench/public-projection.js': ('research-workbench/public-projection.js', 'application/javascript; charset=utf-8'),
++    '/research-workbench/preview.js': ('research-workbench/preview.js', 'application/javascript; charset=utf-8'),
+ }
+ WORKBENCH_ASSETS = {
+     '/workbench/': ('index.html', 'text/html; charset=utf-8'),
+@@ -191,9 +197,14 @@
+         raise
+ 
+ 
+-def read_only_projection(db_path, authority_key, tenant_id, principal_id):
++def read_only_projection(db_path, authority_key, tenant_id, principal_id,
++                         consistent_snapshot=False):
+     connection = _read_only_connection(db_path, PROJECTION_TABLES)
+     try:
++        if consistent_snapshot:
++            # Pin all projection SELECTs to one read-only SQLite snapshot.
++            # The first data SELECT establishes the snapshot; close releases it.
++            connection.execute('BEGIN')
+         authority = TestTenantAuthority(authority_key)
+         gateway = GatewayKernel.__new__(GatewayKernel)
+         gateway.db = connection
+@@ -214,7 +225,7 @@
+ def read_only_public_projection(db_path, authority_key, tenant_id,
+                                 principal_id):
+     projection = read_only_projection(db_path, authority_key, tenant_id,
+-                                      principal_id)
++                                      principal_id, consistent_snapshot=True)
+     public = {
+         'mode': projection['mode'],
+         'production_status': projection['production_status'],
+@@ -429,7 +440,14 @@
+                   session_store=None, outbound_enabled=False,
+                   provider_connection_test_enabled=False,
+                   external_origin=None, base_path='/',mcp_auth_store=None,
+-                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None):
++                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None):
++    from task_delivery_observer import MetadataReader
++    if delivery_ledger_reader is not None and type(delivery_ledger_reader) is not MetadataReader:
++        raise ValueError('EXACT_TEST_METADATA_READER_REQUIRED')
++    if delivery_ledger_reader is not None and delivery_ledger_reader.tenant_id!=tenant_id:
++        raise ValueError('TEST_METADATA_TENANT_MISMATCH')
++    if delivery_ledger_reader is not None and session_store is not None and session_store.tenant_id!=tenant_id:
++        raise ValueError('TEST_METADATA_SESSION_TENANT_MISMATCH')
+     mcp_dispatch_config=validate_dispatch_config(mcp_dispatch_config)
+     actor_tokens = dict(actor_tokens or {})
+     codex_transports = dict(codex_transports or {})
+@@ -736,6 +754,31 @@
+                         'detail': str(exc), 'production_status':
+                         'NOT_IMPLEMENTED'}),
+                         'application/json; charset=utf-8')
++                return
++            if path in ('/api/admin/delivery-ledger','/api/admin/delivery-handoff','/api/admin/delivery-observer'):
++                if not self._delivery_admin_allowed():
++                    self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),'application/json; charset=utf-8');return
++                from task_delivery_observer import observer_status
++                if path == '/api/admin/delivery-observer':
++                    self._send(200,_json_bytes(observer_status()),'application/json; charset=utf-8');return
++                if delivery_ledger_reader is None:
++                    self._send(503,_json_bytes({'state':'UNAVAILABLE','writer_verification':'UNKNOWN'}),'application/json; charset=utf-8');return
++                try:
++                    headers=None
++                    if path == '/api/admin/delivery-handoff':
++                        query=__import__('urllib.parse').parse.parse_qs(urlsplit(self.path).query,keep_blank_values=True)
++                        filename='xuanjun-task-handoff.json'
++                        if set(query)=={'scope'} and query['scope']==['ledger-self-observation']:
++                            result=delivery_ledger_reader.export_observations()
++                            filename='xuanjun-observation-evidence.json'
++                        elif set(query)=={'task_id'} and len(query['task_id'])==1:
++                            result=delivery_ledger_reader.export(query['task_id'][0])
++                        else:raise ValueError('EXACT_EXPORT_SCOPE_REQUIRED')
++                        headers=[('Content-Disposition','attachment; filename="'+filename+'"')]
++                    else:result=delivery_ledger_reader.view()
++                    self._send(200,_json_bytes(result),'application/json; charset=utf-8',headers)
++                except Exception:
++                    self._send(503,_json_bytes({'state':'UNAVAILABLE','writer_verification':'UNKNOWN'}),'application/json; charset=utf-8')
+                 return
+             if path == '/api/admin/model-control':
+                 if not self._admin_allowed():
+@@ -1003,6 +1046,10 @@
+                         value['provider_id'],value['quota_state'],
+                         value['quota_source'],value.get('verified_at'),
+                         value.get('unavailable_reason'))
++                    elif action=='REGISTER_DEVELOPMENT_CONTRACT':
++                        if set(value)!={'task_id'}:raise ValueError('EXACT_DEVELOPMENT_REGISTRATION_ARGUMENTS_REQUIRED')
++                        if mcp_development_host is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
++                        result=mcp_development_host.register_contract(control,value['task_id'])
+                     elif action=='REGISTER_GRAPH':
+                         result=control.gateway.register_graph(control.context,value['graph'])
+                     elif action=='CREATE_PROJECT_TASK':
+@@ -1267,6 +1314,15 @@
+                 self._send(400,_json_bytes({'error':type(exc).__name__,
+                   'detail':str(exc)}),'application/json; charset=utf-8')
+ 
++        def _delivery_admin_allowed(self):
++            # Scope this tenant binding to the new surfaces; preserve legacy behavior.
++            if session_store is not None:
++                if session_store.tenant_id != tenant_id:return False
++                session=self._session()
++                return bool(session is not None and session.get('tenant_id')==tenant_id and
++                            'TASK_CENTER_ADMIN' in session.get('roles',[]))
++            return self._admin_allowed()
++
+         def _admin_allowed(self):
+             session=self._session()
+             if session is not None:
+@@ -1441,7 +1497,7 @@
+                 outbound_enabled=True,provider_connection_test_enabled=False,
+                 external_origin=None,base_path='/',mcp_enabled=False,
+                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
+-                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None):
++                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None):
+     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
+         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
+     if mcp_development_host is not None:
+@@ -1502,7 +1558,7 @@
+                                 identity_provider,session_store,outbound_enabled,
+                                 provider_connection_test_enabled,
+                                 external_origin,base_path,mcp_auth_store,
+-                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host)
++                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader)
+         server=TaskCenterHTTPServer((host, port), handler)
+         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
+         server.correction_observer=None
+@@ -1529,7 +1585,7 @@
+         raise
+ 
+ 
+-def main(argv=None):
++def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
+     parser = argparse.ArgumentParser()
+     parser.add_argument('--db', required=True)
+     authority = parser.add_mutually_exclusive_group(required=True)
+@@ -1554,7 +1610,43 @@
+     parser.add_argument('--mcp-dispatch-config-file')
+     parser.add_argument('--mcp-development-config-file')
+     parser.add_argument('--correction-observer-interval',type=int,choices=(180,300))
++    parser.add_argument('--delivery-ledger-root')
++    parser.add_argument('--delivery-ledger-namespace')
++    parser.add_argument('--delivery-ledger-writer')
++    parser.add_argument('--delivery-observation-file')
++    parser.add_argument('--delivery-observation-collector')
++    parser.add_argument('--delivery-backup-observation-file')
++    parser.add_argument('--delivery-backup-receipt-file')
+     args = parser.parse_args(argv)
++    ledger_config=(args.delivery_ledger_root,args.delivery_ledger_namespace,args.delivery_ledger_writer)
++    observation_config=(args.delivery_observation_file,args.delivery_observation_collector)
++    if any(value is not None for value in observation_config):
++        if not all(observation_config) or not all(ledger_config):
++            parser.error('delivery observation file and collector require complete delivery ledger configuration')
++    for value in (args.delivery_backup_observation_file,args.delivery_backup_receipt_file):
++        if value is not None and (not value or not all(ledger_config)):
++            parser.error('delivery backup observation requires complete delivery ledger configuration')
++    if any(value is not None for value in ledger_config):
++        if not all(ledger_config):
++            parser.error('delivery ledger root, namespace and writer must be supplied together')
++        if delivery_ledger_reader is not None:
++            parser.error('delivery ledger reader and CLI configuration cannot be combined')
++        from task_delivery_observer import MetadataReader
++        observation_reader=None
++        if all(observation_config):
++            if args.delivery_observation_collector=='main-backup-observation-20261117':
++                parser.error('backup observation must use the backup observation option')
++            from task_delivery_observation import ApprovedObservationReader
++            observation_reader=ApprovedObservationReader(*observation_config)
++        backup_reader=None
++        if args.delivery_backup_observation_file:
++            from task_delivery_observation import ApprovedObservationReader
++            backup_reader=ApprovedObservationReader(args.delivery_backup_observation_file,'main-backup-observation-20261117')
++        local_backup_reader=None
++        if args.delivery_backup_receipt_file:
++            from task_delivery_backup_receipt import LocalBackupReceiptReader
++            local_backup_reader=LocalBackupReceiptReader(args.delivery_backup_receipt_file)
++        delivery_ledger_reader=MetadataReader(*ledger_config,tenant_id=args.tenant,observation_reader=observation_reader,backup_observation_reader=backup_reader,local_backup_reader=local_backup_reader)
+     raw_key = (args.test_authority_key if args.test_authority_key is not None
+                else _read_owned_secret_file(args.test_authority_key_file,
+                                              'TEST_AUTHORITY_KEY').rstrip('\r\n'))
+@@ -1607,9 +1699,10 @@
+                          args.allow_mcp_model_outbound,
+                          mcp_dispatch_config=(load_dispatch_config(args.mcp_dispatch_config_file)
+                            if args.mcp_dispatch_config_file else None),
+-                         mcp_development_host=(load_development_host(args.mcp_development_config_file)
++                         mcp_development_host=(load_development_host(args.mcp_development_config_file, execution_provider=execution_provider)
+                            if args.mcp_development_config_file else None),
+-                         correction_observer_interval=args.correction_observer_interval)
++                         correction_observer_interval=args.correction_observer_interval,
++                         delivery_ledger_reader=delivery_ledger_reader)
+     advertised_origin=(args.external_origin or
+                        'http://%s:%d'%server.server_address)
+     advertised_base=_normalize_base_path(args.base_path)
+--- a/scripts/local_development_executor.py
++++ b/scripts/local_development_executor.py
+@@ -46,7 +46,7 @@
+ 
+ 
+ class LocalDevelopmentExecutor:
+-    def __init__(self, control, fence, profile, admission_check=None):
++    def __init__(self, control, fence, profile, admission_check=None, execution_provider=None):
+         required={'project_id','role_id','role_version','principal_id','repository',
+                   'branch','repository_root','resource_key','allowed_file','max_source_bytes'}
+         if not isinstance(profile,dict) or set(profile) not in (required, required | {'producer_snapshot_sha256'}):
+@@ -61,6 +61,7 @@
+                 or not 1<=profile['max_source_bytes']<=131072):
+             raise ValueError('BOUNDED_SINGLE_MODULE_PROFILE_REQUIRED')
+         self.admission_check=admission_check
++        self.execution_provider=execution_provider
+         self.control=control;self.gateway=control.gateway
+         self.supervisor=self.gateway.supervisor;self.fence=fence;self.profile=dict(profile)
+         if fence.supervisor is not self.supervisor:
+@@ -233,26 +234,68 @@
+         return output
+ 
+     def _run_producer_http_acceptance(self,task_id,attempt_id,candidate_event_id,ticket,caller):
+-        from producer_http_runner import run_producer_http
+         from producer_http_contract import REFERENCE_SHA256,ALLOWED_FILE
+         binding=self.prepare_execution_binding(task_id,attempt_id,candidate_event_id)
+         contract=self.supervisor.development_contract(task_id)
++        if any(ticket.get(k)!=binding[k] for k in ('task_id','attempt_id','lease_id','fence','epoch')):
++            raise ValueError('EXECUTION_WRITER_BINDING_MISMATCH')
+         if contract.get('producer_http_test_sha256') != REFERENCE_SHA256:
+             raise ValueError('PINNED_PRODUCER_TEST_REQUIRED')
+-        self.control.db.execute('BEGIN IMMEDIATE')
+-        with self.control.db:
+-            self.supervisor._validate_writer_locked(ticket,caller,self.fence.locks.provider_id)
+-            if self.admission_check is not None:self.admission_check()
++        provider=self.execution_provider
++        if provider is None:
++            # Preserve the installed runner while recording intent before any
++            # side effect; without a query capability retries must reconcile.
++            from producer_http_runner import run_producer_http
++            def provider(intent, source):
++                observation=run_producer_http(source)
++                if observation['result']!={'state':'PASS','detail':'HTTP_PUBLIC_CONTRACT'}:
++                    raise ValueError('PRODUCER_HTTP_TEST_NOT_PASSED')
++                return dict(observation, intent_sha256=hashlib.sha256(canonical(intent).encode()).hexdigest())
++        candidate=self.supervisor.development_candidate(task_id,candidate_event_id)
+         if self._git('rev-parse','refs/heads/'+self.profile['branch'])!=binding['code_commit']:
+             raise ValueError('CANDIDATE_SOURCE_READBACK_CHANGED')
+         raw=self._git('show',binding['code_commit']+':'+ALLOWED_FILE,raw_output=True)
+-        candidate=self.supervisor.development_candidate(task_id,candidate_event_id)
+-        if hashlib.sha256(raw).hexdigest()!=candidate['files'][ALLOWED_FILE]:
++        source_sha256=hashlib.sha256(raw).hexdigest()
++        if source_sha256!=candidate['files'][ALLOWED_FILE]:
+             raise ValueError('CANDIDATE_SOURCE_DIGEST_MISMATCH')
+-        observation=run_producer_http(raw)
+-        if observation['result']!={'state':'PASS','detail':'HTTP_PUBLIC_CONTRACT'}:
+-            raise ValueError('PRODUCER_HTTP_TEST_NOT_PASSED')
+-        if observation['test_reference_sha256']!=REFERENCE_SHA256 or observation['source_sha256']!=candidate['files'][ALLOWED_FILE]:
++        intent=dict(binding,source_sha256=source_sha256,test_reference_sha256=REFERENCE_SHA256,
++                    source_operation_id=candidate['source_operation_id'])
++        intent_id='producer-http-intent:'+candidate['source_operation_id']
++        intent_body=canonical(intent)
++        intent_digest=hashlib.sha256(intent_body.encode()).hexdigest()
++        self.control.db.execute('BEGIN IMMEDIATE')
++        with self.control.db:
++            task,now=self.supervisor._validate_writer_locked(ticket,caller,self.fence.locks.provider_id)
++            if self.admission_check is not None:self.admission_check()
++            if self.prepare_execution_binding(task_id,attempt_id,candidate_event_id)!=binding:
++                raise ValueError('CANDIDATE_CHANGED_BEFORE_TEST')
++            old=self.control.db.execute('SELECT kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
++                (task_id,attempt_id,intent_id)).fetchone()
++            if old is not None:
++                if (old['kind']!='DEVELOPMENT_EXECUTION_INTENT' or old['evidence_ref']!=intent_digest
++                    or old['payload_json']!=intent_body):
++                    raise ValueError('EXECUTION_INTENT_BINDING_CONFLICT')
++            else:
++                self.control.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
++                    (task_id,attempt_id,intent_id,'DEVELOPMENT_EXECUTION_INTENT',now,'TEST_INTENT',intent_digest,intent_body))
++        # Only the host-injected provider may query the original invocation.
++        # MCP callers cannot supply a receipt, or assert that execution never began.
++        if old is not None:
++            query=getattr(provider,'query',None)
++            if not callable(query):raise ValueError('EXECUTION_INTENT_ALREADY_EXISTS_RECONCILE')
++            observation=query(intent)
++            if observation is None:
++                return {'execution_state':'UNKNOWN','execution_evidence_verified':False,
++                        'next_action':'RECONCILE_ORIGINAL_EXECUTION'}
++        else:
++            observation=provider(intent,raw)
++        if (not isinstance(observation,dict) or set(observation)!={'intent_sha256','result','test_reference_sha256','source_sha256','artifact_sha256'}
++            or observation['intent_sha256']!=intent_digest
++            or observation['result']!={'state':'PASS','detail':'HTTP_PUBLIC_CONTRACT'}
++            or observation['test_reference_sha256']!=REFERENCE_SHA256
++            or observation['source_sha256']!=source_sha256
++            or not isinstance(observation['artifact_sha256'],str)
++            or re.fullmatch('[0-9a-f]{64}',observation['artifact_sha256']) is None):
+             raise ValueError('PRODUCER_HTTP_TEST_BINDING_MISMATCH')
+         self.control.db.execute('BEGIN IMMEDIATE')
+         with self.control.db:
+--- a/scripts/task_center_mcp_development.py
++++ b/scripts/task_center_mcp_development.py
+@@ -37,7 +37,7 @@
+     {ticket,caller,lock_root}; review_keys_provider(task,key_ids) supplies existing keys.
+     None is permitted and fails closed only the dependent operation.
+     """
+-    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None):
++    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None,contract_provider=None,execution_provider=None):
+         if not isinstance(bindings,list) or len(bindings)>128:raise ValueError('BOUNDED_DEVELOPMENT_BINDINGS_REQUIRED')
+         required={'tenant_id','principal_id','project_id','task_id','spec_sha256','checkpoint_sha256','contract_sha256',
+                   'role_id','role_version','phase','review_kind','authority_identity','actions','candidate_root','executor_profile'}
+@@ -65,9 +65,39 @@
+             key=tuple(b[k] for k in ('tenant_id','principal_id','project_id','task_id'))
+             if key in seen:raise ValueError('DUPLICATE_DEVELOPMENT_HOST_BINDING')
+             seen.add(key)
+-        for fn in (review_keys_provider,writer_context_provider):
++        for fn in (review_keys_provider,writer_context_provider,contract_provider,execution_provider):
+             if fn is not None and not callable(fn):raise ValueError('TRUSTED_HOST_PROVIDER_REQUIRED')
+-        self.bindings=copy.deepcopy(bindings);self.review_keys_provider=review_keys_provider;self.writer_context_provider=writer_context_provider
++        self.bindings=copy.deepcopy(bindings);self.review_keys_provider=review_keys_provider;self.writer_context_provider=writer_context_provider;self.contract_provider=contract_provider;self.execution_provider=execution_provider
++    def register_contract(self,control,task_id):
++        """Admit only an existing host-custodied contract pinned by bindings."""
++        if self.contract_provider is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
++        control._admin()
++        control.gateway.assert_task_context(control.context,task_id)
++        contract=self.contract_provider(task_id)
++        control.gateway.supervisor._development_contract_shape(contract)
++        rows=[b for b in self.bindings if b['tenant_id']==control.tenant_id and b['task_id']==task_id]
++        if not rows:raise ValueError('DEVELOPMENT_HOST_ACTION_REQUIRED')
++        sha=hashlib.sha256(canonical(contract).encode()).hexdigest()
++        if any(b['contract_sha256']!=sha or b['spec_sha256']!=contract['spec_sha256'] or b['checkpoint_sha256']!=contract['checkpoint_sha256'] for b in rows):
++            raise ValueError('CURRENT_PINNED_DEVELOPMENT_SCOPE_REQUIRED')
++        for b in rows:control._assert_expected_project(task_id,b['project_id'])
++        executors=[b for b in rows if b['phase']=='EXECUTOR']
++        reviewers=[b for b in rows if b['phase']=='REVIEWER']
++        from entry_review_gate import identity
++        developer=identity(contract['developer'])
++        policies=contract['trusted_reviewers']
++        identities=[identity(p,True) for p in policies]
++        if (len(executors)!=1 or executors[0]['authority_identity']!=contract['developer'] or
++            len(reviewers)!=2 or set(p['role'] for p in policies)!={'QA','SECURITY'} or
++            len(set(identities))!=2 or developer in identities or
++            len(set(p['key_id'] for p in policies))!=2 or
++            any(not any(b['review_kind']==p['role'] and b['authority_identity']=={'issuer':p['issuer'],'subject':p['subject']} for b in reviewers) for p in policies)):
++            raise ValueError('CANONICAL_DEVELOPMENT_IDENTITY_REQUIRED')
++        profile=executors[0]['executor_profile']
++        if profile is None or profile['repository']!=contract['target_repository'] or contract['allowed_files']!=[profile['allowed_file']]:
++            raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
++        return control.gateway.supervisor.register_development_contract(task_id,contract)
++
+     def visible(self,identity):
+         allowed=set()
+         for b in self.bindings:
+@@ -116,7 +146,7 @@
+                 if (not isinstance(context,dict) or set(context)!={'ticket','caller','lock_root'}
+                     or not isinstance(context['lock_root'],str) or not context['lock_root'].startswith('/')):raise ValueError('EXISTING_WRITER_CONTEXT_REQUIRED')
+                 fence=Fence(s,context['lock_root'])
+-                try:result=LocalDevelopmentExecutor(c,fence,profile,admission_check=lambda:check(True)).apply_proposal(
++                try:result=LocalDevelopmentExecutor(c,fence,profile,admission_check=lambda:check(True),execution_provider=self.execution_provider).apply_proposal(
+                     a['task_id'],a['attempt_id'],a['request_id'],context['ticket'],context['caller'])
+                 finally:fence.close()
+             elif name=='task_development_review':
+@@ -150,22 +180,23 @@
+     except (OSError,ValueError,TypeError):raise ValueError(code+'_UNAVAILABLE_OR_INVALID') from None
+ 
+ 
+-def load_host(path):
++def load_host(path, *, execution_provider=None):
+     """Read-only original-host custody references; never generates/saves keys.
+ 
+     Files are owned0600 regular single-link and bounded by secure_file_input.
+     The host must supply already-authorized custody material; this loader is
+     not a producer of authority and does not copy canonical Writer fields.
++    execution_provider is an already-constructed trusted host instance, not config.
+     """
+     cfg=_read_host_json(path,'DEVELOPMENT_HOST_CONFIG')
+-    if (not isinstance(cfg,dict) or set(cfg)!={'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}
++    if (not isinstance(cfg,dict) or set(cfg) not in ({'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}, {'schema_version','enabled','bindings','review_keyring_file','writer_context_file','contract_file'})
+             or type(cfg['schema_version']) is not int or cfg['schema_version']!=1 or type(cfg['enabled']) is not bool):
+         raise ValueError('EXACT_DEVELOPMENT_HOST_CONFIG_REQUIRED')
+-    for k in ('review_keyring_file','writer_context_file'):
+-        if cfg[k] is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
++    for k in ('review_keyring_file','writer_context_file','contract_file'):
++        if cfg.get(k) is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
+             raise ValueError('EXISTING_PROTECTED_HOST_REFERENCE_REQUIRED')
+     if not cfg['enabled']:
+-        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None:
++        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('contract_file') is not None:
+             raise ValueError('DISABLED_DEVELOPMENT_CONFIG_MUST_BE_EMPTY')
+         return None
+     def keys(task,ids):
+@@ -179,5 +210,11 @@
+         if not isinstance(value,dict) or set(value)!={'attempt_id','ticket','caller','lock_root'} or value['attempt_id']!=attempt:
+             raise ValueError('EXISTING_EXACT_WRITER_CONTEXT_REQUIRED')
+         return {k:value[k] for k in ('ticket','caller','lock_root')}
++    def contract(task):
++        raw=_read_host_json(cfg['contract_file'],'TRUSTED_DEVELOPMENT_CONTRACT')
++        if not isinstance(raw,dict) or task not in raw:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
++        return raw[task]
+     return DevelopmentHost(cfg['bindings'],keys if cfg['review_keyring_file'] else None,
+-                            writer if cfg['writer_context_file'] else None)
++                            writer if cfg['writer_context_file'] else None,
++                            contract if cfg.get('contract_file') else None,
++                            execution_provider=execution_provider)
+--- a/demos/task-center-digital-twin/task-center.html
++++ b/demos/task-center-digital-twin/task-center.html
+@@ -1 +1 @@
+-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>任务调度中心（TEST_ONLY）</title><link rel="stylesheet" href="styles.css"></head><body><header><div><strong>任务调度中心（TEST_ONLY）</strong><span id="dataMode">数据加载中</span></div><nav><button id="reload">刷新</button> <button id="logout">退出登录</button></nav></header><main id="app" aria-live="polite"><p class="empty">加载中…</p></main><div class="empty">本页面为公开只读调度展示（TEST_ONLY）：仅含板块与调度状态，不含任务正文、用户/租户信息；真实调度、取消、分配、提交等写操作仍需受保护接口的身份与权限。</div><script src="task-center.js"></script></body></html>
++<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>任务调度中心（TEST_ONLY）</title><link rel="stylesheet" href="styles.css"></head><body><header><div><strong>任务调度中心（TEST_ONLY）</strong><span id="dataMode">数据加载中</span></div><nav><a id="researchEntry" href="research-workbench/" hidden>研发工作台（只读）</a> <button id="reload">刷新</button> <button id="logout">退出登录</button></nav></header><main id="app" aria-live="polite"><p class="empty">加载中…</p></main><div class="empty">本页面为公开只读调度展示（TEST_ONLY）：仅含板块与调度状态，不含任务正文、用户/租户信息；真实调度、取消、分配、提交等写操作仍需受保护接口的身份与权限。</div><script src="task-center.js"></script></body></html>
+--- a/demos/task-center-digital-twin/task-center.js
++++ b/demos/task-center-digital-twin/task-center.js
+@@ -6,6 +6,8 @@
+ function paint(p){el('dataMode').textContent=esc(p.mode)+' · '+esc(p.production_status)+' · 观察 '+esc(p.observed_at);
+ var boards=(p.boards||[]).map(function(b){return '<div class="card board-card"><h3>'+esc(b.board_id)+'</h3><div class="metric">'+esc(b.task_count)+'</div><div class="meta">活跃 '+esc(b.active_count)+' · 阻塞 '+esc(b.blocked_count)+'</div><span class="status '+esc(b.health)+'">'+esc(b.health)+'</span></div>';}).join('');
+ el('app').innerHTML='<section class="grid">'+(boards||'<p class="empty">暂无板块数据。</p>')+'</section>';}
++// The full workbench uses the existing admin-only twin projection.
++fetch('api/session',{cache:'no-store',credentials:'same-origin'}).then(function(r){if(!r.ok)throw Error('session unavailable');return r.json();}).then(function(s){if(Array.isArray(s.roles)&&s.roles.indexOf('TASK_CENTER_ADMIN')!==-1)el('researchEntry').hidden=false;}).catch(function(){});
+ el('reload').onclick=load;
+ el('logout').onclick=function(){fetch('api/session/logout',{method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':cookie('xuanjun_task_center_csrf')}}).then(function(r){return r.json().catch(function(){return {};}).then(function(x){if(r.ok||r.status===401){location.replace('login.html');return;}throw Error(x.error||('HTTP '+r.status));});}).catch(function(e){el('dataMode').textContent='退出未成功：'+e.message;});};
+ load();})();
+--- /dev/null
++++ b/scripts/task_delivery_observer.py
+@@ -0,0 +1,99 @@
++"""TEST_ONLY adapter over pre-existing offline metadata; no source authority."""
++import os
++from datetime import datetime, timezone
++from task_delivery_ledger.core import Store, ident, parse_time
++from task_delivery_observation import ApprovedObservationReader,ObservationUnavailable
++from task_delivery_backup_receipt import unavailable as backup_unavailable,LocalBackupReceiptReader
++
++class Unavailable(Exception): pass
++
++class MetadataReader(object):
++    """Bound by the hosting test harness, never by an HTTP request."""
++    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None,handoff_verifier=None,backup_observation_reader=None,local_backup_reader=None):
++        if observation_reader is not None and type(observation_reader) is not ApprovedObservationReader: raise Unavailable()
++        if backup_observation_reader is not None and (type(backup_observation_reader) is not ApprovedObservationReader or backup_observation_reader.collector_ref!='main-backup-observation-20261117'): raise Unavailable()
++        if local_backup_reader is not None and type(local_backup_reader) is not LocalBackupReceiptReader: raise Unavailable()
++        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader;self.handoff_verifier=handoff_verifier;self.backup_observation_reader=backup_observation_reader;self.local_backup_reader=local_backup_reader
++    def _backup(self):
++        snapshot=backup_unavailable()
++        if self.backup_observation_reader is not None:
++            try:snapshot=self.backup_observation_reader.read()
++            except ObservationUnavailable:pass
++        if self.local_backup_reader is None:return snapshot
++        try:result=self.local_backup_reader.read()
++        except ObservationUnavailable:result=backup_unavailable();result['local_receipt_configured']=True
++        if snapshot.get('state')=='OBSERVED_METADATA_ONLY':result['static_snapshot']=snapshot
++        return result
++    def _store(self):
++        # Store.__init__ creates marker/directories; never call it from a GET.
++        marker=os.path.join(self.root,'writer.id')
++        if not os.path.isfile(marker) or not os.path.isdir(os.path.join(self.root,'events')): raise Unavailable()
++        with open(marker,'r',encoding='utf8') as f:
++            if f.read(130)!=self.writer+'\n': raise Unavailable()
++        store=Store.__new__(Store);store.root=__import__('pathlib').Path(self.root);store.writer=self.writer
++        return store
++    def view(self):
++        try:store=self._store()
++        except Unavailable:
++            backup=self._backup()
++            try:observation=self.export_observations()
++            except ObservationUnavailable:
++                if backup.get('state')!='OBSERVED_METADATA_ONLY' and 'static_snapshot' not in backup:raise Unavailable()
++                observation={'state':'UNAVAILABLE','writer_verification':'UNKNOWN','records':[]}
++            return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
++                    'ledger_state':'UNAVAILABLE','observations':observation,'namespace':self.namespace,
++                    'tasks':[],'conflicts':[],'pending_dependencies':[],'backup':backup,'production_status':'NOT_IMPLEMENTED'}
++        v=store.project(self.namespace,verifier=self.handoff_verifier);rows=[]
++        for tid,t in v['tasks'].items():
++            o=v['objects'].get('task:'+tid,{})
++            linked=[x for x in v['objects'].values() if x.get('task_id')==tid]
++            source=[x for x in linked if x.get('kind')=='source_artifact']
++            hosts=[x for x in linked if x.get('kind')=='host_service']
++            roles=[x for x in linked if x.get('kind')=='role']
++            perms=[x for x in linked if x.get('kind')=='permission_ref']
++            history=t['history']
++            matches=[r for r in roles if r['id']==o.get('writer_role_id') and r['id']!='UNKNOWN']
++            role_entry=matches[0].get('entry_ref','UNKNOWN') if len(matches)==1 else 'UNKNOWN'
++            def latest(phase):
++                hits=[e for e in history if e['type']==phase and e['event_id'] not in v['conflicts'] and e['event_id'] not in v['pending_dependencies']]
++                return {'observed_at':hits[-1]['observed_at'],'validity':hits[-1]['validity'],'evidence':hits[-1]['evidence']} if hits else 'UNKNOWN'
++            def permission(p):
++                expiry=p.get('expires_at','UNKNOWN');status=p.get('validity','UNKNOWN')
++                try:
++                    if expiry not in ('UNKNOWN','UNAVAILABLE') and parse_time(expiry)<=datetime.now(timezone.utc):status='EXPIRED'
++                except Exception:status='UNKNOWN'
++                return {'validity':status,'scope':p.get('scope','UNKNOWN'),'expires_at':expiry,'denial':p.get('denial','UNKNOWN')}
++            rows.append({'task_id':tid,'goal':o.get('goal','UNKNOWN'),'validity':o.get('validity','UNKNOWN'),
++                'writer':o.get('writer_role_id','UNKNOWN'),'state':t['state'],'blocker':o.get('blocker','UNKNOWN'),
++                'next_action':o.get('next_action','UNKNOWN'),'entry':role_entry,
++                'roles':[{'role_id':r['id'],'session':r.get('verified_session_ref','UNKNOWN'),'validity':r['validity']} for r in roles],
++                'receipt':{'sent':latest('send_accepted'),'received':latest('actual_received'),'started':latest('start'),
++                           'progress':latest('progress'),'result':latest('result'),'review':latest('review'),'accept':latest('accept')},
++                'sources':[{'repo':x.get('repo_ref','UNKNOWN'),'branch':x.get('branch','UNKNOWN'),'commit':x.get('commit','UNKNOWN'),
++                            'tree':x.get('tree','UNKNOWN'),'manifest':x.get('manifest_ref','UNKNOWN'),'artifact':x.get('artifact_sha256','UNKNOWN'),
++                            'build':x.get('build_ref','UNKNOWN'),'deploy':x.get('deploy_refs',[]),'validity':x['validity']} for x in source],
++                'services':[{'class':x.get('service_class','UNKNOWN'),'host':x.get('host_ref','UNKNOWN'),
++                             'build':x.get('build_ref','UNKNOWN'),'running':x.get('running_ref','UNKNOWN'),'validity':x['validity']} for x in hosts],
++                'permissions':[permission(p) for p in perms],
++                'handoffs':[{'id':h['handoff_id'],'version':h['version'],'status':h['handoff_status'],
++                             'scope':h['scope_included'],'excluded':h['scope_excluded'],'gaps':h['unknown_items'],
++                             'outgoing':h['outgoing'],'receiving':h['receiving'],'supervisor':h['supervisor'],
++                             'summary':h['summary']} for h in v['handoffs'].values() if h['task_id']==tid]})
++        try: observation=self.export_observations()
++        except ObservationUnavailable: observation={'state':'UNAVAILABLE','writer_verification':'UNKNOWN','records':[]}
++        return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
++                'ledger_state':'AVAILABLE_METADATA_ONLY','observations':observation,'namespace':self.namespace,'tasks':rows,'conflicts':v['conflicts'],
++                'pending_dependencies':v['pending_dependencies'],'backup':self._backup(),'production_status':'NOT_IMPLEMENTED'}
++    def export_observations(self):
++        if self.observation_reader is None:raise ObservationUnavailable('no collector')
++        return self.observation_reader.read()
++    def export(self,task_id):
++        return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',
++                'handoff':self._store().handoff(self.namespace,ident(task_id),verifier=self.handoff_verifier)}
++
++def observer_status():
++    # Existing P2/P3 normalize() is TEST_ONLY and lacks actual transport proof.
++    return {'state':'UNAVAILABLE','interface':'ExternalReceiptContract.normalize',
++      'missing':['verified_sender_instance','verified_recipient_instance','trusted_actual_received',
++                 'worker_start_receipt','independent_review_receipt','live_role_permission_scope_expiry'],
++      'note':'TEST_ONLY VALIDATED_NOT_CONSUMED is not trusted production receipt; no import performed'}
+--- /dev/null
++++ b/scripts/task_delivery_observation.py
+@@ -0,0 +1,109 @@
++"""Read one coordinator-approved bounded observation snapshot, never authority.
++
++The digest pins only the exact non-secret metadata bytes handed off by main; it
++is not a signature, an issuer, identity verification, or a production trust
++root. HTTP requests cannot supply a path or alter this allowlist.
++"""
++import hashlib,json,re,uuid
++
++APPROVED_SNAPSHOTS={'main-bounded-sessions-20261116':'cefceddce48f4f810a26dc2c708aacd62ac1b26f16b5258df9eac7bd65537537',
++                    'main-development-handoff-20261117':'cddee07f04affca65f5507b7f286cd0bb22f0a1a71cc8cc16ec166f11ee7cf40',
++                    'main-backup-observation-20261117':'f74730fecb36c2d7744973764d600937a1f57ad7ae51132aaa2b4fd573f18265'}
++SESSION=re.compile(r'^agent:[a-z0-9-]+:subagent:[a-f0-9-]{36}$')
++NAME=re.compile(r'^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$')
++class ObservationUnavailable(Exception):pass
++
++def fields(value,names):
++    if not isinstance(value,dict) or set(value)!=set(names):raise ObservationUnavailable('invalid metadata structure')
++
++def as_uuid(value):
++    try:
++        if not isinstance(value,str) or str(uuid.UUID(value))!=value:raise ValueError()
++    except (ValueError,AttributeError):raise ObservationUnavailable('invalid reference')
++    return value
++
++class ApprovedObservationReader(object):
++    def __init__(self,path,collector_ref):
++        if collector_ref not in APPROVED_SNAPSHOTS:raise ObservationUnavailable('unapproved collector')
++        self.path=path;self.collector_ref=collector_ref
++    def read(self):
++        try:
++            with open(self.path,'rb') as f:raw=f.read(65537)
++            if len(raw)>65536 or hashlib.sha256(raw).hexdigest()!=APPROVED_SNAPSHOTS[self.collector_ref]:raise ObservationUnavailable('unapproved snapshot')
++            document=json.loads(raw.decode('utf8'))
++            if self.collector_ref=='main-backup-observation-20261117':
++                job=document['job'];backup=document['backup'];runs=document['runs']
++                return {'state':'OBSERVED_METADATA_ONLY','source_observation_verified':'MAIN_RELAYED_SNAPSHOT_BYTES_MATCH',
++                        'provider_verification':'UNKNOWN','freshness':'snapshot-not-live',
++                        'backup_observation':{'observed_at':document['observedAtUtc'],
++                            'schedule_enabled':job['enabled'],'interval_ms':job['everyMs'],
++                            'latest_run_at_ms':runs[0]['runAtMs'],'latest_run_status':runs[0]['completionStatus'],
++                            'backup_at':backup['timeUtc'],'backup_status':backup['status'],
++                            'files':backup['files'],'excluded_count':backup['excludedCount'],
++                            'changed':backup['changed'],'remote_verified_reported':backup['remoteVerified']}}
++            if self.collector_ref=='main-development-handoff-20261117':
++                return {'state':'OBSERVED_METADATA_ONLY','source_observation_verified':'MAIN_RELAYED_SNAPSHOT_BYTES_MATCH',
++                        'verification_scope':'MAIN_RELAY_NOT_API_ISSUER_OR_IDENTITY',
++                        'permission_verification':'UNKNOWN','handoff_completed':'UNKNOWN',
++                        'development_handoff':document}
++            result=normalize(document,self.collector_ref)
++            result['state']='OBSERVED_METADATA_ONLY'
++            result['source_observation_verified']='MAIN_APPROVED_SNAPSHOT_BYTES_MATCH'
++            result['verification_scope']='COORDINATOR_HANDOFF_NOT_API_ISSUER_OR_IDENTITY'
++            return result
++        except (OSError,UnicodeError,ValueError,TypeError,KeyError):raise ObservationUnavailable('snapshot unavailable')
++
++def normalize(doc,collector_ref):
++    fields(doc,('schema_version','source','observation_time_basis','scope','purpose','limitations','observations'))
++    if doc['schema_version']!='1.0' or doc['source']!='main official agents_list and bounded sessions_history calls':raise ObservationUnavailable('source mismatch')
++    if not all(isinstance(doc[k],str) and 0<len(doc[k])<=256 for k in ('scope','purpose','observation_time_basis')):raise ObservationUnavailable('invalid metadata')
++    if not isinstance(doc['limitations'],list) or not all(isinstance(x,str) and len(x)<=256 for x in doc['limitations']):raise ObservationUnavailable('invalid limitations')
++    if not isinstance(doc['observations'],list) or len(doc['observations'])>20:raise ObservationUnavailable('invalid observations')
++    output=[];seen={};sessions={};session_roles={};runs={};run_sessions={};messages={}
++    for item in doc['observations']:
++        fields(item,('role_ref','source_api','query','pending_count','truncated','content_truncated','records'))
++        role=item['role_ref']
++        if role not in ('ledger-author','ledger-reviewer') or item['source_api']!='sessions_history':raise ObservationUnavailable('unsupported scope')
++        fields(item['query'],('session_ref','limit','includeTools'))
++        query=item['query'];session=query['session_ref']
++        if not isinstance(session,str) or not SESSION.fullmatch(session) or type(query['limit']) is not int or query['limit']!=2 or query['includeTools'] is not True:raise ObservationUnavailable('invalid query metadata')
++        if type(item['pending_count']) is not int or item['pending_count']<0 or type(item['truncated']) is not bool or type(item['content_truncated']) is not bool or not isinstance(item['records'],list) or len(item['records'])>2:raise ObservationUnavailable('invalid bounded history')
++        if session in session_roles and session_roles[session]!=role:raise ObservationUnavailable('role session mismatch')
++        session_roles[session]=role
++        if session not in sessions:sessions[session]='local-session-%d'%(len(sessions)+1)
++        for rec in item['records']:
++            fields(rec,('role','tool_name','is_error','observed_timestamp_ms','message_ref','run_ref','stop_reason','tool_calls'))
++            msg=as_uuid(rec['message_ref']);run=as_uuid(rec['run_ref']);ts=rec['observed_timestamp_ms']
++            if type(ts) is not int or ts<=0 or ts>9999999999999 or rec['tool_calls']!=[]:raise ObservationUnavailable('invalid record metadata')
++            if rec['role']=='toolResult':
++                if not isinstance(rec['tool_name'],str) or not NAME.fullmatch(rec['tool_name']) or type(rec['is_error']) is not bool or rec['stop_reason'] is not None:raise ObservationUnavailable('invalid tool receipt')
++                kind='TOOL_RESULT_OBSERVED'
++            elif rec['role']=='assistant':
++                if rec['tool_name'] is not None or rec['is_error'] is not None or rec['stop_reason']!='stop':raise ObservationUnavailable('invalid result receipt')
++                kind='ROLE_RESULT_OBSERVED'
++            else:raise ObservationUnavailable('unsupported record role')
++            if run in run_sessions and run_sessions[run]!=session:raise ObservationUnavailable('run session mismatch')
++            run_sessions[run]=session
++            fingerprint=session+'|'+role+'|'+json.dumps(rec,sort_keys=True,separators=(',',':'))
++            if msg in seen:
++                if seen[msg]!=fingerprint:raise ObservationUnavailable('conflicting receipt')
++                continue
++            seen[msg]=fingerprint
++            if run not in runs:runs[run]='local-run-%d'%(len(runs)+1)
++            if msg not in messages:messages[msg]='local-message-%d'%(len(messages)+1)
++            output.append({'role_label':role,'role_identity_verification':'UNKNOWN','source_api':'sessions_history',
++                'source_ref':collector_ref,'session_ref':sessions[session],'run_ref':runs[run],
++                'message_ref':messages[msg],'record_timestamp_ms':ts,'occurred_at':'UNKNOWN',
++                'timestamp_semantics':'API_RECORD_TIME_NOT_EXECUTION_TIME','observation_kind':kind,
++                'tool_name':rec['tool_name'] if kind=='TOOL_RESULT_OBSERVED' else 'UNKNOWN',
++                'tool_reported_error':rec['is_error'] if kind=='TOOL_RESULT_OBSERVED' else 'UNKNOWN',
++                'history_truncated':item['truncated'],'content_truncated':item['content_truncated'],
++                'freshness':'STALE','pending':'UNKNOWN','actual_received':'UNKNOWN','worker_started':'UNKNOWN',
++                'business_result':'UNKNOWN','writer_authority':'UNKNOWN','permission':'UNKNOWN',
++                'unresolved_effects':'UNKNOWN'})
++    return {'state':'UNTRUSTED_METADATA_ONLY','scope':'LEDGER_IMPLEMENTATION_AND_REVIEW_ONLY',
++      'collector_ref':collector_ref,'source_observation_verified':'UNAVAILABLE',
++      'verification_scope':'UNVERIFIED_NORMALIZER_OUTPUT',
++      'official_api_issuer_verification':'UNAVAILABLE','freshness':'STALE','global_idle':'UNKNOWN',
++      'writer_verification':'UNKNOWN','permission_verification':'UNKNOWN','business_acceptance':'UNKNOWN',
++      'handoff_completed':'UNKNOWN','dispatch_performed':False,'records':output}
+--- /dev/null
++++ b/scripts/task_delivery_backup_receipt.py
+@@ -0,0 +1,90 @@
++"""Display-only candidate for existing backup receipts; never scans or backs up.
++
++No provider, scheduler, credential, destination or writer authority is installed.
++A syntactically valid report is not verified source evidence.
++"""
++import json, re
++from datetime import datetime, timezone
++from task_delivery_ledger.core import ident,parse_time,safe,LedgerError
++from task_delivery_observation import ObservationUnavailable
++
++EXCLUSIONS=frozenset(('secrets','environment','customer','business_database','raw_logs','cache'))
++REQUIRED=frozenset(('schema_version','project_ref','receipt_id','source_ref','reported_status',
++    'observed_at','base_ref','result_ref','manifest_ref','restore_ref','last_success_at',
++    'content_changed','file_hashes','excluded','limitations'))
++class BackupReceiptError(Exception):pass
++
++class LocalBackupReceiptReader(object):
++    """Read a caller-bound local report; neither authenticate it nor expose raw fields."""
++    def __init__(self,path):
++        self.path=path
++    def read(self):
++        try:
++            with open(self.path,'rb') as f:raw=f.read(65537)
++            if len(raw)>65536:raise ValueError('oversize')
++            d=json.loads(raw.decode('utf8'))
++            if not isinstance(d,dict) or d.get('status') not in ('ok','failed'):raise ValueError('status')
++            parse_time(d['time_utc'])
++            for k in ('files','excluded_count'):
++                if k in d and (type(d[k]) is not int or d[k]<0):raise ValueError('count')
++            for k in ('changed','remote_verified'):
++                if k in d and type(d[k]) is not bool:raise ValueError('flag')
++            if d['status']=='ok' and any(k not in d for k in ('files','excluded_count')):raise ValueError('missing count')
++            return {'state':'OBSERVED_METADATA_ONLY','source_observation_verified':'LOCAL_RECEIPT_REPORTED_NOT_AUTHENTICATED',
++                'provider_verification':'UNKNOWN','freshness':'local-receipt-not-live-scheduler',
++                'backup_observation':{'observed_at':datetime.now(timezone.utc).isoformat(),
++                    'backup_at':d['time_utc'],'backup_status':d['status'],
++                    'files':d.get('files','UNKNOWN'),'excluded_count':d.get('excluded_count','UNKNOWN'),
++                    'changed':d.get('changed','UNKNOWN'),'remote_verified_reported':d.get('remote_verified','UNKNOWN')}}
++        except (OSError,UnicodeError,ValueError,TypeError,KeyError,LedgerError):raise ObservationUnavailable('local backup receipt unavailable')
++
++def unavailable():
++    return {'state':'UNAVAILABLE','provider_verification':'UNKNOWN','schedule_enabled':'UNKNOWN',
++            'requested_interval_seconds':300,'last_success_at':'UNKNOWN','registered_projects':'UNKNOWN',
++            'destination':'UNKNOWN','backup_started':False}
++
++def map_report(record):
++    """Return untrusted metadata only. Caller cannot supply a verification flag."""
++    if not isinstance(record,dict) or set(record)!=REQUIRED or type(record['schema_version']) is not int or record['schema_version']!=1:raise BackupReceiptError('invalid metadata')
++    for k in ('project_ref','receipt_id','source_ref','base_ref','result_ref','manifest_ref','restore_ref'):
++        try:
++            value=ident(record[k])
++            if k in ('base_ref','result_ref') and re.fullmatch(r'[0-9a-fA-F]+',value):
++                # A bare hexadecimal value claims object identity: accept only
++                # full lowercase Git SHA-1 or SHA-256, never an ambiguous prefix.
++                if not re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})',value):
++                    raise LedgerError('invalid full object reference')
++            else:
++                safe(value,'list_item')
++        except (LedgerError,TypeError):raise BackupReceiptError('invalid reference')
++    try:
++        observed=parse_time(record['observed_at'])
++        if record['last_success_at']!='UNKNOWN' and parse_time(record['last_success_at'])>observed:raise BackupReceiptError('invalid last success')
++    except (ValueError,TypeError,LedgerError):raise BackupReceiptError('invalid time')
++    status=record['reported_status'];changed=record['content_changed']
++    if status not in ('CHECK_NO_CHANGE','BACKUP_SUCCEEDED','BACKUP_FAILED') or type(changed) is not bool:raise BackupReceiptError('invalid state')
++    if status=='CHECK_NO_CHANGE' and (changed or record['base_ref']!=record['result_ref'] or record['file_hashes']):raise BackupReceiptError('invalid no-change report')
++    if status=='BACKUP_SUCCEEDED' and (not changed or record['manifest_ref']=='UNKNOWN' or record['restore_ref']=='UNKNOWN' or record['last_success_at']=='UNKNOWN' or not record['file_hashes']):raise BackupReceiptError('incomplete backup report')
++    if not isinstance(record['file_hashes'],list) or len(record['file_hashes'])>256:raise BackupReceiptError('invalid hashes')
++    seen=set()
++    for item in record['file_hashes']:
++        if not isinstance(item,dict) or set(item)!={'file_ref','sha256'}:raise BackupReceiptError('invalid file reference')
++        try:
++            ident(item['file_ref']);safe(item['file_ref'],'list_item')
++        except (LedgerError,TypeError):raise BackupReceiptError('invalid file reference')
++        if item['file_ref'] in seen or not isinstance(item['sha256'],str) or not re.fullmatch(r'[a-f0-9]{64}',item['sha256']):raise BackupReceiptError('invalid file hash')
++        seen.add(item['file_ref'])
++    if not isinstance(record['excluded'],list) or any(not isinstance(x,str) for x in record['excluded']) or not EXCLUSIONS.issubset(set(record['excluded'])):raise BackupReceiptError('incomplete exclusions')
++    for item in record['excluded']:
++        if item not in EXCLUSIONS:
++            try:safe(item,'list_item')
++            except (LedgerError,TypeError):raise BackupReceiptError('invalid exclusion reference')
++    if not isinstance(record['limitations'],list) or not record['limitations']:raise BackupReceiptError('missing limitations')
++    for item in record['limitations']:
++        try:
++            ident(item);safe(item,'list_item')
++        except (LedgerError,TypeError):raise BackupReceiptError('invalid limitation reference')
++    return {'state':'UNVERIFIED_REPORT','provider_verification':'UNKNOWN','receipt':dict(record),
++            'reported_new_backup':False if status=='CHECK_NO_CHANGE' else 'UNKNOWN',
++            'verified_last_success_at':'UNKNOWN','requested_interval_seconds':300,
++            'schedule_enabled':'UNKNOWN','backup_started':False}
+--- /dev/null
++++ b/scripts/task_delivery_ledger/__init__.py
+@@ -0,0 +1 @@
++"""Local staged delivery ledger."""
+--- /dev/null
++++ b/scripts/task_delivery_ledger/core.py
+@@ -0,0 +1,253 @@
++"""Offline observation journal. Never dispatches or manages business authority."""
++import json, os, re, tempfile, hashlib
++from pathlib import Path
++from datetime import datetime, timezone
++
++ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$')
++TIME = re.compile(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$')
++VALID = {'VERIFIED_NOW', 'HISTORICAL', 'UNKNOWN', 'STALE', 'UNAVAILABLE', 'DENIED'}
++TYPES = {'task','role','host_service','permission_ref','source_artifact'}
++PHASES = {'register','dispatch_request','send_accepted','actual_received','start','progress','block','result','review','accept','cancel','deploy','runtime','business_verify','correction','diagnostic','handoff_propose','handoff_nominate','handoff_send_accepted','handoff_received','handoff_aligned','handoff_gap','handoff_supervision_start','handoff_verified','handoff_rejected','handoff_incomplete'}
++# Deliberately finite fields: input is structured metadata, never arbitrary payloads.
++FIELDS = {'id','schema_version','source','occurred_at','observed_at','validity','kind','project_id','task_id','attempt_id','event_id','idempotency_key','producer','type','causation','evidence','result','data','namespace','target_event_id','state','goal','acceptance','instruction_ref','writer_role_id','blocker','next_action','dependencies','code_refs','deploy_refs','role_id','verified_session_ref','entry_ref','query_capability','send_capability','receipt_ref','service_class','host_ref','build_ref','running_ref','scope','expires_at','denial','manager_ref','repo_ref','branch','commit','tree','dirty_ref','manifest_ref','size','artifact_sha256','download_ref','test_ref','review_ref','rollback_ref','lease_ref','fence_ref','stage','status','message_ref','pending_operations','permission_boundary','source_refs','last_progress','reply_id','receipt_id','substantive','role_idle','unresolved_effects','permission_valid','owner_authorized','reason','version','events','objects','tasks','history','conflicts','snapshot','cursor','progress','diagnostic','eligible','reasons','data_ref','observations','original_entry_ref','dependency_lock_ref','build_id','release_status','business_verify_ref','runtime_source_ref','goal_acceptance_ref','handoff_id','handoff_version','snapshot_digest','snapshot_data','scope_included','scope_excluded','actor_ref','session_ref','identity_evidence_ref','permission_evidence_ref','permission_expires_at','actual_checks','unknown_items','proposal_event_id','received_event_id','alignment_event_id','supervision_start_event_id','target_ref','handoff_status','handoffs','outgoing','receiving','supervisor','required_fields','version_conflict','summary','snapshot_scope','verification_ref','scope_authorization_ref','sanitization','writer_verification'}
++# Reject secret-looking content, paths and URLs with credentials/query. Values are not printed on failure.
++BAD = re.compile(r'(?i)(?:password|passwd|secret|token|private[ _-]?key|authorization|bearer\s+|-----BEGIN|LTAI[A-Za-z0-9]|AKIA[A-Z0-9]{16}|ASIA[A-Z0-9]{16}|\bsk-[A-Za-z0-9]|/home/|/root/|/var/|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|https?://[^\s/@]+@|https?://\S*[?&])')
++class LedgerError(Exception): pass
++class Conflict(LedgerError): pass
++
++# Conservative structured input: text is short, manually reviewed, and never a raw transcript.
++TEXT_FIELDS={'goal','acceptance','blocker','next_action','reason'}
++LIST_FIELDS={'dependencies','code_refs','deploy_refs','source_refs','pending_operations',
++             'scope_included','scope_excluded','actual_checks','unknown_items'}
++DICT_FIELDS={'data','snapshot_data'}
++HASH_FIELDS={'snapshot_digest','artifact_sha256','commit','tree'}
++TIME_FIELDS={'occurred_at','observed_at','expires_at','permission_expires_at'}
++TEXT_RE=re.compile(r'^[\w\s\u3400-\u9fff，。；：、（）(),.：:;!?！？，/\-]{1,256}$')
++OPAQUE=re.compile(r'(?<![A-Za-z0-9])[A-Za-z0-9]{25,}(?![A-Za-z0-9])')
++def safe(value, key=None):
++    if isinstance(value, dict):
++        if key is not None and key not in DICT_FIELDS: raise LedgerError('invalid object type')
++        if any(k not in FIELDS for k in value): raise LedgerError('field not allowed')
++        for k,v in value.items(): safe(v,k)
++    elif isinstance(value, list):
++        if key not in LIST_FIELDS or len(value)>100: raise LedgerError('invalid list')
++        for v in value:
++            if not isinstance(v,str): raise LedgerError('invalid list item')
++            safe(v,'list_item')
++    elif isinstance(value, str):
++        if key in DICT_FIELDS or key in LIST_FIELDS: raise LedgerError('invalid field type')
++        if len(value)>256 or BAD.search(value) or any(ord(c)<32 for c in value): raise LedgerError('unsafe value')
++        if key in TEXT_FIELDS:
++            if not TEXT_RE.fullmatch(value) or OPAQUE.search(value): raise LedgerError('unsafe business text')
++        elif key in HASH_FIELDS:
++            if value!='UNKNOWN' and not re.fullmatch(r'[a-f0-9]{40}|[a-f0-9]{64}',value): raise LedgerError('invalid digest')
++        elif key in TIME_FIELDS:
++            if value not in ('UNKNOWN','UNAVAILABLE'): parse_time(value)
++        elif key in ('branch',):
++            if not re.fullmatch(r'[A-Za-z0-9_.:/-]{1,128}',value) or '..' in value: raise LedgerError('invalid branch')
++        elif not ID.fullmatch(value) or OPAQUE.search(value): raise LedgerError('invalid structured reference')
++    elif isinstance(value,bool):
++        if key not in ('substantive','role_idle','unresolved_effects','permission_valid','owner_authorized'): raise LedgerError('invalid boolean')
++    elif isinstance(value,int):
++        if key not in ('schema_version','version','handoff_version','size') or value<0: raise LedgerError('invalid number')
++    else: raise LedgerError('invalid value')
++
++def parse_time(value):
++    if not isinstance(value,str) or not TIME.fullmatch(value): raise LedgerError('invalid timestamp')
++    v=re.sub(r'([+-]\d\d):(\d\d)$',r'\1\2',value.replace('Z','+0000'))
++    try: return datetime.strptime(v,'%Y-%m-%dT%H:%M:%S.%f%z' if '.' in v else '%Y-%m-%dT%H:%M:%S%z').astimezone(timezone.utc)
++    except ValueError: raise LedgerError('invalid timestamp')
++
++def ident(x):
++    if not isinstance(x,str) or not ID.fullmatch(x) or x in ('.','..'): raise LedgerError('invalid identifier')
++    return x
++
++def canonical(x): return (json.dumps(x,ensure_ascii=False,sort_keys=True,separators=(',',':'))+'\n').encode()
++def digest(data): return hashlib.sha256(data).hexdigest()
++def load(path):
++    try: return json.loads(Path(path).read_text(encoding='utf8'))
++    except (OSError,ValueError) as e: raise LedgerError('input unavailable or invalid') from e
++
++def validate(e):
++    safe(e)
++    required=('schema_version','namespace','event_id','task_id','attempt_id','idempotency_key','producer','type','occurred_at','observed_at','source','evidence','result','data','validity','causation','sanitization')
++    if not isinstance(e,dict) or any(k not in e for k in required): raise LedgerError('missing event field')
++    if any(not isinstance(e[k],str) or not e[k] for k in ('source','evidence','result','causation')): raise LedgerError('source and evidence references required')
++    if e['sanitization'] != 'MANUAL_REDACTED': raise LedgerError('manual redaction declaration required')
++    if e['schema_version'] != 1 or e['validity'] not in VALID or e['type'] not in PHASES: raise LedgerError('invalid schema or phase')
++    for k in ('namespace','event_id','task_id','attempt_id','idempotency_key','producer'): ident(e[k])
++    for k in ('occurred_at','observed_at'): parse_time(e[k])
++    if not isinstance(e['data'],dict): raise LedgerError('invalid data')
++    if e['type']=='register':
++        d=e['data']
++        if not all(k in d for k in ('kind','id','schema_version','source','occurred_at','observed_at','validity')) or d['kind'] not in TYPES or d['validity'] not in VALID or d['schema_version'] != 1: raise LedgerError('invalid registered object')
++        ident(d['id'])
++        required_by_kind={
++            'task':('goal','acceptance','instruction_ref','writer_role_id','state','blocker','next_action','dependencies','code_refs','deploy_refs'),
++            'role':('task_id','verified_session_ref','entry_ref','query_capability','send_capability','receipt_ref'),
++            'host_service':('task_id','service_class','host_ref','source_refs','build_ref','running_ref'),
++            'permission_ref':('task_id','scope','expires_at','denial','manager_ref'),
++            'source_artifact':('task_id','repo_ref','branch','commit','tree','dirty_ref','manifest_ref','size','artifact_sha256','download_ref','test_ref','review_ref','deploy_refs','rollback_ref')}
++        if any(k not in d for k in required_by_kind[d['kind']]): raise LedgerError('missing object field')
++        if d['kind']=='host_service' and d['service_class'] not in ('business','admin','health','fixture','UNKNOWN'): raise LedgerError('invalid service class')
++        if d['kind']=='task' and d['id'] != e['task_id']: raise LedgerError('task identity mismatch')
++        for k in ('occurred_at','observed_at'): parse_time(d[k])
++    if e['type'].startswith('handoff_'):
++        from .handoffs import validate_handoff
++        validate_handoff(e)
++    if e['type']=='correction':
++        ident(e['data'].get('target_event_id'))
++        if not isinstance(e['data'].get('data'),dict): raise LedgerError('correction requires replacement object')
++    return e
++
++# The local marker is not an authentication system: enforce the same limited
++# offline policy on new, replayed, and already-present event files.
++def offline_policy(e, writer, namespace=None, filename=None):
++    validate(e)
++    if e['producer'] != writer: raise LedgerError('writer verification unavailable')
++    if namespace is not None and e['namespace'] != namespace: raise LedgerError('namespace mismatch')
++    if filename is not None and e['event_id'] != filename: raise LedgerError('event identity mismatch')
++    if e['namespace'] != 'synthetic':
++        if e['validity'] != 'HISTORICAL' or e['type'] != 'register' or e['data']['validity'] == 'VERIFIED_NOW':
++            raise LedgerError('writer verification unavailable')
++        if e['data'].get('artifact_sha256','UNKNOWN') != 'UNKNOWN': raise LedgerError('artifact provenance unavailable')
++
++def causal_order(events):
++    """Stable replay dependencies without altering original observation history."""
++    phases={'start','progress','block','result','review','accept'}
++    byid={e['event_id']:e for e in events}; visited=set(); active=[]; cycle=set(); ordered=[]
++    def visit(e):
++        key=e['event_id']
++        if key in visited: return
++        if key in active:
++            cycle.update(active[active.index(key):]); return
++        active.append(key)
++        if e['type'] in phases:
++            parent=byid.get(e['causation'])
++            if parent and parent['type'] in phases.union({'actual_received'}): visit(parent)
++        active.pop(); visited.add(key); ordered.append(e)
++    for e in events: visit(e)
++    return ordered,cycle
++
++class Store:
++    def __init__(self, root, writer):
++        self.root=Path(root); self.writer=ident(writer)
++        for p in ('events','outbox','views'): (self.root/p).mkdir(parents=True,exist_ok=True)
++        self._append(self.root/'writer.id', (self.writer+'\n').encode())
++    def enqueue(self,e):
++        offline_policy(e,self.writer)
++        p=self.root/'outbox'/e['namespace']/ (e['event_id']+'.json')
++        return self._append(p,canonical(e))
++    @staticmethod
++    def _append(p,data):
++        p.parent.mkdir(parents=True,exist_ok=True)
++        # Write complete file before hard-link publication; no overwrite and no partial published event.
++        fd,tmp=tempfile.mkstemp(prefix='.pending-',dir=p.parent)
++        try:
++            with os.fdopen(fd,'wb') as f: f.write(data); f.flush(); os.fsync(f.fileno())
++            try: os.link(tmp,p); return 'APPENDED'
++            except FileExistsError:
++                if p.read_bytes()==data: return 'DUPLICATE'
++                raise Conflict('event content conflict; original preserved')
++        finally: os.unlink(tmp)
++    def flush(self, namespace):
++        ident(namespace); folder=self.root/'outbox'/namespace
++        counts={'appended':0,'duplicate':0,'conflict':0}
++        for p in sorted(folder.glob('*.json')):
++            e=load(p); offline_policy(e,self.writer,namespace,p.stem)
++            try:
++                outcome=self._append(self.root/'events'/namespace/p.name,canonical(e))
++                counts[outcome.lower()]+=1
++            except Conflict:
++                counts['conflict']+=1
++                continue
++            # Retain outbox receipt permanently; repeat is harmless and recoverable.
++        return counts
++    def events(self,namespace):
++        ident(namespace); items=[]
++        for p in (self.root/'events'/namespace).glob('*.json'):
++            e=load(p); offline_policy(e,self.writer,namespace,p.stem)
++            items.append(e)
++        return sorted(items,key=lambda e:(parse_time(e['observed_at']),e['event_id']))
++    def project(self,namespace,verifier=None):
++        events=self.events(namespace); processing,cycles=causal_order(events); all_events={e['event_id']:e for e in events}
++        seen={}; objects={}; tasks={}; conflicts=[]; pending=[]; registered={}; object_ids={}; phase_events={}; phase_rank={}; object_head={}
++        for e in processing:
++            key=(e['task_id'],e['attempt_id'],e['idempotency_key'])
++            if key in seen:
++                if seen[key] != e['event_id']: conflicts.append(e['event_id'])
++                continue
++            seen[key]=e['event_id']; task=tasks.setdefault(e['task_id'],{'task_id':e['task_id'],'state':'UNKNOWN','history':[]})
++            task['history'].append(e)
++            if e['type']=='register':
++                objkey=e['data']['kind']+':'+e['data']['id']; old=object_ids.get(objkey)
++                if old is None:
++                    objects[objkey]=e['data']; object_ids[objkey]=e['data']; object_head[objkey]=e['event_id']; registered[e['event_id']]=(e['task_id'],e['data'])
++                elif old!=e['data']: conflicts.append(e['event_id'])
++            elif e['type']=='correction':
++                entry=registered.get(e['data']['target_event_id']); replacement=e['data']['data']
++                if entry and entry[0]==e['task_id'] and replacement.get('id')==entry[1]['id'] and replacement.get('kind')==entry[1]['kind'] and replacement.get('source')==entry[1]['source'] and object_head.get(entry[1]['kind']+':'+entry[1]['id'])==e['data']['target_event_id']:
++                    candidate=dict(e); candidate['type']='register'; candidate['data']=replacement
++                    try: validate(candidate)
++                    except LedgerError: conflicts.append(e['event_id'])
++                    else:
++                        objects[entry[1]['kind']+':'+entry[1]['id']]=replacement
++                        object_ids[entry[1]['kind']+':'+entry[1]['id']]=replacement
++                        object_head[entry[1]['kind']+':'+entry[1]['id']]=e['event_id']; registered[e['event_id']]=(e['task_id'],replacement)
++                else: conflicts.append(e['event_id'])
++            elif e['type']=='cancel': task['state']='CANCELLED'
++            elif e['type'] in ('start','progress','block','result','review','accept') and task['state']!='CANCELLED':
++                ranks={'start':1,'progress':2,'block':2,'result':3,'review':4,'accept':5}
++                predecessor=phase_events.get(e['causation']); scope=(e['task_id'],e['attempt_id'])
++                allowed={'start':('actual_received',),'progress':('start','progress','block'),'block':('start','progress','block'),'result':('start','progress','block'),'review':('result',),'accept':('review',)}
++                valid=bool(predecessor and (predecessor['task_id'],predecessor['attempt_id'])==scope and predecessor['type'] in allowed[e['type']] and parse_time(predecessor['occurred_at'])<=parse_time(e['occurred_at']) and ranks[e['type']]>=phase_rank.get(scope,0))
++                if e['event_id'] in cycles: conflicts.append(e['event_id'])
++                elif e['causation'] not in all_events or e['causation'] in pending: pending.append(e['event_id'])
++                elif valid:
++                    task['state']={'start':'STARTED','progress':'IN_PROGRESS','block':'BLOCKED','result':'RESULT','review':'REVIEW','accept':'ACCEPTED'}[e['type']]; phase_rank[scope]=ranks[e['type']]
++                else: conflicts.append(e['event_id'])
++            if e['type']=='actual_received' or (e['type'] in ('start','progress','block','result','review','accept') and e['event_id'] not in conflicts and e['event_id'] not in pending and task['state']!='CANCELLED'): phase_events[e['event_id']]=e
++            # Corrections remain traceable and do not silently rewrite authority or historical events.
++        # History is observation-ordered, independent of replay evaluation order.
++        for task in tasks.values(): task['history'].sort(key=lambda e:(parse_time(e['observed_at']),e['event_id']))
++        from .handoffs import project_handoffs
++        return {'schema_version':1,'namespace':namespace,'objects':objects,'tasks':tasks,'conflicts':conflicts,'pending_dependencies':pending,'writer_verification':'UNKNOWN','handoffs':project_handoffs([event for task in tasks.values() for event in task['history']],verifier=verifier)}
++    def handoff(self,namespace,task_id,verifier=None):
++        return handoff(self,namespace,task_id,verifier=verifier)
++    def publish_view(self,namespace,expected):
++        ident(namespace); p=self.root/'views'/(namespace+'.json'); lock=self.root/'views'/(namespace+'.lock')
++        # Local projection CAS only, not a business lease. Crash leaves lock for operator recovery.
++        try: fd=os.open(lock,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
++        except FileExistsError as e: raise Conflict('view busy') from e
++        try:
++            os.close(fd); old=p.read_bytes() if p.exists() else b''
++            if digest(old)!=expected: raise Conflict('view version conflict')
++            data=canonical(self.project(namespace)); tmp=p.with_name(p.name+'.tmp')
++            with open(tmp,'wb') as f: f.write(data); f.flush(); os.fsync(f.fileno())
++            os.replace(tmp,p); return digest(data)
++        finally: os.unlink(lock)
++
++def handoff(store,namespace,task_id=None,verifier=None):
++    # A caller-supplied mutable projection is never an authority or export source.
++    # Store.project rebuilds from the configured store and checks each event's
++    # producer against store.writer via events()/offline_policy().
++    if not isinstance(store,Store) or task_id is None: raise LedgerError('store context required')
++    ident(namespace); ident(task_id)
++    view=store.project(namespace,verifier=verifier)
++    task=view['tasks'].get(task_id)
++    if task is None: raise LedgerError('unknown task')
++    objs={k:v for k,v in view['objects'].items() if v.get('task_id')==task_id or (v.get('kind')=='task' and v.get('id')==task_id)}
++    for obj in objs.values(): safe(obj,'data')
++    return {'schema_version':1,'namespace':namespace,'task_id':task_id,'snapshot':task,'objects':objs,'handoffs':{k:v for k,v in view.get('handoffs',{}).items() if v['task_id']==task_id}}
++
++def stall(replies,receipts, state, role_idle=False, unresolved_effects=True, permission_valid=False, owner_authorized=False, prior_diagnostics=None, incident_id=None):
++    # Inputs are already-observed, deduplicated reply/receipt IDs; no network or action.
++    progress=max([i for i,r in enumerate(replies) if r.get('substantive')],default=-1)
++    since=replies[progress+1:]; ids=[r.get('reply_id') for r in since if r.get('reply_id')]
++    no_reply_progress=len(set(ids))>=3
++    no_receipts=len(receipts)>=2 and receipts[-1]==receipts[-2]
++    stale=no_reply_progress or no_receipts
++    excluded=state in ('PAUSED','CANCELLED','DENIED','EXTERNAL_DEPENDENCY','UNKNOWN','STALE','UNAVAILABLE')
++    eligible=bool(stale and not excluded and role_idle and not unresolved_effects and permission_valid and owner_authorized)
++    key=digest(canonical({'incident_id':incident_id,'progress_id':replies[progress].get('reply_id') if progress>=0 else None})) if stale and incident_id else ''
++    return {'diagnostic':bool(stale and key and key not in (prior_diagnostics or [])),'eligible':eligible,'reason':'observation only; no dispatch','diagnostic_id':key}
+--- /dev/null
++++ b/scripts/task_delivery_ledger/handoffs.py
+@@ -0,0 +1,104 @@
++"""Three-party handoff observation projection, never grants execution authority.
++
++Identity and permission validation must be supplied by a trusted existing system.
++Without a verifier even complete-looking receipts remain incomplete.
++"""
++from datetime import datetime, timezone
++import re
++from .core import LedgerError, ident, canonical, digest, parse_time
++
++SNAPSHOT_FIELDS=('goal_acceptance_ref','instruction_ref','repo_ref','branch','commit','tree','dirty_ref',
++                 'manifest_ref','artifact_sha256','build_ref','deploy_refs','running_ref','runtime_source_ref','entry_ref',
++                 'host_ref','verified_session_ref','permission_boundary','permission_evidence_ref','scope','expires_at','denial',
++                 'writer_role_id','lease_ref','fence_ref','pending_operations','unresolved_effects','next_action')
++COMMON=('handoff_id','handoff_version','snapshot_digest','actor_ref','role_id',
++        'session_ref','identity_evidence_ref','permission_evidence_ref','permission_expires_at')
++UNKNOWN={'UNKNOWN','STALE','UNAVAILABLE','DENIED','NONE',''}
++
++def known(value):
++    if isinstance(value,str): return bool(value.strip()) and value not in UNKNOWN
++    if isinstance(value,list): return bool(value) and all(isinstance(x,str) and known(x) for x in value)
++    return False
++
++def validate_handoff(e):
++    d=e['data']
++    if any(k not in d for k in COMMON): raise LedgerError('missing handoff field')
++    ident(d['handoff_id'])
++    if not isinstance(d['handoff_version'],int) or isinstance(d['handoff_version'],bool) or d['handoff_version']<1: raise LedgerError('invalid handoff version')
++    if not isinstance(d['snapshot_digest'],str) or len(d['snapshot_digest'])!=64 or any(c not in '0123456789abcdef' for c in d['snapshot_digest']): raise LedgerError('invalid digest')
++    for k in ('actor_ref','role_id','session_ref','identity_evidence_ref','permission_evidence_ref'): ident(d[k])
++    if d['permission_expires_at'] not in UNKNOWN: parse_time(d['permission_expires_at'])
++    if e['type']=='handoff_propose':
++        if any(k not in d for k in ('snapshot_data','scope_included','scope_excluded','scope_authorization_ref')): raise LedgerError('missing snapshot')
++        snap=d['snapshot_data']; included=d['scope_included']; excluded=d['scope_excluded']
++        if not isinstance(snap,dict) or set(snap)!=set(SNAPSHOT_FIELDS): raise LedgerError('incomplete snapshot structure')
++        if not isinstance(included,list) or not isinstance(excluded,list) or not included or set(included)&set(excluded) or set(included)|set(excluded)!=set(SNAPSHOT_FIELDS) or len(set(included))!=len(included) or len(set(excluded))!=len(excluded): raise LedgerError('invalid handoff scope')
++        if digest(canonical(snap))!=d['snapshot_digest']: raise LedgerError('snapshot digest mismatch')
++    else:
++        ident(d.get('proposal_event_id'))
++    if e['type'] in ('handoff_aligned','handoff_gap','handoff_verified','handoff_rejected','handoff_incomplete'):
++        if not isinstance(d.get('actual_checks'),list) or not isinstance(d.get('unknown_items'),list): raise LedgerError('missing actual checks')
++    if e['type'] in ('handoff_aligned','handoff_gap'): ident(d.get('received_event_id'))
++    if e['type'] in ('handoff_verified','handoff_rejected','handoff_incomplete'):
++        ident(d.get('alignment_event_id')); ident(d.get('supervision_start_event_id'))
++
++def _usable(e, verifier, now):
++    d=e['data']
++    if e['validity']!='VERIFIED_NOW' or not known(e['source']) or not known(e['evidence']): return False
++    if not all(known(d.get(k)) for k in ('actor_ref','role_id','session_ref','identity_evidence_ref','permission_evidence_ref')): return False
++    try:
++        if parse_time(d['permission_expires_at'])<=now or parse_time(d['permission_expires_at'])<=parse_time(e['occurred_at']): return False
++        return bool(verifier and verifier(e))
++    except (ValueError, LedgerError, TypeError): return False
++
++def project_handoffs(events, verifier=None, now=None):
++    """Verifier(e) must verify identity, role, instance, scope, source and permission.
++    No default verifier: user-supplied receipt text is not evidence of authority.
++    """
++    now=now or datetime.now(timezone.utc)
++    groups={}
++    for e in events:
++        if e['type'].startswith('handoff_'):
++            d=e['data']; groups.setdefault((e['task_id'],d['handoff_id']),[]).append(e)
++    result={}
++    for (task_id,hid), es in groups.items():
++        proposals=[e for e in es if e['type']=='handoff_propose']
++        if not proposals:
++            result[task_id+':'+hid]={'task_id':task_id,'handoff_id':hid,'version':max(x['data']['handoff_version'] for x in es),'snapshot_digest':'UNKNOWN','handoff_status':'待交出','scope_included':[],'scope_excluded':[],'unknown_items':['proposal'],'version_conflict':False,'outgoing':'UNKNOWN','receiving':'UNKNOWN','supervisor':'UNAVAILABLE','summary':{'reason':'尚未收到交出快照'},'history':es}
++            continue
++        version=max(e['data']['handoff_version'] for e in proposals)
++        ps=[e for e in proposals if e['data']['handoff_version']==version]
++        p=ps[0]; d=p['data']; snap=d['snapshot_data']; inc=d['scope_included']; exc=d['scope_excluded']
++        version_conflict=len(ps)!=1
++        same=[e for e in es if e['attempt_id']==p['attempt_id'] and e['data']['handoff_version']==version and e['data']['snapshot_digest']==d['snapshot_digest'] and (e is p or e['data'].get('proposal_event_id')==p['event_id'])]
++        # Resolve exact causal events, not latest conversational summaries.
++        byid={e['event_id']:e for e in same}
++        def last(kind):
++            a=[e for e in same if e['type']==kind]; return a[-1] if a else None
++        nom=last('handoff_nominate'); r=last('handoff_received'); a=last('handoff_aligned'); gap=last('handoff_gap'); start=last('handoff_supervision_start'); v=last('handoff_verified'); reject=last('handoff_rejected'); incomplete=last('handoff_incomplete')
++        unknown=[k for k in inc if not known(snap[k]) or (k in ('deploy_refs','pending_operations') and not isinstance(snap[k],list)) or (k not in ('deploy_refs','pending_operations') and not isinstance(snap[k],str))]
++        if exc and not known(d['scope_authorization_ref']): unknown.append('scope_authorization_ref')
++        for x in (a,gap,v,reject,incomplete):
++            if x: unknown.extend(x['data']['unknown_items'])
++        unknown=list(dict.fromkeys(unknown))
++        state='待接收核对'; outgoing=p['event_id']; receiving=r['event_id'] if r else 'UNKNOWN'; supervisor=start['event_id'] if start else 'UNAVAILABLE'
++        if r: state='待独立核验' if a else '待接收核对'
++        if gap or reject or incomplete or unknown or version_conflict: state='有缺项'
++        chain=bool(nom and r and a and start and v and r['causation']==p['event_id'] and a['data']['received_event_id']==r['event_id'] and a['causation']==r['event_id'] and nom['causation']==p['event_id'] and nom['data'].get('target_ref')==start['data']['role_id'] and start['causation']==nom['event_id'] and v['causation']==start['event_id'] and v['data']['alignment_event_id']==a['event_id'] and v['data']['supervision_start_event_id']==start['event_id'])
++        if chain:
++            if verifier is None: unknown.append('identity_permission_verifier_UNAVAILABLE')
++            party=[p,r,start]; verdicts=[p,nom,r,a,start,v]
++            identity_unique=all(len(set(x['data'][key] for x in party))==3 for key in ('actor_ref','session_ref','role_id'))
++            same_nominator=all(nom['data'][key]==p['data'][key] for key in ('actor_ref','session_ref','role_id','identity_evidence_ref'))
++            same_receiver=all(a['data'][key]==r['data'][key] for key in ('actor_ref','session_ref','role_id'))
++            same_supervisor=all(v['data'][key]==start['data'][key] for key in ('actor_ref','session_ref','role_id'))
++            checks=all(set(inc).issubset(set(x['data']['actual_checks'])) and not x['data']['unknown_items'] for x in (a,v))
++            try:
++                times_ok=(parse_time(p['occurred_at'])<=parse_time(r['occurred_at'])<=parse_time(a['occurred_at'])<=parse_time(v['occurred_at'])<=now and parse_time(p['occurred_at'])<=parse_time(nom['occurred_at'])<=parse_time(start['occurred_at'])<=parse_time(v['occurred_at']))
++            except LedgerError: times_ok=False
++            # Negative receipts supersede optimistic receipts for this version, even if arriving late.
++            if not version_conflict and not (gap or reject or incomplete or unknown) and identity_unique and same_nominator and same_receiver and same_supervisor and checks and times_ok and all(_usable(x,verifier,now) for x in verdicts): state='交接完成(范围)'
++            elif state!='有缺项': state='有缺项'
++        key=task_id+':'+hid
++        result[key]={'task_id':task_id,'handoff_id':hid,'version':version,'snapshot_digest':d['snapshot_digest'],'handoff_status':state,'scope_included':inc,'scope_excluded':exc,'unknown_items':unknown,'version_conflict':version_conflict,'outgoing':outgoing,'receiving':receiving,'supervisor':supervisor,'summary':{'received_event_id':receiving,'alignment_event_id':a['event_id'] if a else 'UNKNOWN','supervision_start_event_id':supervisor,'verification_ref':v['event_id'] if v else 'UNKNOWN','reason':'接收事实不代表执行权；来源身份须独立验证'},'history':es}
++    return result
+--- /dev/null
++++ b/demos/task-center-digital-twin/research-workbench/index.html
+@@ -0,0 +1,2 @@
++<!doctype html>
++<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>研发工作台</title><link rel="stylesheet" href="styles.css"><header><strong>研发工作台</strong><span>只读查看</span><nav><a href="../task-center.html">返回任务中心</a></nav></header><main><section id="publicSummary" aria-live="polite"></section><button id="reloadPublic">刷新公开摘要</button><section id="app"></section></main><script src="workbench.js"></script><script src="public-projection.js"></script><script src="preview.js"></script></html>
+--- /dev/null
++++ b/demos/task-center-digital-twin/research-workbench/styles.css
+@@ -0,0 +1 @@
++:root{font-family:Inter,"Noto Sans SC",sans-serif;color:#10243e;background:radial-gradient(circle at top right,#e8f3ff 0,#f5f8fc 38%,#eef3f8 100%)}*{box-sizing:border-box}body{margin:0;min-height:100vh}header{min-height:72px;background:linear-gradient(115deg,#0b2541,#153f68 62%,#176b78);color:white;display:flex;align-items:center;justify-content:space-between;padding:12px 28px;box-shadow:0 8px 28px #0c274333}header strong{font-size:20px;letter-spacing:.03em}header span{display:block;font-size:12px;color:#b9d8ef;margin-top:5px}header a{color:#e9f7ff;margin-right:12px}button,select,input{font:inherit;min-height:40px}input,select{border:1px solid #bfd0df;border-radius:8px;padding:8px 10px;background:#fff}label{display:inline-flex;align-items:center;gap:8px}button{cursor:pointer;border:1px solid #bdd0e2;border-radius:9px;background:#fff;color:#163454;padding:8px 13px;transition:.15s}button:hover{border-color:#2c7da0;box-shadow:0 3px 12px #24577720}main{max-width:1320px;margin:auto;padding:30px 24px 64px}.title-row,.project-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.notice{padding:14px;border-left:4px solid #d77800;background:#fff6e8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:16px}.card{background:#ffffffdc;backdrop-filter:blur(8px);border:1px solid #d4e0ec;border-radius:16px;padding:18px;box-shadow:0 8px 28px #13304a0e}.board-card{position:relative;overflow:hidden}.board-card:after{content:"";position:absolute;right:-24px;top:-24px;width:90px;height:90px;border-radius:50%;background:#2c7da00c}.board-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#e2f1f6;color:#14556b;font-weight:800}.card h2,.card h3{margin-top:10px}.metric{font-size:34px;font-weight:750}.meta{color:#5e7187;font-size:13px}.status{display:inline-flex;gap:6px;align-items:center;font-weight:650}.status:before{content:"●"}.BLOCKED:before{content:"▲"}.NO_DATA:before{content:"○"}.ACTIVE:before{content:"▶"}.STABLE:before{content:"✓"}.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}.project-group{margin:22px 0}.project-head{margin-bottom:10px}.project-head h2{margin:0}.task{display:grid;grid-template-columns:minmax(150px,2fr) repeat(3,minmax(100px,1fr));gap:10px;align-items:center}.anomaly{border-left:5px solid #bc2525}.crumb{margin-bottom:14px;color:#536a82}.evidence{overflow-wrap:anywhere}.empty{text-align:center;padding:48px;color:#64788e}@media(max-width:768px){main{padding:18px 14px}.task{grid-template-columns:1fr}.toolbar>*{width:100%}header{padding:10px 14px}.title-row,.project-head{align-items:flex-start;flex-direction:column}}
+--- /dev/null
++++ b/demos/task-center-digital-twin/research-workbench/workbench.js
+@@ -0,0 +1,63 @@
++(function(root){
++'use strict';
++var boardNames={'research-development':'研发'};
++  function decodeSegment(value){try{return decodeURIComponent(value);}catch(_error){return null;}}
++  function parseRoute(hash){var raw=(hash||'#overview').replace(/^#/,'').split('?'),encoded=raw[0].split('/').filter(Boolean),parts=encoded.map(decodeSegment),query={};new URLSearchParams(raw[1]||'').forEach(function(v,k){query[k]=v;});if(parts.some(function(x){return x===null;}))return {view:'invalid',board:null,task:null,query:query};return {view:parts[0]||'overview',board:parts[1]||null,task:parts[2]||null,query:query};}
++  function href(view,board,task,query){var path='#'+view+(board?'/'+encodeURIComponent(board):'')+(task?'/'+encodeURIComponent(task):'');var params=new URLSearchParams(query||{}).toString();return path+(params?'?'+params:'');}
++  function esc(v){return String(v==null?'UNKNOWN':v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
++  function filterTasks(data,route){return data.tasks.filter(function(t){return(!route.board||t.board_id===route.board)&&(!route.query.project||t.project_id===route.query.project)&&(!route.query.state||t.state===route.query.state)&&(!route.query.owner||t.responsible_party===route.query.owner);});}
++  function taskCard(t,query){return '<article class="card task"><div><strong>'+esc(t.task_id)+'</strong><div class="meta">'+esc(t.node_id)+'</div></div><span>'+esc(t.runtime_status||'UNKNOWN')+'</span><span>'+esc(t.responsible_party)+'</span><button data-go="'+href('task',t.board_id,t.task_id,query)+'">详情</button></article>';}
++  function board(data,route){var tasks=filterTasks(data,route),projects={};tasks.forEach(function(t){(projects[t.project_id]||(projects[t.project_id]=[])).push(t);});return '<section><div class="crumb"><button data-parent="overview">总览</button> / '+esc(boardNames[route.board])+'</div><h1>'+esc(boardNames[route.board])+'工作台</h1><div class="toolbar"><input id="projectFilter" aria-label="项目筛选" placeholder="项目ID" value="'+esc(route.query.project||'')+'"><select id="stateFilter" aria-label="状态筛选"><option value="">全部状态</option>'+['READY','RECEIVED','STARTED','RUNNING','SUCCESS','HOLD','FAILURE','CANCELLED','CAPABILITY_UNAVAILABLE'].map(function(x){return '<option'+(route.query.state===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select><input id="ownerFilter" aria-label="负责人筛选" placeholder="负责人" value="'+esc(route.query.owner||'')+'"><button id="applyFilter">应用筛选</button></div>'+(Object.keys(projects).length?Object.keys(projects).sort().map(function(p){return '<article class="project-group"><div class="project-head"><div><h2>'+esc(p)+'</h2><span>'+projects[p].length+' 个任务</span></div><button data-go="'+href('project',route.board,p,route.query)+'">项目详情</button></div><div class="grid">'+projects[p].map(function(t){return taskCard(t,route.query);}).join('')+'</div></article>';}).join(''):'<div class="card empty">该筛选暂无任务</div>')+'</section>';}
++  function project(data,route){var projectId=route.task||'',tasks=data.tasks.filter(function(t){return t.board_id===route.board&&t.project_id===projectId;}),blocked=tasks.filter(function(t){return t.blocker;});return '<section><div class="crumb"><button data-parent="overview">总览</button> / <button data-go="'+href('board',route.board,null,route.query)+'">'+esc(boardNames[route.board])+'</button> / '+esc(projectId)+'</div><h1>'+esc(projectId)+'</h1><p class="meta">'+tasks.length+' 个任务 · '+blocked.length+' 个卡点；项目详情来自调用方提供的只读投影。</p><div class="grid">'+tasks.map(function(t){return taskCard(t,route.query);}).join('')+'</div></section>';}
++  function task(data,route){var t=data.tasks.find(function(x){return x.task_id===route.task&&x.board_id===route.board;});if(!t)return '<div class="notice">任务不存在或不属于当前板块。</div>';var a=data.anomalies.find(function(x){return x.task_id===t.task_id;}),receipts=(data.timeline||[]).filter(function(x){return x.task_id===t.task_id;});return '<section><div class="crumb"><button data-parent="overview">总览</button> / <button data-go="'+href('board',t.board_id,null,route.query)+'">'+esc(boardNames[t.board_id])+'</button> / '+esc(t.task_id)+'</div><h1>'+esc(t.task_id)+'</h1><div class="grid"><article class="card"><h2>任务事实</h2><p>项目：'+esc(t.project_id)+'</p><p>节点：'+esc(t.node_id)+'</p><p>权威状态：'+esc(t.state)+'</p><p>运行投影：'+esc(t.runtime_status||'UNKNOWN')+'</p><p>负责人：'+esc(t.task_responsible_party)+'</p><p>下一动作：'+esc(t.next_action)+'</p></article><article class="card"><h2>执行角色与进程事实</h2><p>Writer：'+esc(t.writer_identity)+'</p><p>run / session：'+esc(t.run_id)+' / '+esc(t.session_id)+'</p><p>attempt / epoch：'+esc(t.attempt_id)+' / '+esc(t.epoch)+'</p><p>会话：'+esc(t.session_state)+'</p><p>进程：'+esc(t.process_state)+'</p><p>最后真实进展：'+esc(t.last_real_progress_at)+'</p></article><article class="card"><h2>权限与断点</h2><p>权限：'+esc(t.authority_state)+'</p><p>有效期：'+esc(t.authority_valid_until)+'</p><p>checkpoint：'+esc(t.checkpoint_sha256)+'</p><p>副作用对账：'+esc(t.effects_reconciled)+'</p><p>Writer停止：'+esc(t.writer_stopped)+'</p></article><article class="card"><h2>材料与资源</h2><p>输入版本：'+esc(t.input_version)+'</p><p>输出版本：'+esc(t.output_version)+'</p><p>模块：'+esc(t.module_id)+'</p><p>资源：'+esc((t.resources||[]).join(', ')||'UNKNOWN')+'</p></article></div><article class="card"><h2>回执时间线</h2>'+(receipts.length?receipts.map(function(x){return '<p><strong>'+esc(x.kind)+'</strong> · '+esc(x.observed_at)+' · attempt '+esc(x.attempt_id)+' · 证据 '+esc(x.evidence_ref)+'</p>';}).join(''):'<p class="meta">暂无可验证回执；不据此推断未发生。</p>')+'</article>'+(a?'<article class="card anomaly"><h2>异常证据</h2><p>缺失：'+esc(a.missing)+'</p><p>影响：'+esc(a.impact)+'</p><p>依赖：'+esc(a.depends_on.join(', ')||'无明确依赖')+'</p><p>任务负责人：'+esc(a.task_responsible_party)+'</p><p>解除责任方：'+esc(a.resolution_responsible_party)+'</p><p>下一动作：'+esc(a.next_action)+'</p><p class="evidence">证据：'+esc(a.evidence_ref.join(', '))+'</p></article>':'')+'</section>';}
++  function developmentScene(data,twin,route){
++    var q=route.query||{},mode=q.scene==='ai'?'ai':'project',base={project:q.project||''};
++    var nav='<div class="toolbar"><button data-go="'+href('board','research-development',null,base)+'">按项目</button><button data-go="'+href('board','research-development',null,{scene:'ai',project:base.project})+'">按 AI Agent</button><button id="refresh">刷新只读数据</button></div>';
++    var heading='<section><div class="crumb"><button data-parent="overview">返回总览</button> / 研发</div><h1>研发工作台</h1><p class="meta">只读工作台候选，非开发板块默认3D现场。数据待接线；关联不代表运行。</p>'+nav;
++    if(mode==='project')return heading+'</section>'+board(data,route);
++    if(!twin)return heading+'<p>AI 实例投影待接线、加载失败或无权访问；活性 UNKNOWN。</p></section>';
++    var r=twin.records,allowed=new Set(data.tasks.filter(function(t){return t.board_id==='research-development'&&(!q.project||t.project_id===q.project);}).map(function(t){return t.task_id;}));
++    var instances=r.ai_instances.filter(function(ai){return ai.role_id&&ai.role_instance_id&&Array.isArray(ai.task_ids)&&ai.task_ids.some(function(id){return allowed.has(id);});});
++    var roles=Array.from(new Set(instances.map(function(ai){return ai.role_id;}))).sort();
++    var links=roles.map(function(role){return '<button data-go="'+href('board','research-development',null,{scene:'ai',project:base.project,role:role})+'">'+esc(role)+'</button>';}).join('');
++    var selected=instances.filter(function(ai){return ai.role_id===q.role;});
++    var instanceLinks=selected.map(function(ai){return '<button data-go="'+href('board','research-development',null,{scene:'ai',project:base.project,role:ai.role_id,instance:ai.role_instance_id})+'">'+esc(ai.role_instance_id)+'</button>';}).join('');
++    var matches=selected.filter(function(ai){return ai.role_instance_id===q.instance;});
++    var detail=matches.length===1?matches.map(function(ai){var ids=ai.task_ids.filter(function(id){return allowed.has(id);});return '<article class="card"><h3>'+esc(ai.role_id)+' / '+esc(ai.role_instance_id)+'</h3><p>run / session：'+esc(ai.run_id)+' / '+esc(ai.session_id)+'</p><p>进程、会话活性、当前工作和输出：UNKNOWN；以下为关联任务，非当前运行证明。</p>'+ids.map(function(id){var t=r.tasks.find(function(x){return x.task_id===id;});if(!t)return '<p>关联任务 '+esc(id)+' · 详情 UNKNOWN</p>';var ev=r.evidence.filter(function(x){return x.task_id===id&&t.attempt_id!=null&&x.attempt_id===t.attempt_id;});return '<p>任务 '+esc(id)+' · attempt '+esc(t.attempt_id)+' · 权威状态 '+esc(t.state)+'</p><p>产物摘要：'+esc(t.artifact_sha256)+'</p>'+ev.map(function(x){return '<p>事件 '+esc(x.kind)+' · 观察时间 '+esc(x.occurred_at)+' · 证据 '+esc(x.evidence_ref)+'</p>';}).join('')+'<button data-go="'+href('task','research-development',id,{scene:'ai',project:base.project,role:ai.role_id,instance:ai.role_instance_id})+'">任务详情</button>';}).join('')+'</article>';}).join(''):(q.instance?'<p>实例不存在或身份不唯一，详情 UNKNOWN。</p>':'');
++    return heading+'<p class="meta">受控候选投影；新鲜度 UNKNOWN，证据引用不代表可解引用或验收通过。</p><h2>AI 角色</h2>'+(links||'<p>没有可关联实例；不代表无人在工作。</p>')+(q.role?'<h2>具体实例：'+esc(q.role)+'</h2>'+(instanceLinks||'<p>实例不可用或无权访问。</p>'):'')+detail+'</section>';
++  }
++
++function developmentLedger(data,ledger,taskId){
++ var heading='<section><h2>任务与三方交接资料</h2>';
++ if(!ledger||ledger.mode!=='TEST_ONLY'||!Array.isArray(ledger.tasks)||(ledger.tenant_id!=null&&ledger.tenant_id!==data.tenant_id))return heading+'<p>台账暂不可用或无权查看；交接及来源范围 UNKNOWN。</p></section>';
++ var allowed=new Set(data.tasks.filter(function(t){return t.board_id==='research-development'&&(!taskId||t.task_id===taskId);}).map(function(t){return t.task_id;}));
++ var rows=ledger.tasks.filter(function(t){return allowed.has(t.task_id);});
++ var h=ledger.observations&&ledger.observations.development_handoff;
++ var history=h&&Array.isArray(h.records)?'<article class="card"><h3>历史开发交接（协调方转述）</h3><p>现时权限 UNKNOWN；不是生产执行授权或三方同版验收。</p><p>仓库 '+esc(h.repository)+' · 分支 '+esc(h.branch)+' · 入口 '+esc(h.entry)+'</p><p>运行版本 '+esc(h.runtime_version)+' · 断点 '+esc(h.next_action)+'</p>'+h.records.map(function(r){return '<p>'+esc(r.phase)+' · '+esc(r.role)+' · 版本 '+esc(r.commit)+' · 基线 '+esc(r.base)+' · 依据 '+esc(r.basis)+' · 消息 '+esc(r.message_ref)+' · run '+esc(r.run_ref)+' · 记录时间 '+esc(r.timestamp_ms)+' · 记录 '+esc(r.file_ref)+'</p>';}).join('')+'</article>':'<p>历史交接来源 UNKNOWN；不代表未发生。</p>';
++ return heading+history+'<p>测试观察资料，任务编号仅供关联；来源及负责身份尚未核实，不构成实际接件、授权或验收证明。租户绑定未由此响应证明。</p>'+(ledger.ledger_state==='UNAVAILABLE'?'<p>台账不可用；不代表没有任务。</p>':rows.length?rows.map(function(t){return '<article class="card"><h3>'+esc(t.task_id)+'</h3><p>资料状态 '+esc(t.state)+' · 资料有效性 '+esc(t.validity)+'</p>'+(Array.isArray(t.handoffs)&&t.handoffs.length?t.handoffs.map(function(x){return '<p>交接资料 '+esc(x.status==='交接完成(范围)'?'资料显示交接完成，真实性尚待核实':x.status)+' · 版本 '+esc(x.version)+'；交出 / 接收 / 监督：'+esc(x.outgoing)+' / '+esc(x.receiving)+' / '+esc(x.supervisor)+'</p>';}).join(''):'<p>暂无交接资料；不代表未发生。</p>')+'</article>';}).join(''):'<p>无匹配的研发任务资料；不代表没有任务或交接。</p>')+'<a href="../delivery-ledger.html">查看原任务与交付资料</a></section>';
++}
++
++function render(data,route,twin,ledger){
++ route=route||parseRoute('#board/research-development');
++ if(route.board!=='research-development'||!['board','project','task'].includes(route.view))return '<div class="notice">此模块仅提供研发工作台；总图和3D现场由原导航承载。</div>';
++ if(!data||data.mode!=='TEST_ONLY'||!data.tenant_id||!Array.isArray(data.tasks)||!Array.isArray(data.anomalies))return '<section><h1>研发工作台</h1><p role="status">已授权只读数据未接入。项目、Agent、实例及执行活性未知；不使用演示数据填充。</p></section>';
++ if(!twin||twin.mode!=='TEST_ONLY'||twin.tenant_id!==data.tenant_id||!twin.records||!['tasks','ai_instances','evidence'].every(function(k){return Array.isArray(twin.records[k]);}))twin=null;
++ return route.view==='board'?developmentScene(data,twin,route)+developmentLedger(data,ledger):route.view==='project'?project(data,route):task(data,route)+(data.tasks.some(function(t){return t.task_id===route.task&&t.board_id===route.board;})?developmentLedger(data,ledger,route.task):'');
++}
++function mount(container,options){
++ var state=options||{},route=parseRoute(state.hash||'#board/research-development');
++ function paint(){container.innerHTML=render(state.data,route,state.twin,state.ledger);}
++ function go(hash){route=parseRoute(hash);paint();if(state.onNavigate)state.onNavigate(hash);}
++ function click(event){var button=event.target.closest('button');if(!button||!container.contains(button))return;
++ if(button.hasAttribute('data-parent')){if(state.onReturn)state.onReturn('overview');return;}
++ if(button.hasAttribute('data-go')){go(button.getAttribute('data-go'));return;}
++ if(button.id==='refresh'){if(state.onRefresh)state.onRefresh();return;}
++ if(button.id==='applyFilter'){go(href('board','research-development',null,{project:container.querySelector('#projectFilter').value,state:container.querySelector('#stateFilter').value,owner:container.querySelector('#ownerFilter').value}));}
++ }
++ container.addEventListener('click',click);paint();
++ return {update:function(data,twin,ledger){state.data=data;state.twin=twin;state.ledger=ledger;paint();},navigate:go,destroy:function(){container.removeEventListener('click',click);container.innerHTML='';}};
++}
++var api={parseRoute:parseRoute,href:href,render:render,mount:mount};
++if(typeof module!=='undefined')module.exports=api;
++else root.XuanjunResearchWorkbench=api;
++})(typeof window!=='undefined'?window:this);
+--- /dev/null
++++ b/demos/task-center-digital-twin/research-workbench/public-projection.js
+@@ -0,0 +1,34 @@
++(function(root){
++'use strict';
++var SOURCE='https://uk.wenwenwenyiyiyi.work/task-center-test/api/public-projection';
++function esc(v){return String(v==null?'UNKNOWN':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
++function count(v){return Number.isSafeInteger(v)&&v>=0?v:'UNKNOWN';}
++function project(p){
++ if(!p||p.mode!=='TEST_ONLY'||!Array.isArray(p.boards))throw Error('公共投影格式不匹配');
++ var matches=p.boards.filter(function(b){return b&&b.board_id==='research-development';}),b=matches.length===1?matches[0]:{};
++ var observed=typeof p.observed_at==='number'&&Number.isFinite(p.observed_at)&&p.observed_at>0&&p.observed_at<=8640000000000?p.observed_at:null;
++ var keys=['source','schema_version','snapshot_sha256','observed_at_unit','observed_at_semantics','valid_until','freshness'];
++ var metadata=null;
++ if(keys.some(function(k){return Object.prototype.hasOwnProperty.call(p,k);})){
++  if(p.source!=='task-center-public-projection'||p.schema_version!==1||typeof p.snapshot_sha256!=='string'||!/^[a-f0-9]{64}$/.test(p.snapshot_sha256)||p.observed_at_unit!=='unix_seconds'||p.observed_at_semantics!=='MAX_CANONICAL_TASK_LAST_EVENT_AT'||p.valid_until!==null||p.freshness!=='UNKNOWN')throw Error('公共摘要版本不匹配');
++  metadata={source:p.source,schema_version:1,snapshot_sha256:p.snapshot_sha256,observed_at_unit:p.observed_at_unit,observed_at_semantics:p.observed_at_semantics,valid_until:null,freshness:'UNKNOWN'};
++ }
++ // One response supplies counts, source event time and snapshot identity; never merge refreshes.
++ // Digest is a producer identity, not a client-verified signature or freshness proof.
++ // Explicit allowlist. Never forward task bodies, tenants, IDs, logs or unknown properties.
++ return {metadata:metadata,mode:'TEST_ONLY',production_status:p.production_status==='NOT_IMPLEMENTED'?'NOT_IMPLEMENTED':'UNKNOWN',observed_at:observed,task_count:count(b.task_count),active_count:count(b.active_count),blocked_count:count(b.blocked_count),health:['ACTIVE','NO_DATA','BLOCKED','HEALTHY','UNKNOWN'].includes(b.health)?b.health:'UNKNOWN'};
++}
++function render(p,receivedAt){
++ function label(v){return v==='UNKNOWN'?'待确认':esc(v);}
++ return '<article class="card"><h2>研发公共摘要</h2><p>任务 '+label(p.task_count)+' · 活跃汇总 '+label(p.active_count)+' · 阻塞 '+label(p.blocked_count)+'</p><p>数据观察时间：'+esc(p.observed_at===null?'待确认':new Date(p.observed_at*1000).toISOString())+'</p><p>数据时效待确认；刷新不代表有新的任务进展。</p><p>项目、执行人员及实例详情尚未接入；活跃汇总不代表具体实例正在运行。</p></article>';
++}
++function mount(container,options){
++ options=options||{};var generation=0,disposed=false;
++ async function refresh(){var request=++generation;container.innerHTML='<p role="status">正在读取公开摘要…</p>';
++ try{var response=await (options.fetch||root.fetch)(options.endpoint||SOURCE,{method:'GET',credentials:'omit',cache:'no-store',redirect:'error'});if(!response.ok)throw Error('HTTP '+response.status);var p=project(await response.json());if(disposed||request!==generation)return;container.innerHTML=render(p,new Date().toISOString());}
++ catch(error){if(disposed||request!==generation)return;container.innerHTML='<p role="status">公开摘要读取失败；当前数据待确认。未保留上次成功数值。请重试。</p>';}
++ }
++ refresh();return {refresh:refresh,destroy:function(){disposed=true;generation++;container.innerHTML='';}};
++}
++var api={source:SOURCE,project:project,render:render,mount:mount};if(typeof module!=='undefined')module.exports=api;else root.XuanjunPublicProjection=api;
++})(typeof window!=='undefined'?window:this);
+--- /dev/null
++++ b/demos/task-center-digital-twin/research-workbench/preview.js
+@@ -0,0 +1,23 @@
++'use strict';
++// Explicit read-only workbench; the server retains session and admin authority.
++var generation=0;
++var workbench=window.XuanjunResearchWorkbench.mount(document.getElementById('app'),{onRefresh:refreshWorkbench,onReturn:function(){window.location.href=new URL('../task-center.html',document.baseURI).href;}});
++function readProjection(path){
++ return fetch(new URL('../api/'+path,document.baseURI).href,{credentials:'same-origin',cache:'no-store'}).then(function(response){
++  if(!response.ok)throw new Error('unavailable');
++  return response.json();
++ });
++}
++function refreshWorkbench(){
++ var current=++generation;
++ // Clear previously authorized data immediately, including on session expiry.
++ workbench.update(null,null,null);
++ return Promise.all([
++  readProjection('projection').catch(function(){return null;}),
++  readProjection('admin/digital-twin').catch(function(){return null;}),
++  readProjection('admin/delivery-ledger').catch(function(){return null;})
++ ]).then(function(result){if(current===generation)workbench.update(result[0],result[1],result[2]);});
++}
++var publicSummary=window.XuanjunPublicProjection.mount(document.getElementById('publicSummary'),{endpoint:new URL('../api/public-projection',document.baseURI).href});
++document.getElementById('reloadPublic').onclick=publicSummary.refresh;
++refreshWorkbench();

@@ -103,9 +103,11 @@ class IntentDelta(unittest.TestCase):
 
     def test_expired_lease_before_invocation(self):
         f=self.f;calls=[]
-        # Establish candidate while no provider is connected, then expire its lease.
-        result=f.apply(f.proposal())
-        self.assertEqual(result['execution_state'],'NOT_CONNECTED')
+        # Create the candidate without invoking either executor, then expire it.
+        from unittest.mock import patch
+        with patch.object(f.adapter, '_run_producer_http_acceptance', return_value={'execution_state':'TEST_NOT_INVOKED'}):
+            result=f.apply(f.proposal())
+        self.assertEqual(result['execution_state'],'TEST_NOT_INVOKED')
         f.s.db.execute('UPDATE tasks SET authority_valid_until=0 WHERE task_id=?',('demo-b',));f.s.db.commit()
         f.adapter.execution_provider=lambda intent,source:calls.append(intent)
         with self.assertRaisesRegex(ValueError,'STALE_WRITER_TICKET'):

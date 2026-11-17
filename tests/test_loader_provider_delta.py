@@ -51,9 +51,9 @@ class LoaderDelta(unittest.TestCase):
         self.assertEqual(result['execution_state'],'ISOLATED_TEST_ELIGIBLE')
         self.assertEqual(len(calls),1)
         self.assertEqual((self.count('DEVELOPMENT_EXECUTION_INTENT'),self.count('DEVELOPMENT_EXECUTION')),(1,1))
-    def test_none_not_connected(self):
-        self.assertEqual(self.call(None)['execution_state'],'NOT_CONNECTED')
-        self.assertEqual(self.count('DEVELOPMENT_EXECUTION_INTENT'),0)
+    def test_none_uses_installed_producer(self):
+        self.assertEqual(self.call(None)['execution_state'],'ISOLATED_TEST_ELIGIBLE')
+        self.assertEqual(self.count('DEVELOPMENT_EXECUTION_INTENT'),1)
     def test_wrong_binding_rejected_before_execution(self):
         with self.assertRaises(ValueError): self.call(self.provider,True)
         self.assertEqual(self.provider.execute_calls,0)
