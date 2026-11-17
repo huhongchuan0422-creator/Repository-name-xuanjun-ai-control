@@ -1,7 +1,7 @@
 'use strict';
 // Explicit read-only workbench; the server retains session and admin authority.
 var generation=0;
-var workbench=window.XuanjunResearchWorkbench.mount(document.getElementById('app'),{onRefresh:refreshWorkbench});
+var workbench=window.XuanjunResearchWorkbench.mount(document.getElementById('app'),{onRefresh:refreshWorkbench,onReturn:function(){window.location.href=new URL('../task-center.html',document.baseURI).href;}});
 function readProjection(path){
  return fetch(new URL('../api/'+path,document.baseURI).href,{credentials:'same-origin',cache:'no-store'}).then(function(response){
   if(!response.ok)throw new Error('unavailable');

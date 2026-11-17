@@ -1255,12 +1255,12 @@
     },
     {
       "path": "demos/task-center-digital-twin/research-workbench/index.html",
-      "sha256": "d13ce92e34403a26eb12aff76ac827e8be38a39c92ae6ba2e2651cd4dbe5eecf",
+      "sha256": "3a358955f7b257c1b14a439dee0568ae3c36d46c6b5fdbb1a6c6773e996d38e7",
       "source": "integration-tc-144a"
     },
     {
       "path": "demos/task-center-digital-twin/research-workbench/preview.js",
-      "sha256": "b08f66727d503e1d64112a4e141beb0bdf356cf54a9cae047c5f33fcc854a091",
+      "sha256": "3d7e9ddf7f61a3c3b042d6ec8e124a739968131d965eb9aa0995d04b99fd69b7",
       "source": "integration-tc-144a"
     },
     {
@@ -1285,12 +1285,12 @@
     },
     {
       "path": "demos/task-center-digital-twin/task-center.html",
-      "sha256": "d129e1472a495fdd4b1a9e25d7e10ed32850de5b2cd1e9f1ef51675879c53cc5",
+      "sha256": "b943d2766a03a31ee38720cc72c6384a30a43c6ac1b9d162bf85703d0bba6728",
       "source": "integration-tc-144a"
     },
     {
       "path": "demos/task-center-digital-twin/task-center.js",
-      "sha256": "963010fd39cd07e41f8b004b3c09320785c132b41235bf5158213b80e50feda9",
+      "sha256": "1c98f206238abb0c6d7eb9040f34b61dff1c9acd8f7329c2a3219c014565d977",
       "source": "integration-tc-144a"
     },
     {
@@ -2075,7 +2075,7 @@
     },
     {
       "path": "tests/test_research_workbench_assets_delta.py",
-      "sha256": "9cb6e0ec36b5762dd08b0019a0000fb5b1d36070af2f5b0778d79cbce28620ff",
+      "sha256": "ecc3ffc5df3f46bbdf1407e83518b32053dea5148bee9668d8eaac4fcefb9505",
       "source": "integration-tc-144a"
     },
     {
