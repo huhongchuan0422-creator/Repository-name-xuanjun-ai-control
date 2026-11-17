@@ -24,11 +24,11 @@ KEY=bytes(range(32))
 PREFIX='/task-center-test/'
 CSP="default-src 'self'; object-src 'none'; frame-ancestors 'none'"
 ASSETS={
-    'index.html':('d13ce92e34403a26eb12aff76ac827e8be38a39c92ae6ba2e2651cd4dbe5eecf','text/html; charset=utf-8'),
+    'index.html':('3a358955f7b257c1b14a439dee0568ae3c36d46c6b5fdbb1a6c6773e996d38e7','text/html; charset=utf-8'),
     'styles.css':('7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab','text/css; charset=utf-8'),
     'workbench.js':('444a1bf2ea76c9b795c0e3e9190b3ddabf316b964dcf6277684395687599b31d','application/javascript; charset=utf-8'),
     'public-projection.js':('60625fed226b5daced47a5ce9c79ce3cf5a24546d4d9cfdbc2bd7f9c51caf543','application/javascript; charset=utf-8'),
-    'preview.js':('b08f66727d503e1d64112a4e141beb0bdf356cf54a9cae047c5f33fcc854a091','application/javascript; charset=utf-8'),
+    'preview.js':('3d7e9ddf7f61a3c3b042d6ec8e124a739968131d965eb9aa0995d04b99fd69b7','application/javascript; charset=utf-8'),
 }
 
 class ScriptTags(HTMLParser):
