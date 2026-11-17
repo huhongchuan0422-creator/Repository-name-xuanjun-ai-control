@@ -32,8 +32,8 @@ class IntentDelta(unittest.TestCase):
         self.assertEqual(result['execution_state'],'ISOLATED_TEST_ELIGIBLE')
         candidate=f.s.development_candidate('demo-b',result['candidate_event_id'])
         f.s._require_development_execution_ready(candidate)
-        with self.assertRaisesRegex(ValueError,'EXECUTION_INTENT_ALREADY_EXISTS_RECONCILE'):
-            f.adapter._run_producer_http_acceptance('demo-b','attempt-b',result['candidate_event_id'],f.ticket,f.caller)
+        replay=f.adapter._run_producer_http_acceptance('demo-b','attempt-b',result['candidate_event_id'],f.ticket,f.caller)
+        self.assertEqual(replay['execution_event_id'],result['execution_event_id'])
     def test_wrong_receipt_binding(self):
         f=self.f
         def wrong(intent,source):

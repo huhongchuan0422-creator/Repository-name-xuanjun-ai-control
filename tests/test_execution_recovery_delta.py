@@ -43,7 +43,7 @@ class RecoveryDelta(unittest.TestCase):
         candidate=self.f.s.development_candidate('demo-b',recovered['candidate_event_id'])
         self.f.s._require_development_execution_ready(candidate)
         duplicate=self.host();self.assertEqual(duplicate['execution_event_id'],recovered['execution_event_id'])
-        self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,2))
+        self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,1))
         self.assertEqual((self.count('DEVELOPMENT_EXECUTION_INTENT'),self.count('DEVELOPMENT_EXECUTION')),(1,1))
     def test_unknown_query_never_reexecutes(self):
         self.timeout();self.provider.response='unknown'
@@ -53,13 +53,17 @@ class RecoveryDelta(unittest.TestCase):
         self.assertEqual((self.count('DEVELOPMENT_EXECUTION_INTENT'),self.count('DEVELOPMENT_EXECUTION')),(1,0))
     def test_missing_provider_never_replays_existing_intent(self):
         self.timeout()
-        candidate=self.f.s.db.execute("SELECT event_id FROM events WHERE kind='DEVELOPMENT_CANDIDATE'").fetchone()[0]
-        self.f.adapter.execution_provider=None
         with patch('producer_http_runner.run_producer_http') as old_runner:
-            with self.assertRaisesRegex(ValueError,'EXECUTION_INTENT_ALREADY_EXISTS_RECONCILE'):
-                self.f.adapter._run_producer_http_acceptance('demo-b','attempt-b',candidate,self.f.ticket,self.f.caller)
+            result=self.f.host_call(self.rid)
+            self.assertEqual(result['execution_state'],'UNKNOWN')
+            self.assertEqual(result['reconciliation_state'],'NO_QUERY_CAPABILITY_NO_REPLAY')
+            self.assertFalse(result['execution_evidence_verified'])
             old_runner.assert_not_called()
         self.assertEqual((self.provider.execute_calls,self.count('DEVELOPMENT_EXECUTION')),(1,0))
+        # The original entry can query the real host-injected provider later.
+        recovered=self.host()
+        self.assertEqual(recovered['execution_state'],'ISOLATED_TEST_ELIGIBLE')
+        self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,1))
     def test_bad_query_receipt_rejected(self):
         self.timeout()
         for field in ('wrong_intent','wrong_source','wrong_test'):

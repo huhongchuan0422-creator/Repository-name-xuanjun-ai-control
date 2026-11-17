@@ -275,6 +275,17 @@ class LocalDevelopmentExecutor:
                 if (old['kind']!='DEVELOPMENT_EXECUTION_INTENT' or old['evidence_ref']!=intent_digest
                     or old['payload_json']!=intent_body):
                     raise ValueError('EXECUTION_INTENT_BINDING_CONFLICT')
+                # Reuse only the already-persisted canonical execution, under
+                # the same live writer/tenant/source/contract checks above.
+                execution_id='producer-http-execution:'+candidate['source_operation_id']
+                recorded=self.control.db.execute('SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                    (task_id,attempt_id,execution_id)).fetchone()
+                if recorded is not None:
+                    self.supervisor._require_development_execution_ready(candidate)
+                    evidence=json.loads(recorded['payload_json'])
+                    return {'execution_state':'ISOLATED_TEST_ELIGIBLE','execution_evidence_verified':True,
+                            'execution_event_id':execution_id,'execution_artifact_sha256':evidence['artifact_sha256'],
+                            'generated_code_executed':True,'next_action':'WAIT_INDEPENDENT_REVIEW'}
             else:
                 self.control.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',
                     (task_id,attempt_id,intent_id,'DEVELOPMENT_EXECUTION_INTENT',now,'TEST_INTENT',intent_digest,intent_body))
@@ -282,7 +293,10 @@ class LocalDevelopmentExecutor:
         # MCP callers cannot supply a receipt, or assert that execution never began.
         if old is not None:
             query=getattr(provider,'query',None)
-            if not callable(query):raise ValueError('EXECUTION_INTENT_ALREADY_EXISTS_RECONCILE')
+            if not callable(query):
+                return {'execution_state':'UNKNOWN','execution_evidence_verified':False,
+                        'next_action':'RECONCILE_WITH_TRUSTED_QUERY_PROVIDER',
+                        'reconciliation_state':'NO_QUERY_CAPABILITY_NO_REPLAY'}
             observation=query(intent)
             if observation is None:
                 return {'execution_state':'UNKNOWN','execution_evidence_verified':False,

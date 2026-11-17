@@ -36,7 +36,7 @@ class LoaderDelta(unittest.TestCase):
         self.assertEqual(result['execution_state'],'ISOLATED_TEST_ELIGIBLE')
         candidate=self.f.s.development_candidate('demo-b',result['candidate_event_id']); self.f.s._require_development_execution_ready(candidate)
         self.assertEqual(self.call(self.provider)['execution_event_id'],result['execution_event_id'])
-        self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,3))
+        self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,2))
         self.assertEqual((self.count('DEVELOPMENT_EXECUTION_INTENT'),self.count('DEVELOPMENT_EXECUTION')),(1,1))
     def test_fixed_http_oracle_via_loader(self):
         import hashlib

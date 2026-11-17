@@ -39,7 +39,7 @@ class StartupDelta(unittest.TestCase):
         self.provider.response='receipt'; r=self.call(self.provider)
         self.assertEqual(r['execution_state'],'ISOLATED_TEST_ELIGIBLE')
         self.assertEqual(self.call(self.provider)['execution_event_id'],r['execution_event_id'])
-        self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,3))
+        self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,2))
         self.assertEqual((self.count('DEVELOPMENT_EXECUTION_INTENT'),self.count('DEVELOPMENT_EXECUTION')),(1,1))
     def test_cli_default_uses_installed_producer(self):
         self.assertEqual(self.call(None)['execution_state'],'ISOLATED_TEST_ELIGIBLE')

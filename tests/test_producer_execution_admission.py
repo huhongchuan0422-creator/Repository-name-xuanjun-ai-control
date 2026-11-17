@@ -30,6 +30,37 @@ class ExecutionAdmission(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'HOLD_SANDBOX_UNAVAILABLE'):
             f.s._require_development_execution_ready(candidate)
         print('SYNTHETIC_EXECUTION result='+json.dumps(result,sort_keys=True))
+    def test_repeated_success_reuses_bound_execution_and_rejects_tamper(self):
+        from unittest.mock import patch
+        import producer_http_runner
+        f=self.f; request=f.proposal(); real=producer_http_runner.run_producer_http
+        with patch('producer_http_runner.run_producer_http',wraps=real) as runner:
+            first=f.host_call(request); second=f.host_call(request)
+            self.assertEqual(runner.call_count,1)
+        self.assertTrue(first['execution_evidence_verified'])
+        self.assertTrue(second['execution_evidence_verified'])
+        self.assertEqual(first['execution_event_id'],second['execution_event_id'])
+        self.assertEqual(first['execution_artifact_sha256'],second['execution_artifact_sha256'])
+        self.assertEqual(f.s.db.execute("SELECT count(*) FROM events WHERE kind='DEVELOPMENT_EXECUTION'").fetchone()[0],1)
+        prior=f.s.db.execute("SELECT evidence_ref FROM events WHERE kind='DEVELOPMENT_EXECUTION_INTENT'").fetchone()[0]
+        f.s.db.execute("UPDATE events SET evidence_ref=? WHERE kind='DEVELOPMENT_EXECUTION_INTENT'",('0'*64,));f.s.db.commit()
+        with self.assertRaisesRegex(ValueError,'EXECUTION_INTENT_BINDING_CONFLICT'):f.host_call(request)
+        f.s.db.execute("UPDATE events SET evidence_ref=? WHERE kind='DEVELOPMENT_EXECUTION_INTENT'",(prior,));f.s.db.commit()
+        f.s.db.execute("UPDATE events SET evidence_ref=? WHERE kind='DEVELOPMENT_EXECUTION'",('0'*64,));f.s.db.commit()
+        with self.assertRaisesRegex(ValueError,'HOLD_SANDBOX_UNAVAILABLE'):f.host_call(request)
+
+    def test_fixed_runner_unknown_stays_unknown_without_replay(self):
+        from unittest.mock import patch
+        f=self.f; request=f.proposal()
+        with patch('producer_http_runner.run_producer_http',side_effect=TimeoutError('lost result')) as runner:
+            with self.assertRaises(TimeoutError):f.host_call(request)
+            result=f.host_call(request)
+            self.assertEqual(runner.call_count,1)
+        self.assertEqual(result['execution_state'],'UNKNOWN')
+        self.assertEqual(result['reconciliation_state'],'NO_QUERY_CAPABILITY_NO_REPLAY')
+        self.assertFalse(result['execution_evidence_verified'])
+        self.assertEqual(f.s.db.execute("SELECT count(*) FROM events WHERE kind='DEVELOPMENT_EXECUTION'").fetchone()[0],0)
+
     def test_wrong_http_semantics_do_not_admit(self):
         f=self.f;f.raw=f.raw.replace(b"'MAX_CANONICAL_TASK_LAST_EVENT_AT'",b"'NOT_THE_EXPECTED_SEMANTICS'")
         with self.assertRaisesRegex(ValueError,'PRODUCER_HTTP_TEST_NOT_PASSED'):f.host_call(f.proposal())
