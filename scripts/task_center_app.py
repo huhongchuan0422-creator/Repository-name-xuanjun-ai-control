@@ -1557,6 +1557,7 @@ def main(argv=None, *, execution_provider=None):
     parser.add_argument('--allow-mcp-model-outbound',action='store_true')
     parser.add_argument('--mcp-dispatch-config-file')
     parser.add_argument('--mcp-development-config-file')
+    parser.add_argument('--mcp-producer-provider-directory')
     parser.add_argument('--correction-observer-interval',type=int,choices=(180,300))
     args = parser.parse_args(argv)
     raw_key = (args.test_authority_key if args.test_authority_key is not None
@@ -1601,6 +1602,11 @@ def main(argv=None, *, execution_provider=None):
         raise ValueError('ADMIN_TOKEN_OR_IDENTITY_REQUIRED')
     if identity_provider is not None and (admin_token is not None or actor_tokens):
         raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
+    if args.mcp_producer_provider_directory:
+        if execution_provider is not None or not args.mcp_development_config_file:
+            raise ValueError('PRODUCER_PROVIDER_CONFIGURATION_CONFLICT')
+        from producer_http_provider import ProducerHTTPProvider
+        execution_provider = ProducerHTTPProvider(args.mcp_producer_provider_directory)
     from task_center_mcp_development import load_host as load_development_host
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
