@@ -132,12 +132,30 @@ class MainProcessTest(unittest.TestCase):
                 return rows,task,intent,json.loads(stored[0][1]),stored[0][2]
             proc=start();first_pid=proc.pid;token=oauth();first=apply(token)
             self.assertEqual(first['execution_state'],'ISOLATED_TEST_ELIGIBLE');self.assertEqual(first['next_action'],'WAIT_INDEPENDENT_REVIEW')
+            status=jpost('/mcp',{'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'task_development_status',
+                'arguments':{'task_id':'demo-b','attempt_id':'attempt-b'}}},{'Authorization':'Bearer '+token})
+            self.assertEqual(json.loads(status['result']['content'][0]['text'])['execution_state'],'ISOLATED_TEST_ELIGIBLE')
+            # Only this temporary TEST_ONLY ledger is altered to verify that
+            # corrupt evidence cannot be projected as execution eligibility.
+            with sqlite3.connect(str(root/'ledger.sqlite')) as db:
+                original=db.execute("SELECT evidence_ref FROM events WHERE kind='DEVELOPMENT_EXECUTION'").fetchone()[0]
+                db.execute("UPDATE events SET evidence_ref=? WHERE kind='DEVELOPMENT_EXECUTION'",('0'*64,))
+            try:
+                status=jpost('/mcp',{'jsonrpc':'2.0','id':3,'method':'tools/call','params':{'name':'task_development_status',
+                    'arguments':{'task_id':'demo-b','attempt_id':'attempt-b'}}},{'Authorization':'Bearer '+token})
+                self.assertEqual(json.loads(status['result']['content'][0]['text'])['execution_state'],'HOLD_SANDBOX_UNAVAILABLE')
+            finally:
+                with sqlite3.connect(str(root/'ledger.sqlite')) as db:
+                    db.execute("UPDATE events SET evidence_ref=? WHERE kind='DEVELOPMENT_EXECUTION'",(original,))
             before=readback();self.assertEqual(hashlib.sha256(before[4]).hexdigest(),first['execution_artifact_sha256'])
             stop(proc);proc=None
             proc=start();second_pid=proc.pid;self.assertNotEqual(first_pid,second_pid)
             second=apply(token);after=readback()
             self.assertEqual(second['execution_event_id'],first['execution_event_id']);self.assertTrue(second['duplicate'])
             self.assertEqual(after,before);self.assertEqual(second['next_action'],'WAIT_INDEPENDENT_REVIEW')
+            status=jpost('/mcp',{'jsonrpc':'2.0','id':4,'method':'tools/call','params':{'name':'task_development_status',
+                'arguments':{'task_id':'demo-b','attempt_id':'attempt-b'}}},{'Authorization':'Bearer '+token})
+            self.assertEqual(json.loads(status['result']['content'][0]['text'])['execution_state'],'ISOLATED_TEST_ELIGIBLE')
             stop(proc);proc=None
             print('PROCESS_PROOF '+json.dumps({'main_pids':[first_pid,second_pid],'main_exit_codes':[0,0],
                 'task':'demo-b','attempt':'attempt-b','intent_sha256':hashlib.sha256(canonical(before[2]).encode()).hexdigest(),

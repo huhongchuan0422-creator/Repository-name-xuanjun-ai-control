@@ -26,7 +26,7 @@ def tools():
     for name,extra in EXTRA.items():
         p={k:{'type':'string','minLength':1,'maxLength':200} for k in ('task_id','attempt_id')+extra}
         if 'reviews' in p:p['reviews']={'type':'array','maxItems':2,'items':{'type':'object'}}
-        out.append({'name':name,'description':'Original host-bound development workflow; signed reviews required; LOCAL_ONLY runtime execution remains HOLD.',
+        out.append({'name':name,'description':'Original host-bound development workflow; signed reviews required; LOCAL_ONLY execution requires pinned evidence.',
             'inputSchema':{'type':'object','properties':p,'required':list(p),'additionalProperties':False}})
     return out
 
@@ -159,10 +159,18 @@ class DevelopmentHost:
             elif name=='task_development_finalize':
                 result=finalize_reviewed_candidate(s,a['task_id'],a['reviewed_event_id'],a['completion_event_id'],admission_check=lambda:check(True))
             else:
-                candidates=list(s.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='DEVELOPMENT_CANDIDATE'",(a['task_id'],a['attempt_id'])))
-                local=any(json.loads(x[0]).get('source_kind')=='LOCAL_ONLY_CONFIRMED_OPERATION' for x in candidates)
+                candidates=[json.loads(x[0]) for x in s.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='DEVELOPMENT_CANDIDATE'",(a['task_id'],a['attempt_id']))]
+                local=[x for x in candidates if x.get('source_kind')=='LOCAL_ONLY_CONFIRMED_OPERATION']
+                execution_state='HOLD_SANDBOX_UNAVAILABLE' if local else 'REFER_TO_CANONICAL_SIGNED_REVIEW'
+                if len(local)==1 and len(candidates)==1:
+                    try:
+                        s._require_development_execution_ready(local[0])
+                    except ValueError:
+                        pass
+                    else:
+                        execution_state='ISOLATED_TEST_ELIGIBLE'
                 result={'task_id':a['task_id'],'attempt_id':a['attempt_id'],'canonical_task_state':task['state'],'authority_state':task['authority_state'],
-                    'execution_state':'HOLD_SANDBOX_UNAVAILABLE' if local else 'REFER_TO_CANONICAL_SIGNED_REVIEW',
+                    'execution_state':execution_state,
                     'source_kind':'AUTHENTICATED_MCP','observation_only':True}
             return {'jsonrpc':'2.0','id':value.get('id'),'result':{'content':[{'type':'text','text':json.dumps(result,sort_keys=True)}],'isError':False}}
         finally:s.close()

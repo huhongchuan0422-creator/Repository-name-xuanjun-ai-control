@@ -74,6 +74,7 @@ class DevelopmentBridgeTests(unittest.TestCase):
     def test_source_apply_uses_original_writer_and_never_executes_code(self):
         rid=self.f.proposal();result=self.call('developer-1','task_development_apply',request_id=rid)
         self.assertEqual(result['execution_state'],'HOLD_SANDBOX_UNAVAILABLE');self.assertFalse(result['generated_code_executed'])
+        self.assertEqual(self.call('developer-1','task_development_status')['execution_state'],'HOLD_SANDBOX_UNAVAILABLE')
         self.assertEqual(self.f.git('show','refs/heads/main:module.py'),self.f.raw.decode().strip())
         with self.assertRaisesRegex(ValueError,'HOLD_SANDBOX'):
             self.call('qa','task_development_review',candidate_event_id=result['candidate_event_id'],reviewed_event_id='review-local',reviews=[])
