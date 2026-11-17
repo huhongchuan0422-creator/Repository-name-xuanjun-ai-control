@@ -2173,21 +2173,21 @@
       "provenance": "verified-producer-base"
     },
     {
-      "mode": "0600",
+      "mode": "0644",
       "path": "scripts/producer_http_contract.py",
       "sha256": "52673857af86fe712fe3449f1744ab3ed3dbcd38e10b744775e6e10e29e4c165",
       "size": 286,
       "provenance": "verified-producer-base"
     },
     {
-      "mode": "0600",
+      "mode": "0644",
       "path": "scripts/producer_http_runner.py",
       "sha256": "ecca53ddfa680b064b76ca6824c1d468f3dd3bbc4c3120b3c1c45561405f676e",
       "size": 5494,
       "provenance": "verified-producer-base"
     },
     {
-      "mode": "0600",
+      "mode": "0644",
       "path": "scripts/producer_tree_delta.py",
       "sha256": "f06fa33bb32c1007ef71d07de0d6f9e4ef153e368dfef406b8a164f2e8ab5eee",
       "size": 2358,
