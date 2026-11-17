@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('assert');const fs=require('fs');const vm=require('vm');
+const workbench=require('../demos/task-center-digital-twin/research-workbench/workbench.js');
+const code=fs.readFileSync('demos/task-center-digital-twin/research-workbench/preview.js','utf8');
+const pending=[];let refresh, updates=[];
+const app={innerHTML:'',addEventListener(){},removeEventListener(){},contains(){return true;}};
+const realMount=workbench.mount;
+const window={XuanjunResearchWorkbench:{mount(el,options){refresh=options.onRefresh;const mounted=realMount(el,options);return {update(d,t){updates.push([d,t]);mounted.update(d,t);}};}},XuanjunPublicProjection:{mount(){return {refresh(){}};}}};
+const context={window,document:{baseURI:'https://example.test/task-center-test/research-workbench/',getElementById(id){return id==='app'?app:{};}},URL,Promise,fetch(url,options){return new Promise(resolve=>pending.push({url,options,resolve}));}};
+const data={mode:'TEST_ONLY',tenant_id:'t',tasks:[{board_id:'research-development',project_id:'project-one',task_id:'task-one'}],anomalies:[]};
+const twin={mode:'TEST_ONLY',tenant_id:'t',records:{tasks:[],ai_instances:[],evidence:[]}};
+const respond=(p,status,body)=>p.resolve({ok:status===200,status,json:()=>Promise.resolve(body)});
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+(async()=>{vm.runInNewContext(code,context);assert.equal(pending.length,2);assert.equal(pending[0].url,'https://example.test/task-center-test/api/projection');assert.equal(pending[1].url,'https://example.test/task-center-test/api/admin/digital-twin');assert.equal(pending[0].options.credentials,'same-origin');respond(pending[0],200,data);respond(pending[1],200,twin);await tick();assert(app.innerHTML.includes('task-one'));assert.strictEqual(updates.at(-1)[1],twin);
+refresh();assert(app.innerHTML.includes('已授权只读数据未接入'));respond(pending[2],401,{});respond(pending[3],403,{});await tick();assert(app.innerHTML.includes('已授权只读数据未接入'));
+refresh();respond(pending[4],200,data);respond(pending[5],403,{});await tick();assert(app.innerHTML.includes('task-one'));assert.strictEqual(updates.at(-1)[1],null);
+refresh();respond(pending[6],200,data);respond(pending[7],200,{...twin,tenant_id:'other'});await tick();assert(workbench.render(data,{view:'board',board:'research-development',query:{scene:'ai'}},{...twin,tenant_id:'other'}).includes('无权访问'));
+refresh();refresh();respond(pending[10],200,data);respond(pending[11],200,twin);await tick();const count=updates.length;respond(pending[8],401,{});respond(pending[9],403,{});await tick();assert.equal(updates.length,count);assert(app.innerHTML.includes('task-one'));console.log('preview delta passed');})().catch(e=>{console.error(e);process.exitCode=1;});
