@@ -22,9 +22,13 @@ class ResearchEntryJourney(SessionAuthIntegrationTests):
         from task_center_app import make_server
         from task_center_session_auth import FileTestIdentityProvider
         import threading
+        from task_delivery_observer import MetadataReader
+        from task_delivery_observation import ApprovedObservationReader
+        source=os.path.join(os.path.dirname(os.path.dirname(__file__)),'evidence/development-handoff/main-relayed-20261117.json')
+        reader=MetadataReader('/nonexistent-read-only-ledger','pilot354','ledger-writer','tenant-session',ApprovedObservationReader(source,'main-development-handoff-20261117'))
         server=make_server(self.db, b'0123456789abcdef0123456789abcdef', 'tenant-session', 'viewer', port=0,
           identity_provider=FileTestIdentityProvider(self.identity_path), session_store=self.sessions,
-          base_path='/task-center-test/')
+          base_path='/task-center-test/',delivery_ledger_reader=reader)
         thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
         base='http://127.0.0.1:%d/task-center-test/'%server.server_port
         try:
@@ -38,9 +42,13 @@ class ResearchEntryJourney(SessionAuthIntegrationTests):
             self.assertEqual(denied.exception.code,401)
             with self.assertRaises(HTTPError) as denied: get(anon,'api/admin/digital-twin')
             self.assertEqual(denied.exception.code,403)
+            with self.assertRaises(HTTPError) as denied: get(anon,'api/admin/delivery-ledger')
+            self.assertEqual(denied.exception.code,403)
             viewer=client();login(viewer,'viewer','fixture-viewer-only')
             self.assertEqual(json.loads(get(viewer,'api/session').read())['roles'],['TASK_CENTER_VIEWER'])
             with self.assertRaises(HTTPError) as denied: get(viewer,'api/admin/digital-twin')
+            self.assertEqual(denied.exception.code,403)
+            with self.assertRaises(HTTPError) as denied: get(viewer,'api/admin/delivery-ledger')
             self.assertEqual(denied.exception.code,403)
             admin=client();login(admin,'admin','fixture-password-only')
             html=get(admin,'task-center.html').read().decode();links=Links();links.feed(html)
@@ -55,6 +63,10 @@ class ResearchEntryJourney(SessionAuthIntegrationTests):
             twin=json.loads(get(admin,'api/admin/digital-twin').read())
             self.assertEqual(twin['tenant_id'],'tenant-session')
             self.assertEqual(twin['permissions']['read_role'],'TASK_CENTER_ADMIN')
+            observed=json.loads(get(admin,'api/admin/delivery-ledger').read())
+            self.assertEqual(observed['ledger_state'],'UNAVAILABLE')
+            self.assertEqual(observed['observations']['development_handoff']['branch'],'candidate/tc-workbench-resources-20261115')
+            self.assertEqual(observed['observations']['permission_verification'],'UNKNOWN')
             self.assertEqual(get(admin,'task-center.html').status,200)
         finally:
             server.shutdown();server.server_close();thread.join(2)

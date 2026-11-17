@@ -26,9 +26,9 @@ CSP="default-src 'self'; object-src 'none'; frame-ancestors 'none'"
 ASSETS={
     'index.html':('3a358955f7b257c1b14a439dee0568ae3c36d46c6b5fdbb1a6c6773e996d38e7','text/html; charset=utf-8'),
     'styles.css':('7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab','text/css; charset=utf-8'),
-    'workbench.js':('444a1bf2ea76c9b795c0e3e9190b3ddabf316b964dcf6277684395687599b31d','application/javascript; charset=utf-8'),
+    'workbench.js':('fd6d43e9092b2ff666314ec6517db39e227fa57cab8d30830f8c4182f9c5dd7e','application/javascript; charset=utf-8'),
     'public-projection.js':('60625fed226b5daced47a5ce9c79ce3cf5a24546d4d9cfdbc2bd7f9c51caf543','application/javascript; charset=utf-8'),
-    'preview.js':('3d7e9ddf7f61a3c3b042d6ec8e124a739968131d965eb9aa0995d04b99fd69b7','application/javascript; charset=utf-8'),
+    'preview.js':('77dbd0213f12de8a5ba75dbbf7bcee16ac75e032e56fd0990cc381a706a8d6f6','application/javascript; charset=utf-8'),
 }
 
 class ScriptTags(HTMLParser):

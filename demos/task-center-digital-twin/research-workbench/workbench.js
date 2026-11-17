@@ -27,16 +27,26 @@ var boardNames={'research-development':'研发'};
     return heading+'<p class="meta">受控候选投影；新鲜度 UNKNOWN，证据引用不代表可解引用或验收通过。</p><h2>AI 角色</h2>'+(links||'<p>没有可关联实例；不代表无人在工作。</p>')+(q.role?'<h2>具体实例：'+esc(q.role)+'</h2>'+(instanceLinks||'<p>实例不可用或无权访问。</p>'):'')+detail+'</section>';
   }
 
-function render(data,route,twin){
+function developmentLedger(data,ledger,taskId){
+ var heading='<section><h2>任务与三方交接资料</h2>';
+ if(!ledger||ledger.mode!=='TEST_ONLY'||!Array.isArray(ledger.tasks)||(ledger.tenant_id!=null&&ledger.tenant_id!==data.tenant_id))return heading+'<p>台账暂不可用或无权查看；交接及来源范围 UNKNOWN。</p></section>';
+ var allowed=new Set(data.tasks.filter(function(t){return t.board_id==='research-development'&&(!taskId||t.task_id===taskId);}).map(function(t){return t.task_id;}));
+ var rows=ledger.tasks.filter(function(t){return allowed.has(t.task_id);});
+ var h=ledger.observations&&ledger.observations.development_handoff;
+ var history=h&&Array.isArray(h.records)?'<article class="card"><h3>历史开发交接（协调方转述）</h3><p>现时权限 UNKNOWN；不是生产执行授权或三方同版验收。</p><p>仓库 '+esc(h.repository)+' · 分支 '+esc(h.branch)+' · 入口 '+esc(h.entry)+'</p><p>运行版本 '+esc(h.runtime_version)+' · 断点 '+esc(h.next_action)+'</p>'+h.records.map(function(r){return '<p>'+esc(r.phase)+' · '+esc(r.role)+' · 版本 '+esc(r.commit)+' · 基线 '+esc(r.base)+' · 依据 '+esc(r.basis)+' · 消息 '+esc(r.message_ref)+' · run '+esc(r.run_ref)+' · 记录时间 '+esc(r.timestamp_ms)+' · 记录 '+esc(r.file_ref)+'</p>';}).join('')+'</article>':'<p>历史交接来源 UNKNOWN；不代表未发生。</p>';
+ return heading+history+'<p>测试观察资料，任务编号仅供关联；来源及负责身份尚未核实，不构成实际接件、授权或验收证明。租户绑定未由此响应证明。</p>'+(ledger.ledger_state==='UNAVAILABLE'?'<p>台账不可用；不代表没有任务。</p>':rows.length?rows.map(function(t){return '<article class="card"><h3>'+esc(t.task_id)+'</h3><p>资料状态 '+esc(t.state)+' · 资料有效性 '+esc(t.validity)+'</p>'+(Array.isArray(t.handoffs)&&t.handoffs.length?t.handoffs.map(function(x){return '<p>交接资料 '+esc(x.status==='交接完成(范围)'?'资料显示交接完成，真实性尚待核实':x.status)+' · 版本 '+esc(x.version)+'；交出 / 接收 / 监督：'+esc(x.outgoing)+' / '+esc(x.receiving)+' / '+esc(x.supervisor)+'</p>';}).join(''):'<p>暂无交接资料；不代表未发生。</p>')+'</article>';}).join(''):'<p>无匹配的研发任务资料；不代表没有任务或交接。</p>')+'<a href="../delivery-ledger.html">查看原任务与交付资料</a></section>';
+}
+
+function render(data,route,twin,ledger){
  route=route||parseRoute('#board/research-development');
  if(route.board!=='research-development'||!['board','project','task'].includes(route.view))return '<div class="notice">此模块仅提供研发工作台；总图和3D现场由原导航承载。</div>';
  if(!data||data.mode!=='TEST_ONLY'||!data.tenant_id||!Array.isArray(data.tasks)||!Array.isArray(data.anomalies))return '<section><h1>研发工作台</h1><p role="status">已授权只读数据未接入。项目、Agent、实例及执行活性未知；不使用演示数据填充。</p></section>';
  if(!twin||twin.mode!=='TEST_ONLY'||twin.tenant_id!==data.tenant_id||!twin.records||!['tasks','ai_instances','evidence'].every(function(k){return Array.isArray(twin.records[k]);}))twin=null;
- return route.view==='board'?developmentScene(data,twin,route):route.view==='project'?project(data,route):task(data,route);
+ return route.view==='board'?developmentScene(data,twin,route)+developmentLedger(data,ledger):route.view==='project'?project(data,route):task(data,route)+(data.tasks.some(function(t){return t.task_id===route.task&&t.board_id===route.board;})?developmentLedger(data,ledger,route.task):'');
 }
 function mount(container,options){
  var state=options||{},route=parseRoute(state.hash||'#board/research-development');
- function paint(){container.innerHTML=render(state.data,route,state.twin);}
+ function paint(){container.innerHTML=render(state.data,route,state.twin,state.ledger);}
  function go(hash){route=parseRoute(hash);paint();if(state.onNavigate)state.onNavigate(hash);}
  function click(event){var button=event.target.closest('button');if(!button||!container.contains(button))return;
  if(button.hasAttribute('data-parent')){if(state.onReturn)state.onReturn('overview');return;}
@@ -45,7 +55,7 @@ function mount(container,options){
  if(button.id==='applyFilter'){go(href('board','research-development',null,{project:container.querySelector('#projectFilter').value,state:container.querySelector('#stateFilter').value,owner:container.querySelector('#ownerFilter').value}));}
  }
  container.addEventListener('click',click);paint();
- return {update:function(data,twin){state.data=data;state.twin=twin;paint();},navigate:go,destroy:function(){container.removeEventListener('click',click);container.innerHTML='';}};
+ return {update:function(data,twin,ledger){state.data=data;state.twin=twin;state.ledger=ledger;paint();},navigate:go,destroy:function(){container.removeEventListener('click',click);container.innerHTML='';}};
 }
 var api={parseRoute:parseRoute,href:href,render:render,mount:mount};
 if(typeof module!=='undefined')module.exports=api;
