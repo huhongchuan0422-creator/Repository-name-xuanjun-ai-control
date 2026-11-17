@@ -92,6 +92,16 @@
       "source": "integration-tc-144a"
     },
     {
+      "path": "demos/task-center-digital-twin/delivery-ledger.html",
+      "reason": "not-tracked-or-invalid",
+      "source": "integration-tc-144a"
+    },
+    {
+      "path": "demos/task-center-digital-twin/delivery-ledger.js",
+      "reason": "not-tracked-or-invalid",
+      "source": "integration-tc-144a"
+    },
+    {
       "path": "scripts/p2_uk_swas_diagnostic.py",
       "reason": "phone-unclassified",
       "source": "integration-tc-144a"
@@ -1205,7 +1215,7 @@
     },
     {
       "path": "demos/task-center-digital-twin/admin.html",
-      "sha256": "60c82106c6b08fc18034ac3547698294fbeee3233433f4d20d18adf2c313481c",
+      "sha256": "604c49a633a91d3781e342e44b0edae2d50799448fbf5f7e290b8526a0cc25e9",
       "source": "integration-tc-144a"
     },
     {
@@ -1215,17 +1225,7 @@
     },
     {
       "path": "demos/task-center-digital-twin/app.js",
-      "sha256": "40fb1dcb41514154e76a978678ab068c6811ef6fae41a55cc0fc534a35c150ee",
-      "source": "integration-tc-144a"
-    },
-    {
-      "path": "demos/task-center-digital-twin/delivery-ledger.html",
-      "sha256": "fc783a5e0d80da88b6c5365d7caa90caeef0f878182b15cd83a543468cb666a8",
-      "source": "integration-tc-144a"
-    },
-    {
-      "path": "demos/task-center-digital-twin/delivery-ledger.js",
-      "sha256": "817dc09bb98384c7b63c405b24446d1e1a14676d1e3645294d6dab17e62afedc",
+      "sha256": "acdfe44920b9a416dc9195ae08a5205af38ec3f146924e6789452dc47d68dd19",
       "source": "integration-tc-144a"
     },
     {
@@ -1765,7 +1765,7 @@
     },
     {
       "path": "tests/development_ledger_delta.test.cjs",
-      "sha256": "0c811c12435d0672c3a26135f5c605fbf4384e61d81f2b6870c6445e451c436a",
+      "sha256": "c9210353a0d7e59285e8edbef0085b45ddff35f26747f5f73063f590f1011057",
       "source": "integration-tc-144a"
     },
     {
@@ -1870,12 +1870,12 @@
     },
     {
       "path": "tests/test_delivery_144a_delta.py",
-      "sha256": "6a5c942e0bb31af224c6906bf7c0d0f7cfb76ae045981de0562075cecbcb1902",
+      "sha256": "5ad916e3a8b912ebd40e51dada13c434768a893364cb474179e68d080b1bfae9",
       "source": "integration-tc-144a"
     },
     {
       "path": "tests/test_delivery_ledger_route.py",
-      "sha256": "2310d41a7c25b5b505f43b8240371ae2646a63447bcc73070fcd5a8a480efd37",
+      "sha256": "ebc5a0f97564170d7437fec6876fd7044c335fbd6bb6beea4cb74171293522c8",
       "source": "integration-tc-144a"
     },
     {
