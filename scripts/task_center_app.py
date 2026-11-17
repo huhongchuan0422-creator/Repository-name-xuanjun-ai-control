@@ -84,8 +84,6 @@ ASSETS = {
     '/login.html': ('login.html', 'text/html; charset=utf-8'),
     '/login.js': ('login.js', 'application/javascript; charset=utf-8'),
     '/oauth-callback.html': ('oauth-callback.html', 'text/html; charset=utf-8'),
-    '/delivery-ledger.html': ('delivery-ledger.html', 'text/html; charset=utf-8'),
-    '/delivery-ledger.js': ('delivery-ledger.js', 'application/javascript; charset=utf-8'),
     '/task-center.html': ('task-center.html', 'text/html; charset=utf-8'),
     '/task-center.js': ('task-center.js', 'application/javascript; charset=utf-8'),
     '/research-workbench/': ('research-workbench/index.html', 'text/html; charset=utf-8'),
@@ -782,8 +780,6 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 except Exception:
                     self._send(503,_json_bytes({'state':'UNAVAILABLE','writer_verification':'UNKNOWN'}),'application/json; charset=utf-8')
                 return
-            if path in ('/delivery-ledger.html','/delivery-ledger.js') and not self._delivery_admin_allowed():
-                self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),'application/json; charset=utf-8');return
             if path == '/api/admin/model-control':
                 if not self._admin_allowed():
                     self._send(403, _json_bytes({'error':'ADMIN_REQUIRED'}),

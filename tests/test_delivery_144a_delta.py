@@ -28,7 +28,7 @@ class Integration144a(unittest.TestCase):
         viewer,_,_=same.create({'tenant_id':'tenant-ui','principal_id':'fixture-readonly','roles':['TASK_VIEWER']})
         self.assertEqual(self.session_request(same,viewer),403)
         with mock.patch.object(same,'get',return_value={'tenant_id':'tenant-other','roles':['TASK_CENTER_ADMIN']}):
-            for path in ('/api/admin/delivery-ledger','/api/admin/delivery-handoff?task_id=task1','/api/admin/delivery-observer','/delivery-ledger.html'):
+            for path in ('/api/admin/delivery-ledger','/api/admin/delivery-handoff?task_id=task1','/api/admin/delivery-observer'):
                 self.assertEqual(self.session_request(same,token,path),403)
         wrong=MetadataReader(self.f.root,'synthetic','writer','tenant-other')
         with self.assertRaisesRegex(ValueError,'TEST_METADATA_TENANT_MISMATCH'):
