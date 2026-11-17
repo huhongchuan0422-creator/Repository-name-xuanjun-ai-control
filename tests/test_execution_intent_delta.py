@@ -7,11 +7,14 @@ ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 import local_development_executor
 import task_center_mcp_development
-sys.path.insert(0,str(ROOT/'tc-canonical-producer-scoped-20261114'/'candidate'/'tests'))
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 import test_producer_executor_delta as fixtures
+# The copied fixture is executed against this candidate's scripts, but its
+# repository and source assets remain in the original scoped delivery layout.
+fixtures.ROOT=ROOT/'deliveries'/'tc-canonical-producer-scoped-20261114'/'candidate'
 from task_supervisor import canonical
 import producer_http_runner
-producer_http_runner.__file__=str(ROOT/'tc-canonical-producer-scoped-20261114'/'candidate'/'scripts'/'producer_http_runner.py')
+producer_http_runner.__file__=str(Path(__file__).resolve().parents[1]/'scripts'/'producer_http_runner.py')
 
 class IntentDelta(unittest.TestCase):
     def setUp(self):
