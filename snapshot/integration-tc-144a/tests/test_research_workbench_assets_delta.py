@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -27,7 +28,7 @@ ASSETS={
     'styles.css':('7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab','text/css; charset=utf-8'),
     'workbench.js':('444a1bf2ea76c9b795c0e3e9190b3ddabf316b964dcf6277684395687599b31d','application/javascript; charset=utf-8'),
     'public-projection.js':('60625fed226b5daced47a5ce9c79ce3cf5a24546d4d9cfdbc2bd7f9c51caf543','application/javascript; charset=utf-8'),
-    'preview.js':('be4ed31f1d9244c837acdf47b5c249e46d6f97008dd948309cb2c98a9019735b','application/javascript; charset=utf-8'),
+    'preview.js':('b08f66727d503e1d64112a4e141beb0bdf356cf54a9cae047c5f33fcc854a091','application/javascript; charset=utf-8'),
 }
 
 class ScriptTags(HTMLParser):
@@ -80,6 +81,9 @@ class ResearchWorkbenchAssetsDelta(unittest.TestCase):
         for name in ('integration-manifest.json','resource-metadata.test.cjs','dev-preview.cjs'):
             with self.assertRaises(HTTPError) as caught:self.get(PREFIX+'research-workbench/'+name)
             self.assertEqual(caught.exception.code,404)
+    def test_preview_uses_real_http_projection_and_admin_denial(self):
+        subprocess.check_call(['node', 'tests/research_workbench_http_delta.test.cjs', self.base+PREFIX], cwd=ROOT, timeout=15)
+
     def test_public_api_error_is_503_without_internal_details(self):
         with patch.object(app,'read_only_projection',side_effect=ValueError('INTERNAL_PRIVATE_DETAIL')):
             with self.assertRaises(HTTPError) as caught:self.get(PREFIX+'api/public-projection')

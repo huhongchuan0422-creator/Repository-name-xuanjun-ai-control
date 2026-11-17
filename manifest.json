@@ -1260,7 +1260,7 @@
     },
     {
       "path": "demos/task-center-digital-twin/research-workbench/preview.js",
-      "sha256": "be4ed31f1d9244c837acdf47b5c249e46d6f97008dd948309cb2c98a9019735b",
+      "sha256": "b08f66727d503e1d64112a4e141beb0bdf356cf54a9cae047c5f33fcc854a091",
       "source": "integration-tc-144a"
     },
     {
@@ -2075,7 +2075,7 @@
     },
     {
       "path": "tests/test_research_workbench_assets_delta.py",
-      "sha256": "6de1b232dca4958547e65ab2b4f203c3c1d5c3ebc4098f6e8f21a05a5b1c3300",
+      "sha256": "9cb6e0ec36b5762dd08b0019a0000fb5b1d36070af2f5b0778d79cbce28620ff",
       "source": "integration-tc-144a"
     },
     {
