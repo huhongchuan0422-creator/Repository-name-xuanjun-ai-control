@@ -78,6 +78,25 @@ class DevelopmentBridgeTests(unittest.TestCase):
         self.assertEqual(self.f.git('show','refs/heads/main:module.py'),self.f.raw.decode().strip())
         with self.assertRaisesRegex(ValueError,'HOLD_SANDBOX'):
             self.call('qa','task_development_review',candidate_event_id=result['candidate_event_id'],reviewed_event_id='review-local',reviews=[])
+    def test_corrupt_candidate_payload_is_hold(self):
+        self.assertEqual(self.call('developer-1','task_development_status')['execution_state'],'REFER_TO_CANONICAL_SIGNED_REVIEW')
+        result=self.call('developer-1','task_development_apply',request_id=self.f.proposal())
+        event=result['candidate_event_id']
+        row=self.f.s.db.execute('SELECT payload_json FROM events WHERE event_id=?',(event,)).fetchone()
+        try:
+            for bad in ('{', 'null', '[]', '"text"', '17', b'\xff'):
+                with self.subTest(payload=bad):
+                    self.f.s.db.execute('UPDATE events SET payload_json=? WHERE event_id=?',(bad,event));self.f.s.db.commit()
+                    status=self.call('developer-1','task_development_status')
+                    self.assertEqual(status['execution_state'],'HOLD_SANDBOX_UNAVAILABLE')
+        finally:
+            self.f.s.db.execute('UPDATE events SET payload_json=? WHERE event_id=?',(row[0],event));self.f.s.db.commit()
+        self.f.s.db.execute('''INSERT INTO events SELECT task_id,attempt_id,event_id||'-corrupt',kind,observed_at,evidence_kind,evidence_ref,?
+            FROM events WHERE event_id=?''',('{',event));self.f.s.db.commit()
+        try:
+            self.assertEqual(self.call('developer-1','task_development_status')['execution_state'],'HOLD_SANDBOX_UNAVAILABLE')
+        finally:
+            self.f.s.db.execute('DELETE FROM events WHERE event_id=?',(event+'-corrupt',));self.f.s.db.commit()
     def test_native_signed_review_and_original_revoke_finalize(self):
         candidate,reviews=self.native_candidate()
         result=self.call('qa','task_development_review',candidate_event_id=candidate,reviewed_event_id='review-native',reviews=reviews)

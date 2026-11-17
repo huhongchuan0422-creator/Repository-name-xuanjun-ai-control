@@ -102,15 +102,15 @@ class MainProcessTest(unittest.TestCase):
                 redirect='https://chatgpt.com/connector_platform_oauth_redirect'
                 client=jpost('/oauth/register',{'redirect_uris':[redirect],'grant_types':['authorization_code'],
                     'response_types':['code'],'token_endpoint_auth_method':'none'})
-                login=raw('/api/session/login','POST',json.dumps({'username':'fixture-developer','password':'fixture-password-only'}).encode(),
-                    {'Content-Type':'application/json','Origin':ORIGIN})
-                cookie=login.headers.get_all('Set-Cookie')[0].split(';',1)[0]
+                with raw('/api/session/login','POST',json.dumps({'username':'fixture-developer','password':'fixture-password-only'}).encode(),
+                    {'Content-Type':'application/json','Origin':ORIGIN}) as login:
+                    cookie=login.headers.get_all('Set-Cookie')[0].split(';',1)[0]
                 verifier='z'*64;challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
                 resource=ORIGIN+BASE+'/mcp'
                 params={'response_type':'code','client_id':client['client_id'],'redirect_uri':redirect,'code_challenge':challenge,
                     'code_challenge_method':'S256','state':'fixture-only','resource':resource,'scope':'task:read task:submit'}
-                response=raw('/oauth/authorize?'+urlencode(params),headers={'Cookie':cookie})
-                code=parse_qs(urlsplit(response.headers['Location']).query)['code'][0]
+                with raw('/oauth/authorize?'+urlencode(params),headers={'Cookie':cookie}) as response:
+                    code=parse_qs(urlsplit(response.headers['Location']).query)['code'][0]
                 exchange={'grant_type':'authorization_code','code':code,'client_id':client['client_id'],
                     'redirect_uri':redirect,'code_verifier':verifier,'resource':resource}
                 return json.loads(raw('/oauth/token','POST',urlencode(exchange).encode(),{'Content-Type':'application/x-www-form-urlencoded'}).read())['access_token']
@@ -135,6 +135,20 @@ class MainProcessTest(unittest.TestCase):
             status=jpost('/mcp',{'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'task_development_status',
                 'arguments':{'task_id':'demo-b','attempt_id':'attempt-b'}}},{'Authorization':'Bearer '+token})
             self.assertEqual(json.loads(status['result']['content'][0]['text'])['execution_state'],'ISOLATED_TEST_ELIGIBLE')
+            # Exercise the actual HTTP status read with corrupted candidate
+            # payloads only in this temporary isolated TEST_ONLY ledger.
+            with sqlite3.connect(str(root/'ledger.sqlite')) as db:
+                candidate_body=db.execute('SELECT payload_json FROM events WHERE event_id=?',(first['candidate_event_id'],)).fetchone()[0]
+            try:
+                for damaged in ('{','null'):
+                    with sqlite3.connect(str(root/'ledger.sqlite')) as db:
+                        db.execute('UPDATE events SET payload_json=? WHERE event_id=?',(damaged,first['candidate_event_id']))
+                    status=jpost('/mcp',{'jsonrpc':'2.0','id':5,'method':'tools/call','params':{'name':'task_development_status',
+                        'arguments':{'task_id':'demo-b','attempt_id':'attempt-b'}}},{'Authorization':'Bearer '+token})
+                    self.assertEqual(json.loads(status['result']['content'][0]['text'])['execution_state'],'HOLD_SANDBOX_UNAVAILABLE')
+            finally:
+                with sqlite3.connect(str(root/'ledger.sqlite')) as db:
+                    db.execute('UPDATE events SET payload_json=? WHERE event_id=?',(candidate_body,first['candidate_event_id']))
             # Only this temporary TEST_ONLY ledger is altered to verify that
             # corrupt evidence cannot be projected as execution eligibility.
             with sqlite3.connect(str(root/'ledger.sqlite')) as db:
