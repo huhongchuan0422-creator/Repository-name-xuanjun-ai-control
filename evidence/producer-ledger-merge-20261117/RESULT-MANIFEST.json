@@ -4,7 +4,7 @@
   "base_result_files_sha256": "59dadb8f70c430753b4b55158fe17541930ff70dd238e514930a7dc9fdf6bba1",
   "base_app_sha256": "a0d3b074a9deb4091070861b13a551190714294d216bf494dd46dfdd02cd8296",
   "candidate_commit": "16ac19e53ed39804f942cf381eed859c6e92bc23",
-  "patch_sha256": "03a4dbf7cb9fc151fb69af63835489909b73576a73cd77e34091231bb51c4fda",
+  "patch_sha256": "6ae7aa6fca47cd5b232d991e2775979315c9ee421bf6bcaddc0bd066371fd58b",
   "includes": "scripts/, demos/task-center-digital-twin/, producer-test-assets/ files from verified producer baseline plus listed delta; no installed-only scan",
   "excludes": [
     "INSTALL_MANIFEST.json",
@@ -24,8 +24,8 @@
       "path": "scripts/local_development_executor.py",
       "operation": "modify",
       "base_sha256": "f97b5e59eda027a2bc5c0576a8e3dd9d9bbd1c398017a1ed4f4bc5af45f0b4ef",
-      "result_sha256": "b6abfa5fd72b3f8ce9d2020d707cd8a6152f6b4d9c2caf552c757b8131afca0f",
-      "result_size": 27435,
+      "result_sha256": "409d153383d25a43f771397d934061b5c10fd6370b85d84f8ef319e464a66faa",
+      "result_size": 30072,
       "result_mode": "0644"
     },
     {
@@ -1992,8 +1992,8 @@
     },
     {
       "path": "scripts/local_development_executor.py",
-      "sha256": "b6abfa5fd72b3f8ce9d2020d707cd8a6152f6b4d9c2caf552c757b8131afca0f",
-      "size": 27435,
+      "sha256": "409d153383d25a43f771397d934061b5c10fd6370b85d84f8ef319e464a66faa",
+      "size": 30072,
       "mode": "0644",
       "provenance": "merged-result"
     },

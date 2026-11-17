@@ -56,7 +56,7 @@ class RecoveryDelta(unittest.TestCase):
         with patch('producer_http_runner.run_producer_http') as old_runner:
             result=self.f.host_call(self.rid)
             self.assertEqual(result['execution_state'],'UNKNOWN')
-            self.assertEqual(result['reconciliation_state'],'NO_QUERY_CAPABILITY_NO_REPLAY')
+            self.assertEqual(result['reconciliation_state'],'ORIGINAL_PROVIDER_UNAVAILABLE_NO_REPLAY')
             self.assertFalse(result['execution_evidence_verified'])
             old_runner.assert_not_called()
         self.assertEqual((self.provider.execute_calls,self.count('DEVELOPMENT_EXECUTION')),(1,0))
@@ -64,6 +64,45 @@ class RecoveryDelta(unittest.TestCase):
         recovered=self.host()
         self.assertEqual(recovered['execution_state'],'ISOLATED_TEST_ELIGIBLE')
         self.assertEqual((self.provider.execute_calls,self.provider.query_calls),(1,1))
+    def test_different_provider_cannot_claim_original_invocation(self):
+        self.timeout()
+        original=self.provider
+        impostor=Provider()
+        # An attacker can fabricate a receipt from the public intent; it must
+        # never even be queried when it did not start this invocation.
+        def forged(intent):
+            impostor.query_calls+=1
+            return {'intent_sha256':hashlib.sha256(canonical(intent).encode()).hexdigest(),
+                'result':{'state':'PASS','detail':'HTTP_PUBLIC_CONTRACT'},
+                'test_reference_sha256':intent['test_reference_sha256'],
+                'source_sha256':intent['source_sha256'],'artifact_sha256':'a'*64}
+        impostor.query=forged
+        self.provider=impostor
+        result=self.host()
+        self.assertEqual(result['execution_state'],'UNKNOWN')
+        self.assertEqual(result['reconciliation_state'],'ORIGINAL_PROVIDER_UNAVAILABLE_NO_REPLAY')
+        self.assertEqual((impostor.execute_calls,impostor.query_calls,self.count('DEVELOPMENT_EXECUTION')),(0,0,0))
+        self.provider=original
+        self.assertEqual(self.host()['execution_state'],'ISOLATED_TEST_ELIGIBLE')
+        self.assertEqual((original.execute_calls,original.query_calls),(1,1))
+    def test_legacy_intent_without_source_never_queries_provider(self):
+        import json
+        self.timeout()
+        row=self.f.s.db.execute("SELECT payload_json FROM events WHERE kind='DEVELOPMENT_EXECUTION_INTENT'").fetchone()
+        intent=json.loads(row['payload_json']);del intent['execution_source']
+        body=canonical(intent);digest=hashlib.sha256(body.encode()).hexdigest()
+        self.f.s.db.execute("UPDATE events SET payload_json=?,evidence_ref=? WHERE kind='DEVELOPMENT_EXECUTION_INTENT'",(body,digest));self.f.s.db.commit()
+        result=self.host()
+        self.assertEqual(result['execution_state'],'UNKNOWN')
+        self.assertEqual((self.provider.execute_calls,self.provider.query_calls,self.count('DEVELOPMENT_EXECUTION')),(1,0,0))
+    def test_fixed_runner_unknown_cannot_be_claimed_by_new_provider(self):
+        with patch('producer_http_runner.run_producer_http',side_effect=TimeoutError('fixed unknown')) as runner:
+            with self.assertRaises(TimeoutError):self.f.host_call(self.rid)
+            result=self.host()
+            self.assertEqual(runner.call_count,1)
+        self.assertEqual(result['execution_state'],'UNKNOWN')
+        self.assertEqual(result['reconciliation_state'],'ORIGINAL_PROVIDER_UNAVAILABLE_NO_REPLAY')
+        self.assertEqual((self.provider.execute_calls,self.provider.query_calls,self.count('DEVELOPMENT_EXECUTION')),(0,0,0))
     def test_bad_query_receipt_rejected(self):
         self.timeout()
         for field in ('wrong_intent','wrong_source','wrong_test'):

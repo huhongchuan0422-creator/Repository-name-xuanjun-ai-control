@@ -8,7 +8,10 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import stat
+import threading
+import weakref
 import subprocess
 from pathlib import Path
 from task_writer_fence import OfflineGitCAS
@@ -20,6 +23,32 @@ PRODUCER_SNAPSHOT = 'fe9b78539bf92674ca8dcddeb5fb1813ccd032d6b34d5e6e65528444dc6
 PRODUCER_BASE_TREE = '6ce6cc628cc8107c5146e17357844b8aa9d84d42'
 
 SANDBOX_STATE='HOLD_SANDBOX_UNAVAILABLE'
+
+# A query must be issued by the very same host-injected provider instance that
+# started an invocation. Random IDs are persisted; the object-to-ID mapping is
+# intentionally process-local, so a restart cannot guess old custody.
+_PROVIDER_SOURCES={}
+_PROVIDER_SOURCES_LOCK=threading.RLock()
+
+def _provider_source(provider):
+    if provider is None:
+        return {'kind':'FIXED_RUNNER','id':secrets.token_hex(32)}
+    key=id(provider)
+    with _PROVIDER_SOURCES_LOCK:
+        entry=_PROVIDER_SOURCES.get(key)
+        if entry is not None and entry[0]() is provider:
+            return {'kind':'PROVIDER_INSTANCE','id':entry[1]}
+        source_id=secrets.token_hex(32)
+        def forget(ref):
+            with _PROVIDER_SOURCES_LOCK:
+                current=_PROVIDER_SOURCES.get(key)
+                if current is not None and current[0] is ref:
+                    _PROVIDER_SOURCES.pop(key,None)
+        try:ref=weakref.ref(provider,forget)
+        except TypeError:
+            return {'kind':'UNQUERYABLE_PROVIDER','id':source_id}
+        _PROVIDER_SOURCES[key]=(ref,source_id)
+        return {'kind':'PROVIDER_INSTANCE','id':source_id}
 
 
 def capabilities():
@@ -241,6 +270,7 @@ class LocalDevelopmentExecutor:
             raise ValueError('EXECUTION_WRITER_BINDING_MISMATCH')
         if contract.get('producer_http_test_sha256') != REFERENCE_SHA256:
             raise ValueError('PINNED_PRODUCER_TEST_REQUIRED')
+        source=_provider_source(self.execution_provider)
         provider=self.execution_provider
         if provider is None:
             # Preserve the installed runner while recording intent before any
@@ -258,8 +288,9 @@ class LocalDevelopmentExecutor:
         source_sha256=hashlib.sha256(raw).hexdigest()
         if source_sha256!=candidate['files'][ALLOWED_FILE]:
             raise ValueError('CANDIDATE_SOURCE_DIGEST_MISMATCH')
-        intent=dict(binding,source_sha256=source_sha256,test_reference_sha256=REFERENCE_SHA256,
-                    source_operation_id=candidate['source_operation_id'])
+        intent_base=dict(binding,source_sha256=source_sha256,test_reference_sha256=REFERENCE_SHA256,
+                         source_operation_id=candidate['source_operation_id'])
+        intent=dict(intent_base,execution_source=source)
         intent_id='producer-http-intent:'+candidate['source_operation_id']
         intent_body=canonical(intent)
         intent_digest=hashlib.sha256(intent_body.encode()).hexdigest()
@@ -272,9 +303,21 @@ class LocalDevelopmentExecutor:
             old=self.control.db.execute('SELECT kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
                 (task_id,attempt_id,intent_id)).fetchone()
             if old is not None:
-                if (old['kind']!='DEVELOPMENT_EXECUTION_INTENT' or old['evidence_ref']!=intent_digest
-                    or old['payload_json']!=intent_body):
+                try:
+                    stored=json.loads(old['payload_json'])
+                    stored_source=stored.get('execution_source')
+                    stored_base={k:v for k,v in stored.items() if k!='execution_source'}
+                    source_valid=(stored_source is None or
+                        (type(stored_source) is dict and set(stored_source)=={'kind','id'} and
+                         stored_source['kind'] in ('FIXED_RUNNER','PROVIDER_INSTANCE','UNQUERYABLE_PROVIDER') and
+                         isinstance(stored_source['id'],str) and re.fullmatch('[0-9a-f]{64}',stored_source['id'])))
+                    if (old['kind']!='DEVELOPMENT_EXECUTION_INTENT' or stored_base!=intent_base or not source_valid or
+                        old['payload_json']!=canonical(stored) or old['evidence_ref']!=hashlib.sha256(old['payload_json'].encode()).hexdigest()):
+                        raise ValueError('EXECUTION_INTENT_BINDING_CONFLICT')
+                except (TypeError,ValueError,AttributeError):
                     raise ValueError('EXECUTION_INTENT_BINDING_CONFLICT')
+                intent=stored
+                intent_digest=old['evidence_ref']
                 # Reuse only the already-persisted canonical execution, under
                 # the same live writer/tenant/source/contract checks above.
                 execution_id='producer-http-execution:'+candidate['source_operation_id']
@@ -292,6 +335,11 @@ class LocalDevelopmentExecutor:
         # Only the host-injected provider may query the original invocation.
         # MCP callers cannot supply a receipt, or assert that execution never began.
         if old is not None:
+            if (stored_source is None or stored_source.get('kind')!='PROVIDER_INSTANCE' or
+                source!=stored_source):
+                return {'execution_state':'UNKNOWN','execution_evidence_verified':False,
+                        'next_action':'RECONCILE_ORIGINAL_EXECUTION',
+                        'reconciliation_state':'ORIGINAL_PROVIDER_UNAVAILABLE_NO_REPLAY'}
             query=getattr(provider,'query',None)
             if not callable(query):
                 return {'execution_state':'UNKNOWN','execution_evidence_verified':False,

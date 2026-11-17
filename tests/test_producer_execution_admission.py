@@ -57,7 +57,7 @@ class ExecutionAdmission(unittest.TestCase):
             result=f.host_call(request)
             self.assertEqual(runner.call_count,1)
         self.assertEqual(result['execution_state'],'UNKNOWN')
-        self.assertEqual(result['reconciliation_state'],'NO_QUERY_CAPABILITY_NO_REPLAY')
+        self.assertEqual(result['reconciliation_state'],'ORIGINAL_PROVIDER_UNAVAILABLE_NO_REPLAY')
         self.assertFalse(result['execution_evidence_verified'])
         self.assertEqual(f.s.db.execute("SELECT count(*) FROM events WHERE kind='DEVELOPMENT_EXECUTION'").fetchone()[0],0)
 
