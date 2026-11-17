@@ -26,7 +26,7 @@ CSP="default-src 'self'; object-src 'none'; frame-ancestors 'none'"
 ASSETS={
     'index.html':('3a358955f7b257c1b14a439dee0568ae3c36d46c6b5fdbb1a6c6773e996d38e7','text/html; charset=utf-8'),
     'styles.css':('7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab','text/css; charset=utf-8'),
-    'workbench.js':('de7a1513f1a0a3c2b34276bf9beff0baa55819f4cbd30d4671b6c76ede4ceee3','application/javascript; charset=utf-8'),
+    'workbench.js':('f1ee19509623b61800fdea778cf4dbc7ae7f7665ed991546fe9e53b6e9c9d73c','application/javascript; charset=utf-8'),
     'public-projection.js':('60625fed226b5daced47a5ce9c79ce3cf5a24546d4d9cfdbc2bd7f9c51caf543','application/javascript; charset=utf-8'),
     'preview.js':('77dbd0213f12de8a5ba75dbbf7bcee16ac75e032e56fd0990cc381a706a8d6f6','application/javascript; charset=utf-8'),
 }

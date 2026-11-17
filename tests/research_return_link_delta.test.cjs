@@ -10,7 +10,7 @@ for(const route of ['#board/research-development','#task/research-development/ta
  assert.match(html,/task-1/);
  assert.doesNotMatch(html,/delivery-ledger\.html/);
  const match=html.match(/<a href="([^"]+)">返回任务调度中心（公开调度摘要）<\/a>/);
- assert(match);links.push(match[1]);
+ assert(match);assert.match(html,/<\/a><span>返回后将退出当前详情。<\/span>/);links.push(match[1]);
 }
 const denied=ui.render(data,ui.parseRoute('#board/research-development'),null,{...ledger,tenant_id:'other-tenant'});
 assert.match(denied,/台账暂不可用或无权查看/);

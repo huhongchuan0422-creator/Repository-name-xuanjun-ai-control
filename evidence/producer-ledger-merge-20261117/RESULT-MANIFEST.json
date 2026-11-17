@@ -4,7 +4,7 @@
   "base_result_files_sha256": "59dadb8f70c430753b4b55158fe17541930ff70dd238e514930a7dc9fdf6bba1",
   "base_app_sha256": "a0d3b074a9deb4091070861b13a551190714294d216bf494dd46dfdd02cd8296",
   "candidate_commit": "16ac19e53ed39804f942cf381eed859c6e92bc23",
-  "patch_sha256": "e82b70026ba63d78392532f4d28995dc6303ce2f6a2c53e03c25cf969a0dfd94",
+  "patch_sha256": "ab3f4a1a2964062a50907b53a334eb46f21549918e44ef0ed45175988be30588",
   "includes": "scripts/, demos/task-center-digital-twin/, producer-test-assets/ files from verified producer baseline plus listed delta; no installed-only scan",
   "excludes": [
     "INSTALL_MANIFEST.json",
@@ -120,8 +120,8 @@
       "path": "demos/task-center-digital-twin/research-workbench/workbench.js",
       "operation": "add",
       "base_sha256": null,
-      "result_sha256": "de7a1513f1a0a3c2b34276bf9beff0baa55819f4cbd30d4671b6c76ede4ceee3",
-      "result_size": 14942,
+      "result_sha256": "f1ee19509623b61800fdea778cf4dbc7ae7f7665ed991546fe9e53b6e9c9d73c",
+      "result_size": 14988,
       "result_mode": "0644"
     },
     {
@@ -228,8 +228,8 @@
     },
     {
       "path": "demos/task-center-digital-twin/research-workbench/workbench.js",
-      "sha256": "de7a1513f1a0a3c2b34276bf9beff0baa55819f4cbd30d4671b6c76ede4ceee3",
-      "size": 14942,
+      "sha256": "f1ee19509623b61800fdea778cf4dbc7ae7f7665ed991546fe9e53b6e9c9d73c",
+      "size": 14988,
       "mode": "0644",
       "provenance": "merged-result"
     },
