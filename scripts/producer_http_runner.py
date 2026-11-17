@@ -23,6 +23,13 @@ KEY=b'0123456789abcdef0123456789abcdef'
 
 
 def run_producer_http(source):
+    """Compatibility API: return the original hash-only observation."""
+    observation, _ = run_producer_http_with_artifact(source)
+    return observation
+
+
+def run_producer_http_with_artifact(source):
+    """Return the observation and exact bounded stdout bytes; not an attestation."""
     if type(source) is not bytes or not 1 <= len(source) <= 131072:
         raise ValueError('BOUNDED_PRODUCER_SOURCE_REQUIRED')
     assets=Path(__file__).resolve().parents[1]/'producer-test-assets'
@@ -82,5 +89,5 @@ def run_producer_http(source):
             try:result=json.loads(out.decode('ascii'))
             except (ValueError,UnicodeError):raise ValueError('PRODUCER_HTTP_TEST_UNAVAILABLE')
             if not isinstance(result,dict) or set(result)!={'state','detail'}:raise ValueError('PRODUCER_HTTP_TEST_UNAVAILABLE')
-            return {'result':result,'artifact_sha256':hashlib.sha256(out).hexdigest(),
-                    'test_reference_sha256':REFERENCE_SHA256,'source_sha256':hashlib.sha256(source).hexdigest()}
+            return ({'result':result,'artifact_sha256':hashlib.sha256(out).hexdigest(),
+                     'test_reference_sha256':REFERENCE_SHA256,'source_sha256':hashlib.sha256(source).hexdigest()}, out)
