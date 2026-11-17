@@ -1,3 +1,5 @@
+> `RETURN-LINK-FIX.md` supersedes earlier artifact hashes after the 4eb1 installed-closure review.
+
 > `SOURCE-BINDING-FIX.md` supersedes earlier provider identity and artifact-hash statements after independent eae1 review.
 
 # Installed producer + ledger/workbench merge (author test, not deployment)

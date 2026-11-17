@@ -26,7 +26,7 @@ CSP="default-src 'self'; object-src 'none'; frame-ancestors 'none'"
 ASSETS={
     'index.html':('3a358955f7b257c1b14a439dee0568ae3c36d46c6b5fdbb1a6c6773e996d38e7','text/html; charset=utf-8'),
     'styles.css':('7518dbf2cf1346df7c13449c51bb1cfd568cc5821db262acb00f5769eac25dab','text/css; charset=utf-8'),
-    'workbench.js':('fd6d43e9092b2ff666314ec6517db39e227fa57cab8d30830f8c4182f9c5dd7e','application/javascript; charset=utf-8'),
+    'workbench.js':('de7a1513f1a0a3c2b34276bf9beff0baa55819f4cbd30d4671b6c76ede4ceee3','application/javascript; charset=utf-8'),
     'public-projection.js':('60625fed226b5daced47a5ce9c79ce3cf5a24546d4d9cfdbc2bd7f9c51caf543','application/javascript; charset=utf-8'),
     'preview.js':('77dbd0213f12de8a5ba75dbbf7bcee16ac75e032e56fd0990cc381a706a8d6f6','application/javascript; charset=utf-8'),
 }
@@ -83,6 +83,23 @@ class ResearchWorkbenchAssetsDelta(unittest.TestCase):
             self.assertEqual(caught.exception.code,404)
     def test_preview_uses_real_http_projection_and_admin_denial(self):
         subprocess.check_call(['node', 'tests/research_workbench_http_delta.test.cjs', self.base+PREFIX], cwd=ROOT, timeout=15)
+
+    def test_rendered_return_link_resolves_to_existing_main_entry(self):
+        # Use the actually served JS from the selected app root (including
+        # installed-base overlays), not a separately copied JS fixture.
+        workbench=os.path.join(app.ASSET_ROOT,'research-workbench','workbench.js')
+        payload=subprocess.check_output(['node','tests/research_return_link_delta.test.cjs',workbench],cwd=ROOT,timeout=15)
+        links=json.loads(payload.decode('utf-8'))
+        for page in ('research-workbench/','research-workbench/index.html'):
+            for link in links:
+                target=urljoin(self.base+PREFIX+page,link)
+                self.assertEqual(target,self.base+PREFIX+'task-center.html')
+                status,_,body=self.get(PREFIX+'task-center.html')
+                self.assertEqual(status,200)
+                self.assertIn(b'id=\"researchEntry\"',body)
+                self.assertIn(b'task-center.js',body)
+        with self.assertRaises(HTTPError) as denied:self.get(PREFIX+'api/admin/delivery-ledger')
+        self.assertEqual(denied.exception.code,403)
 
     def test_public_api_error_is_503_without_internal_details(self):
         with patch.object(app,'read_only_projection',side_effect=ValueError('INTERNAL_PRIVATE_DETAIL')):
