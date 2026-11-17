@@ -11,11 +11,12 @@ function readProjection(path){
 function refreshWorkbench(){
  var current=++generation;
  // Clear previously authorized data immediately, including on session expiry.
- workbench.update(null,null);
+ workbench.update(null,null,null);
  return Promise.all([
   readProjection('projection').catch(function(){return null;}),
-  readProjection('admin/digital-twin').catch(function(){return null;})
- ]).then(function(result){if(current===generation)workbench.update(result[0],result[1]);});
+  readProjection('admin/digital-twin').catch(function(){return null;}),
+  readProjection('admin/delivery-ledger').catch(function(){return null;})
+ ]).then(function(result){if(current===generation)workbench.update(result[0],result[1],result[2]);});
 }
 var publicSummary=window.XuanjunPublicProjection.mount(document.getElementById('publicSummary'),{endpoint:new URL('../api/public-projection',document.baseURI).href});
 document.getElementById('reloadPublic').onclick=publicSummary.refresh;
