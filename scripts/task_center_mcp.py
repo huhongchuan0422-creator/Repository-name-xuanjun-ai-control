@@ -150,8 +150,13 @@ class RemoteTaskCenterMCP(object):
         if name=='task_dispatch_contract':return dispatch_contract()
         if name=='task_capabilities':return self.service.capabilities()
         if name=='task_submit':return self.service.submit(args)
-        if name=='task_get':return self.service.status(args['task_id'])
-        if name=='task_query_result':return self.service.result(args['task_id'])
+        if name in ('task_get','task_query_result'):
+            try:
+                return (self.service.status(args['task_id']) if name=='task_get'
+                        else self.service.result(args['task_id']))
+            except KeyError as exc:
+                if exc.args != ('MCP_TASK_NOT_VISIBLE',):raise
+                raise ValueError('MCP_TASK_NOT_VISIBLE') from None
         raise ValueError('UNKNOWN_MCP_TOOL')
     def rpc(self,value):
         method=value.get('method');rpc_id=value.get('id')
