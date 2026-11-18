@@ -440,7 +440,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
-                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None,handoff_host=None):
+                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None):
     from task_delivery_observer import MetadataReader
     if handoff_host is not None:
         from task_center_handoff_host import HandoffHost
@@ -449,6 +449,32 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
         databases=handoff_host.db.execute('PRAGMA database_list').fetchall()
         if not any(row[1]=='main' and os.path.realpath(row[2])==os.path.realpath(db_path) for row in databases):
             raise ValueError('HANDOFF_HOST_DATABASE_MISMATCH')
+    if ledger_bridge is not None:
+        from task_center_handoff_ledger import HandoffLedgerBridge
+        if (type(ledger_bridge) is not HandoffLedgerBridge or handoff_host is not ledger_bridge.host
+            or handoff_host.db_path is None or os.path.realpath(handoff_host.db_path)!=os.path.realpath(db_path)
+            or delivery_ledger_reader is not None):raise ValueError('HANDOFF_LEDGER_HOST_BINDING_REQUIRED')
+        delivery_ledger_reader=MetadataReader(ledger_bridge.root,ledger_bridge.namespace,ledger_bridge.writer,tenant_id,ledger_authority=ledger_bridge)
+
+    def host_call(method, *args):
+        if ledger_bridge is None:return getattr(handoff_host,method)(*args)
+        # A request owns its own existing database connection; never carry a
+        # creator-thread connection into a server thread or disable checks.
+        from urllib.parse import quote
+        from task_center_handoff_host import HandoffHost
+        from task_center_role_contract import RoleContractResolver
+        connection=sqlite3.connect('file:%s?mode=rw'%quote(handoff_host.db_path,safe='/'),uri=True,timeout=5)
+        connection.row_factory=sqlite3.Row
+        try:
+            original=handoff_host.role_contract
+            contract=RoleContractResolver(connection,original.contracts,original.intake_plans) if original is not None else None
+            readback=handoff_host._lifecycle_candidate_readback
+            root=os.path.dirname(readback.artifacts) if readback is not None else None
+            host=HandoffHost(connection,handoff_host.tenant_id,handoff_host.issuer,handoff_host.adapter,
+                clock=handoff_host.clock,mcp_config=handoff_host.mcp_config,role_contract=contract,candidate_lifecycle_root=root)
+            return getattr(host,method)(*args)
+        finally:connection.close()
+
     if delivery_ledger_reader is not None and type(delivery_ledger_reader) is not MetadataReader:
         raise ValueError('EXACT_TEST_METADATA_READER_REQUIRED')
     if delivery_ledger_reader is not None and delivery_ledger_reader.tenant_id!=tenant_id:
@@ -679,7 +705,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     if identity_provider.is_formal_session(session) is not True:raise ValueError('FORMAL_SESSION_REQUIRED')
                     query=__import__('urllib.parse').parse.parse_qs(urlsplit(self.path).query,keep_blank_values=True)
                     if set(query)!={'task_id','attempt_id','event_id'} or any(len(v)!=1 for v in query.values()):raise ValueError('EXACT_READ_REQUIRED')
-                    result=handoff_host.read_receipt(session,query['task_id'][0],query['attempt_id'][0],query['event_id'][0])
+                    result=host_call('read_receipt',session,query['task_id'][0],query['attempt_id'][0],query['event_id'][0])
                     self._send(200,_json_bytes(result),'application/json; charset=utf-8')
                 except Exception:
                     self._send(404,_json_bytes({'error':'HANDOFF_RECEIPT_UNAVAILABLE'}),'application/json; charset=utf-8')
@@ -971,7 +997,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     if length<2 or length>8192:raise ValueError('BODY_LIMIT')
                     value=json.loads(self.rfile.read(length).decode('utf-8'))
                     if not isinstance(value,dict) or set(value) not in ({'task_id','attempt_id','handoff_version'}, {'task_id','attempt_id','handoff_version','parent_event_id'}):raise ValueError('EXACT_REFERENCE_REQUEST_REQUIRED')
-                    result=handoff_host.issue_reference(session,value['task_id'],value['attempt_id'],value['handoff_version'],value.get('parent_event_id'))
+                    result=host_call('issue_reference',session,value['task_id'],value['attempt_id'],value['handoff_version'],value.get('parent_event_id'))
                     self._send(200,_json_bytes(result),'application/json; charset=utf-8')
                 except Exception:
                     self._send(409,_json_bytes({'error':'HANDOFF_REFERENCE_UNAVAILABLE'}),'application/json; charset=utf-8')
@@ -990,7 +1016,19 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     length=int(self.headers.get('Content-Length','0'))
                     if length<2 or length>8192:raise ValueError('BODY_LIMIT')
                     value=json.loads(self.rfile.read(length).decode('utf-8'))
-                    result=handoff_host.record(session,value)
+                    if ledger_bridge is not None and isinstance(value,dict) and value.get('ledger_event') is not None:
+                        event=value['ledger_event']
+                        if not isinstance(event,dict) or event.get('producer')!=ledger_bridge.writer or event.get('namespace')!=ledger_bridge.namespace:
+                            raise ValueError('HANDOFF_LEDGER_HOST_BINDING_REQUIRED')
+                    result=host_call('record',session,value)
+                    if ledger_bridge is not None and value.get('ledger_event') is not None and result.get('state') in ('RECORDED','ALREADY_RECORDED'):
+                        try:
+                            publication=ledger_bridge.flush(value['task_id'],value['attempt_id'],value['event_id'])
+                            result['ledger_publication']='CONFLICT' if publication['flush']['conflict'] else 'PUBLISHED'
+                        except Exception:
+                            # The authenticated DB transaction already committed;
+                            # caller must reconcile/retry, never report rollback.
+                            result['ledger_publication']='PENDING_RECOVERY'
                     self._send(200,_json_bytes(result),'application/json; charset=utf-8')
                 except Exception:
                     self._send(409,_json_bytes({'error':'HANDOFF_NOT_RECORDED'}),'application/json; charset=utf-8')
@@ -1581,7 +1619,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None):
+                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if mcp_development_host is not None:
@@ -1642,7 +1680,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 identity_provider,session_store,outbound_enabled,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
-                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader,handoff_host)
+                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader,handoff_host,ledger_bridge)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None
