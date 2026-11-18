@@ -57,7 +57,7 @@ def safe(value, key=None):
             if value not in ('UNKNOWN','UNAVAILABLE'): parse_time(value)
         elif key in ('branch',):
             if not re.fullmatch(r'[A-Za-z0-9_.:/-]{1,128}',value) or '..' in value: raise LedgerError('invalid branch')
-        elif not ID.fullmatch(value) or OPAQUE.search(value): raise LedgerError('invalid structured reference')
+        elif not ID.fullmatch(value) or (OPAQUE.search(value) and not re.fullmatch(r'(?:ev|ho)-[0-9a-f]{32}',value)): raise LedgerError('invalid structured reference')
     elif isinstance(value,bool):
         if key not in ('substantive','role_idle','unresolved_effects','permission_valid','owner_authorized'): raise LedgerError('invalid boolean')
     elif isinstance(value,int):
@@ -114,12 +114,15 @@ def validate(e):
 
 # The local marker is not an authentication system: enforce the same limited
 # offline policy on new, replayed, and already-present event files.
-def offline_policy(e, writer, namespace=None, filename=None):
+def offline_policy(e, writer, namespace=None, filename=None, authority=None):
     validate(e)
     if e['producer'] != writer: raise LedgerError('writer verification unavailable')
     if namespace is not None and e['namespace'] != namespace: raise LedgerError('namespace mismatch')
     if filename is not None and e['event_id'] != filename: raise LedgerError('event identity mismatch')
     if e['namespace'] != 'synthetic':
+        if authority is not None:
+            from task_center_handoff_ledger import HandoffLedgerBridge
+            if type(authority) is HandoffLedgerBridge and authority.verify_event(e, writer, namespace): return
         if e['validity'] != 'HISTORICAL' or e['type'] != 'register' or e['data']['validity'] == 'VERIFIED_NOW':
             raise LedgerError('writer verification unavailable')
         if e['data'].get('artifact_sha256','UNKNOWN') != 'UNKNOWN': raise LedgerError('artifact provenance unavailable')
@@ -142,12 +145,12 @@ def causal_order(events):
     return ordered,cycle
 
 class Store:
-    def __init__(self, root, writer):
-        self.root=Path(root); self.writer=ident(writer)
+    def __init__(self, root, writer, authority=None):
+        self.root=Path(root); self.writer=ident(writer); self.authority=authority
         for p in ('events','outbox','views'): (self.root/p).mkdir(parents=True,exist_ok=True)
         self._append(self.root/'writer.id', (self.writer+'\n').encode())
     def enqueue(self,e):
-        offline_policy(e,self.writer)
+        offline_policy(e,self.writer,authority=getattr(self,'authority',None))
         p=self.root/'outbox'/e['namespace']/ (e['event_id']+'.json')
         return self._append(p,canonical(e))
     @staticmethod
@@ -166,7 +169,7 @@ class Store:
         ident(namespace); folder=self.root/'outbox'/namespace
         counts={'appended':0,'duplicate':0,'conflict':0}
         for p in sorted(folder.glob('*.json')):
-            e=load(p); offline_policy(e,self.writer,namespace,p.stem)
+            e=load(p); offline_policy(e,self.writer,namespace,p.stem,authority=getattr(self,'authority',None))
             try:
                 outcome=self._append(self.root/'events'/namespace/p.name,canonical(e))
                 counts[outcome.lower()]+=1
@@ -178,7 +181,7 @@ class Store:
     def events(self,namespace):
         ident(namespace); items=[]
         for p in (self.root/'events'/namespace).glob('*.json'):
-            e=load(p); offline_policy(e,self.writer,namespace,p.stem)
+            e=load(p); offline_policy(e,self.writer,namespace,p.stem,authority=getattr(self,'authority',None))
             items.append(e)
         return sorted(items,key=lambda e:(parse_time(e['observed_at']),e['event_id']))
     def project(self,namespace,verifier=None):

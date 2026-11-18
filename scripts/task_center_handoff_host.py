@@ -42,6 +42,14 @@ class HostAuthAdapter(object):
         """
         return None
 
+    def assess_ledger_event(self, binding, event):
+        """Trusted host verifies every supplied snapshot/check/source fact; default denies."""
+        return False
+
+    def verify_ledger_event_current(self, event, host_record):
+        """Independently recheck identity and current permission for projection."""
+        return False
+
     def assess_candidate_bundle(self, binding):
         """Host-only artifact readback seam; base supplies no evidence.
 
@@ -218,6 +226,9 @@ class HandoffHost(object):
         return {'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','reason':reason,'alert_delivery':'UNKNOWN','event_id':value['event_id']}
 
     def record(self, session, value):
+        ledger_event=value.get('ledger_event') if isinstance(value,dict) else None
+        if ledger_event is not None:
+            value=dict(value);del value['ledger_event']
         required={'task_id','attempt_id','handoff_id','handoff_version','event_id','action','causation','snapshot_digest','backup_cycle_id','backup_manifest_sha256','checked','provider_ref'}
         if not isinstance(value,dict):raise ValueError('EXACT_HANDOFF_REQUEST_REQUIRED')
         extra={'target_ref'} if value.get('action')=='NOMINATE' else {'alignment_ref'} if value.get('action')=='VERIFIED' else set()
@@ -279,9 +290,15 @@ class HandoffHost(object):
                 return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',assessment,contract)
             key='handoff-host:'+value['event_id'];kind='AUTHENTICATED_HANDOFF_'+value['action']
             payload=dict(value,tenant_id=self.tenant_id,issuer=claims['issuer'],principal_id=claims['principal_id'],session_id=claims['session_id'],role_id=claims['role_id'],scope=claims['scope'],expires_at=claims['expires_at'],fence=task['fence'],epoch=task['epoch'],backup_cycle_at=assessment['cycle_at'],backup_state='COMPLETE',contract_id=contract['contract_id'],contract_version=contract['contract_version'],contract_sha256=contract['contract_sha256'])
+            if ledger_event is not None:
+                from task_center_handoff_ledger import validate_host_event
+                validate_host_event(self, binding, payload, ledger_event, now)
             prior=db.execute('SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],key)).fetchone()
             if prior is not None:
                 if prior['kind']!=kind or prior['payload_json']!=canonical(payload):raise ValueError('HANDOFF_EVENT_CONFLICT')
+                ledger_row=db.execute('SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind=?',(value['task_id'],value['attempt_id'],'handoff-ledger:'+value['event_id'],'HANDOFF_LEDGER_BOUND')).fetchone()
+                from task_delivery_ledger.core import canonical as ledger_canonical
+                if (ledger_row is None)!=(ledger_event is None) or (ledger_row is not None and ledger_row['payload_json']!=ledger_canonical(ledger_event).decode('utf-8')):raise ValueError('HANDOFF_LEDGER_CONFLICT')
                 db.rollback();return {'state':'ALREADY_RECORDED','event_id':value['event_id']}
             existing=db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind=? LIMIT 2049",(value['task_id'],value['attempt_id'],kind)).fetchall()
             if len(existing)>2048:raise ValueError('HANDOFF_HISTORY_LIMIT')
@@ -315,6 +332,9 @@ class HandoffHost(object):
             contract_record={k:payload[k] for k in ('tenant_id','task_id','attempt_id','event_id','handoff_id','handoff_version','backup_cycle_id','snapshot_digest','backup_manifest_sha256','provider_ref','issuer','contract_id','contract_version','contract_sha256')}
             db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],'handoff-contract:'+value['event_id'],'HANDOFF_CONTRACT_BOUND',now,'PHASE_EXECUTION','HOST_AUTHENTICATED',canonical(contract_record)))
             db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],key,kind,now,'PHASE_EXECUTION','HOST_AUTHENTICATED',canonical(payload)))
+            if ledger_event is not None:
+                from task_delivery_ledger.core import canonical as ledger_canonical
+                db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],'handoff-ledger:'+value['event_id'],'HANDOFF_LEDGER_BOUND',now,'PHASE_EXECUTION','HOST_AUTHENTICATED',ledger_canonical(ledger_event).decode('utf-8')))
             db.commit();return {'state':'RECORDED','event_id':value['event_id']}
         except Exception:
             db.rollback();raise

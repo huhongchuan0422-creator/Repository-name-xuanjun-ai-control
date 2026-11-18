@@ -9,11 +9,18 @@ class Unavailable(Exception): pass
 
 class MetadataReader(object):
     """Bound by the hosting test harness, never by an HTTP request."""
-    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None,handoff_verifier=None,backup_observation_reader=None,local_backup_reader=None):
+    def __init__(self,root,namespace,writer,tenant_id,observation_reader=None,handoff_verifier=None,backup_observation_reader=None,local_backup_reader=None,ledger_authority=None):
         if observation_reader is not None and type(observation_reader) is not ApprovedObservationReader: raise Unavailable()
         if backup_observation_reader is not None and (type(backup_observation_reader) is not ApprovedObservationReader or backup_observation_reader.collector_ref!='main-backup-observation-20261117'): raise Unavailable()
         if local_backup_reader is not None and type(local_backup_reader) is not LocalBackupReceiptReader: raise Unavailable()
-        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader;self.handoff_verifier=handoff_verifier;self.backup_observation_reader=backup_observation_reader;self.local_backup_reader=local_backup_reader
+        if ledger_authority is not None:
+            from task_center_handoff_ledger import HandoffLedgerBridge
+            if (type(ledger_authority) is not HandoffLedgerBridge or ledger_authority.host.tenant_id!=tenant_id
+                or os.path.realpath(ledger_authority.root)!=os.path.realpath(root)
+                or ledger_authority.namespace!=namespace or ledger_authority.writer!=writer):raise Unavailable()
+            if handoff_verifier is not None and handoff_verifier!=ledger_authority.verify_current:raise Unavailable()
+            handoff_verifier=ledger_authority.verify_current
+        self.root=os.path.realpath(root);self.namespace=ident(namespace);self.writer=ident(writer);self.tenant_id=ident(tenant_id);self.observation_reader=observation_reader;self.handoff_verifier=handoff_verifier;self.backup_observation_reader=backup_observation_reader;self.local_backup_reader=local_backup_reader;self.ledger_authority=ledger_authority
     def _backup(self):
         snapshot=backup_unavailable()
         if self.backup_observation_reader is not None:
@@ -30,7 +37,7 @@ class MetadataReader(object):
         if not os.path.isfile(marker) or not os.path.isdir(os.path.join(self.root,'events')): raise Unavailable()
         with open(marker,'r',encoding='utf8') as f:
             if f.read(130)!=self.writer+'\n': raise Unavailable()
-        store=Store.__new__(Store);store.root=__import__('pathlib').Path(self.root);store.writer=self.writer
+        store=Store.__new__(Store);store.root=__import__('pathlib').Path(self.root);store.writer=self.writer;store.authority=self.ledger_authority
         return store
     def view(self):
         try:store=self._store()
