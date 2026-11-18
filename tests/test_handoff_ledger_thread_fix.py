@@ -50,7 +50,7 @@ class ThreadFix(MainChain):
             def is_formal_session(self,session):return session.get('principal_id')=='alice'
         def connect():
             db=sqlite3.connect(self.path);db.row_factory=sqlite3.Row;return db
-        sessions=SessionStore(connect,'tenant-1')
+        sessions=SessionStore(connect,'tenant-1',ttl_seconds=7200)
         token,csrf,_=sessions.create({'tenant_id':'tenant-1','principal_id':'alice','roles':['TASK_CENTER_ADMIN']})
         original_auth=self.auth.authenticate_and_authorize
         self.auth.authenticate_and_authorize=lambda session,action,binding:original_auth(session['principal_id'] if isinstance(session,dict) else session,action,binding)

@@ -81,6 +81,24 @@ class HandoffHost(object):
             from task_center_candidate_readback import LifecycleCandidateReadback
             self._lifecycle_candidate_readback=LifecycleCandidateReadback(db,tenant_id,candidate_lifecycle_root)
 
+    @staticmethod
+    def _bind_session_claims(session, claims, now):
+        """Bind adapter claims to the original SessionStore identity facts.
+
+        This comparison grants no task/action permission. The HTTP handler is
+        responsible for obtaining a live SessionStore session; trusted adapter
+        remains responsible for current role, action, session provenance and
+        every snapshot fact. Legacy host-specific non-dict sessions are not
+        interpreted as SessionStore identities here.
+        """
+        if not isinstance(session,dict):return
+        tenant=session.get('tenant_id');principal=session.get('principal_id');expiry=session.get('expires_at')
+        if (not isinstance(tenant,str) or not isinstance(principal,str) or
+            type(expiry) not in (int,float) or not math.isfinite(expiry) or expiry<=now or
+            claims.get('tenant_id')!=tenant or claims.get('principal_id')!=principal or
+            type(claims.get('expires_at')) not in (int,float) or claims['expires_at']>expiry):
+            raise ValueError('HANDOFF_SESSION_CLAIMS_MISMATCH')
+
     def assess_candidate_bundle(self, binding):
         if self._lifecycle_candidate_readback is not None:
             return self._lifecycle_candidate_readback(binding)
@@ -147,6 +165,7 @@ class HandoffHost(object):
                 any(not isinstance(claims[k],str) or not ID.fullmatch(claims[k]) for k in fields-{'expires_at'}) or
                 claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or claims['scope']!='handoff:ISSUE' or
                 type(claims['expires_at']) not in (int,float) or not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
+            self._bind_session_claims(session,claims,now)
             event_id='ev-'+secrets.token_hex(16)
             handoff_id=parent['handoff_id'] if parent else 'ho-'+secrets.token_hex(16)
             cycle_id=parent['backup_cycle_id'] if parent else 'cy-'+secrets.token_hex(16)
@@ -254,6 +273,7 @@ class HandoffHost(object):
                 claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or
                 claims['scope']!='handoff:'+value['action'] or type(claims['expires_at']) not in (int,float) or
                 not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
+            self._bind_session_claims(session,claims,now)
             task=self._current_task(value['task_id'],value['attempt_id'],now)
             self._require_reference(value,task,claims)
             if db.execute("SELECT 1 FROM writer_operations WHERE task_id=? AND state IN ('PREPARED','DISPATCHING','UNKNOWN') LIMIT 1",(value['task_id'],)).fetchone():
@@ -416,6 +436,7 @@ class HandoffHost(object):
             claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or claims['scope']!='handoff:READ' or
             type(now) not in (int,float) or not math.isfinite(now) or type(claims['expires_at']) not in (int,float) or
             not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
+        self._bind_session_claims(session,claims,now)
         history=[]
         for entry in alert_rows:
             a=json.loads(entry['payload_json'])
