@@ -64,6 +64,41 @@ class WorkerAdmission(unittest.TestCase):
         scheduler=ModelScheduler(self.f.f.control,adapters={'openai-compatible':self.adapter},admission=self.admission)
         with self.assertRaisesRegex(ValueError,'MCP_NO_CALL_HOLD_REQUIRED'):scheduler.resume_mcp_no_call_hold(self.request)
         self.assertEqual(self.adapter.calls,1)
+    def test_missing_assignment_holds_and_reports(self):
+        self.db.execute("DELETE FROM model_assignments WHERE task_id=?",(self.task,));self.db.commit()
+        self.assert_hold()
+        self.assertEqual(self.db.execute('SELECT error_kind FROM model_requests WHERE request_id=?',(self.request,)).fetchone()[0],'MCP_WORKER_CONTEXT_MISSING')
+        self.assertEqual(self.run_worker()['state'],'IDLE')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox WHERE task_id=?',(self.task,)).fetchone()[0],1)
+    def test_missing_role_holds_and_reports(self):
+        self.db.execute("DELETE FROM role_templates WHERE role_id='mcp-text-executor'");self.db.commit();self.assert_hold()
+    def test_missing_project_metadata_holds_and_reports(self):
+        self.db.execute('DELETE FROM gateway_task_metadata WHERE task_id=?',(self.task,));self.db.commit();self.assert_hold()
+    def test_new_hold_cycle_creates_new_pending_without_resending_prior(self):
+        self.db.execute("UPDATE role_templates SET enabled=0 WHERE role_id='mcp-text-executor'");self.db.commit()
+        self.assert_hold()
+        first=self.db.execute('SELECT outbox_id,delivered_at FROM outbox WHERE task_id=?',(self.task,)).fetchone()
+        self.assertIsNone(first['delivered_at'])
+        self.assertEqual(self.run_worker()['state'],'IDLE')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox WHERE task_id=?',(self.task,)).fetchone()[0],1)
+        # Test-only simulated old delivery; this is not a real receipt.
+        self.db.execute('UPDATE outbox SET delivered_at=123 WHERE outbox_id=?',(first['outbox_id'],));self.db.commit()
+        self.db.execute("UPDATE role_templates SET enabled=1 WHERE role_id='mcp-text-executor'");self.db.commit()
+        scheduler=ModelScheduler(self.f.f.control,adapters={'openai-compatible':self.adapter},admission=self.admission)
+        self.assertEqual(scheduler.resume_mcp_no_call_hold(self.request)['state'],'QUEUED')
+        self.db.execute("UPDATE role_templates SET capabilities_json='[]' WHERE role_id='mcp-text-executor'");self.db.commit()
+        self.assertEqual(scheduler.run_once()['state'],'HOLD')
+        rows=self.db.execute('SELECT outbox_id,delivered_at FROM outbox WHERE task_id=? ORDER BY delivered_at IS NULL',(self.task,)).fetchall()
+        self.assertEqual(len(rows),2);self.assertEqual(rows[0]['outbox_id'],first['outbox_id']);self.assertEqual(rows[0]['delivered_at'],123)
+        self.assertIsNone(rows[1]['delivered_at']);self.assertNotEqual(rows[0]['outbox_id'],rows[1]['outbox_id'])
+        self.assertEqual(scheduler.run_once()['state'],'IDLE')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox WHERE task_id=?',(self.task,)).fetchone()[0],2)
+        self.assertEqual(self.adapter.calls,0)
+        self.db.execute("UPDATE role_templates SET capabilities_json='[\"general\"]' WHERE role_id='mcp-text-executor'");self.db.commit()
+        scheduler.resume_mcp_no_call_hold(self.request)
+        self.assertEqual(scheduler.run_once()['state'],'SUCCEEDED')
+        self.assertEqual(scheduler.run_once()['state'],'IDLE');self.assertEqual(self.adapter.calls,1)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM model_requests WHERE request_id=?',(self.request,)).fetchone()[0],1)
     def test_missing_host_plan_fails_closed(self):
         self.assertEqual(self.run_worker(False)['state'],'HOLD');self.assertEqual(self.adapter.calls,0)
     def test_timeout_unknown_never_replays(self):

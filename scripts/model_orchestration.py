@@ -2520,6 +2520,22 @@ class ModelScheduler(object):
         self.adapters=adapters or {'siliconflow':SiliconFlowAdapter(),
           'openai-compatible':OpenAICompatibleAdapter()}
 
+    def _emit_mcp_hold_locked(self,candidate,reason,now):
+        """New identity only after a request has entered a new HOLD cycle."""
+        prefix='mcp-worker-hold-'+candidate['request_id']
+        count=self.db.execute('''SELECT count(*) FROM events WHERE task_id=? AND attempt_id=?
+          AND (event_id=? OR event_id GLOB ?) AND kind='SUPERVISION_ACTION'
+          AND evidence_ref='MCP_WORKER_ADMISSION_HOLD' ''',
+          (candidate['task_id'],candidate['attempt_id'],prefix,prefix+'-*')).fetchone()[0]
+        event_id=prefix+'-'+str(count+1)
+        payload={'state':'HOLD','action':'RECONCILE_BEFORE_CONTROLLED_REASSIGN',
+          'request_id':candidate['request_id'],'reason':reason,
+          'requires_effect_reconciliation':True,'takeover_allowed':False}
+        self.db.execute('''INSERT INTO events VALUES (?,?,?,?,?,?,?,?)''',
+          (candidate['task_id'],candidate['attempt_id'],event_id,'SUPERVISION_ACTION',
+           now,'PHASE_EXECUTION','MCP_WORKER_ADMISSION_HOLD',canonical(payload)))
+        self.control.gateway.supervisor._enqueue(candidate['task_id'],candidate['attempt_id'],event_id,payload,now)
+
     def _hold_mcp_request(self,candidate,reason,now):
         """Atomic original queue hold and supervised, not-delivered alert."""
         safe=(reason if isinstance(reason,str) and len(reason)<=80 and
@@ -2530,15 +2546,7 @@ class ModelScheduler(object):
             changed=self.db.execute('''UPDATE model_requests SET state='HOLD',error_kind=?,updated_at=?
               WHERE tenant_id=? AND request_id=? AND state IN ('QUEUED','RETRY_WAIT')''',
               (safe,now,candidate['tenant_id'],candidate['request_id'])).rowcount
-            if changed:
-                event_id='mcp-worker-hold-'+candidate['request_id']
-                payload={'state':'HOLD','action':'RECONCILE_BEFORE_CONTROLLED_REASSIGN',
-                  'request_id':candidate['request_id'],'reason':safe,
-                  'requires_effect_reconciliation':True,'takeover_allowed':False}
-                self.db.execute('''INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?,?,?)''',
-                  (candidate['task_id'],candidate['attempt_id'],event_id,'SUPERVISION_ACTION',
-                   now,'PHASE_EXECUTION','MCP_WORKER_ADMISSION_HOLD',canonical(payload)))
-                self.control.gateway.supervisor._enqueue(candidate['task_id'],candidate['attempt_id'],event_id,payload,now)
+            if changed:self._emit_mcp_hold_locked(candidate,safe,now)
             self.db.commit()
         except Exception:self.db.rollback();raise
 
@@ -2560,7 +2568,7 @@ class ModelScheduler(object):
                   (self.control.tenant_id,request_id)).fetchone() or
                 self.db.execute('SELECT 1 FROM model_call_reservations WHERE tenant_id=? AND request_id=?',
                   (self.control.tenant_id,request_id)).fetchone() or
-                not self.db.execute("SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='SUPERVISION_ACTION' AND evidence_ref='MCP_WORKER_ADMISSION_HOLD'",(row['task_id'],row['attempt_id'],'mcp-worker-hold-'+request_id)).fetchone()):
+                not self.db.execute("SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND (event_id=? OR event_id GLOB ?) AND kind='SUPERVISION_ACTION' AND evidence_ref='MCP_WORKER_ADMISSION_HOLD'",(row['task_id'],row['attempt_id'],'mcp-worker-hold-'+request_id,'mcp-worker-hold-'+request_id+'-*')).fetchone()):
                 raise ValueError('MCP_NO_CALL_EVIDENCE_REQUIRED')
             self.admission.check(self.db,row,now)
             changed=self.db.execute("UPDATE model_requests SET state='QUEUED',error_kind=NULL,next_attempt_at=?,updated_at=? WHERE tenant_id=? AND request_id=? AND state='HOLD' AND attempts=0",(now,now,self.control.tenant_id,request_id)).rowcount
@@ -2592,6 +2600,25 @@ class ModelScheduler(object):
                self.control.tenant_id,now))
             self.db.commit()
         except Exception:self.db.rollback();raise
+        # The legacy eligible query has inner joins. Inspect only already-bound
+        # MCP queued requests whose required joins disappeared; preserve the
+        # old selection semantics for all other scheduler users.
+        missing=[]
+        if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_task_bindings'").fetchone():
+            missing=list(self.db.execute('''SELECT r.tenant_id,r.request_id,r.task_id,r.attempt_id
+              FROM model_requests r JOIN mcp_task_bindings mb ON mb.tenant_id=r.tenant_id
+                AND mb.request_id=r.request_id AND mb.task_id=r.task_id
+              JOIN tasks t ON t.task_id=r.task_id
+              LEFT JOIN gateway_task_metadata g ON g.task_id=r.task_id AND g.tenant_id=r.tenant_id
+              LEFT JOIN model_request_bindings b ON b.tenant_id=r.tenant_id AND b.request_id=r.request_id
+              LEFT JOIN model_providers p ON p.tenant_id=r.tenant_id AND p.provider_id=r.provider_id
+              LEFT JOIN model_catalog m ON m.tenant_id=r.tenant_id AND m.provider_id=r.provider_id AND m.model_id=r.model_id
+              LEFT JOIN model_assignments a ON a.tenant_id=r.tenant_id AND a.task_id=r.task_id AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id
+              LEFT JOIN role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id AND rt.version=a.role_version
+              WHERE r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND r.next_attempt_at<=?
+                AND (g.task_id IS NULL OR b.request_id IS NULL OR p.provider_id IS NULL OR m.model_id IS NULL OR a.role_id IS NULL OR rt.role_id IS NULL)
+              ORDER BY r.created_at,r.request_id LIMIT 64''',(self.control.tenant_id,now)))
+            for incomplete in missing:self._hold_mcp_request(incomplete,'MCP_WORKER_CONTEXT_MISSING',now)
         candidates=list(self.db.execute('''WITH eligible AS (SELECT r.*,
           ROW_NUMBER() OVER (PARTITION BY r.provider_id ORDER BY
           r.created_at,r.request_id) AS provider_rank FROM model_requests r WHERE
@@ -2618,7 +2645,7 @@ class ModelScheduler(object):
           AND rt.version=a.role_version
           ORDER BY r.provider_rank,r.created_at,r.request_id''',
           (self.control.tenant_id,now)))
-        if not candidates:return {'state':'IDLE'}
+        if not candidates:return {'state':'HOLD','reason':'MCP_WORKER_CONTEXT_MISSING'} if missing else {'state':'IDLE'}
         row=None;reservation=None;reserved_secret=None;last_limit=None
         for candidate in candidates:
             mcp_table=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_task_bindings'").fetchone()
@@ -2776,10 +2803,7 @@ class ModelScheduler(object):
                     changed=self.db.execute("UPDATE model_requests SET state='HOLD',error_kind='MCP_WORKER_AUTHORITY_CHANGED',lease_owner=NULL,lease_until=NULL,updated_at=? WHERE tenant_id=? AND request_id=? AND state='RUNNING' AND lease_owner=? AND attempts=?",(self.clock(),row['tenant_id'],row['request_id'],self.worker_id,row['attempts']+1)).rowcount
                     if changed:
                         self.control._settle_reservation_locked(reservation['reservation_id'],'CANCELLED',self.clock(),UNKNOWN,None)
-                        event_id='mcp-worker-hold-'+row['request_id']
-                        payload={'state':'HOLD','action':'RECONCILE_BEFORE_CONTROLLED_REASSIGN','request_id':row['request_id'],'reason':'MCP_WORKER_AUTHORITY_CHANGED','requires_effect_reconciliation':True,'takeover_allowed':False}
-                        self.db.execute('INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],event_id,'SUPERVISION_ACTION',self.clock(),'PHASE_EXECUTION','MCP_WORKER_ADMISSION_HOLD',canonical(payload)))
-                        self.control.gateway.supervisor._enqueue(row['task_id'],row['attempt_id'],event_id,payload,self.clock())
+                        self._emit_mcp_hold_locked(row,'MCP_WORKER_AUTHORITY_CHANGED',self.clock())
                     self.db.commit()
                 except Exception:self.db.rollback();raise
                 return {'request_id':row['request_id'],'state':'HOLD' if changed else UNKNOWN,'reason':'MCP_WORKER_AUTHORITY_CHANGED' if changed else 'MCP_WORKER_RESERVATION_CHANGED'}
