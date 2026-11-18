@@ -57,6 +57,23 @@ class ContinuationDelta(unittest.TestCase):
             self.assertNotIn('examplevalue123',json.dumps(projected))
         self.assertEqual(CONTINUATION_REFERENCES['credential_ref'],frozenset())
 
+    def test_direct_projection_sanitizes_all_event_object_locations(self):
+        for field in CONTINUATION_FIELDS:
+            for location in ('event','data','nested_data','nested_snapshot'):
+                e=scenario()[0]
+                if location=='event':target=e
+                elif location=='data':target=e['data']
+                elif location=='nested_data':target=e['data'].setdefault('data',{})
+                else:target=e['data']['snapshot_data'].setdefault('data',{})
+                target[field]='examplevalue123'
+                before=copy.deepcopy(e)
+                projected=project_handoffs([e])['t1:h1']
+                self.assertNotIn('examplevalue123',json.dumps(projected))
+                self.assertEqual(e,before)
+        e=scenario()[0];e['data']['permission_request_ref']='openclaw-github-identity-status'
+        result=project_handoffs([e])['t1:h1']
+        self.assertEqual(result['history'][0]['data']['permission_request_ref'],'openclaw-github-identity-status')
+
     def test_complete_registered_references_are_still_unverified(self):
         from unittest.mock import patch
         from task_delivery_ledger.core import CONTINUATION_REFERENCES

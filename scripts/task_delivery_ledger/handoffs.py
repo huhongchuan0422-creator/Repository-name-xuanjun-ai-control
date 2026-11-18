@@ -65,11 +65,18 @@ def project_handoffs(events, verifier=None, now=None):
     for e in events:
         if e['type'].startswith('handoff_'):
             e=copy.deepcopy(e)
-            snap=e.get('data',{}).get('snapshot_data')
-            if isinstance(snap,dict):
+            # The existing event contract permits these two object-valued
+            # fields at multiple levels, and extra whitelisted keys at the
+            # event/data levels. Sanitize the copied history at each allowed
+            # object location, not just the proposal snapshot.
+            pending=[e]
+            while pending:
+                obj=pending.pop()
                 for key in CONTINUATION_FIELDS:
-                    if key in snap and (not isinstance(snap[key],str) or snap[key] not in CONTINUATION_REFERENCES[key]):
-                        snap[key]='UNKNOWN'
+                    if key in obj and (not isinstance(obj[key],str) or obj[key] not in CONTINUATION_REFERENCES[key]):
+                        obj[key]='UNKNOWN'
+                for key in ('data','snapshot_data'):
+                    if isinstance(obj.get(key),dict):pending.append(obj[key])
             d=e['data']; groups.setdefault((e['task_id'],d['handoff_id']),[]).append(e)
     result={}
     for (task_id,hid), es in groups.items():
