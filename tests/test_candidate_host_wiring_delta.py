@@ -2,7 +2,7 @@
 import hashlib,json,os,tempfile,threading,unittest
 import test_mcp_acceptance_evidence_delta as fixture
 import test_task_center_mcp_http as http_fixture
-from development_authority_release import lifecycle
+from development_authority_release import lifecycle,candidate_submission_args
 from task_center_handoff_host import HostAuthAdapter,HandoffHost
 from task_center_app import make_server
 
@@ -26,8 +26,9 @@ class HostWiring(fixture.AcceptanceEvidence):
             self.host=HandoffHost(self.h.supervisor.db,'tenant-mcp','formal-fixture',adapter,
                 mcp_config=self.config,role_contract=self.contract,candidate_lifecycle_root=root)
             h=self.h
-            cid=h.rpc(h.token(principal='developer-1'),'task_submit_candidate',self.fx.args(
-                artifact_sha256=digest,checklist_sha256=self.fx.check))['candidate_id']
+            args=candidate_submission_args(root,'demo-b','attempt-b',self.fx.check)
+            self.assertEqual(args['artifact_sha256'],digest)
+            cid=h.rpc(h.token(principal='developer-1'),'task_submit_candidate',args)['candidate_id']
             for actor in ('qa','security'):
                 h.rpc(h.token(principal=actor),'task_review_candidate',self.fx.args(candidate_id=cid,findings=[],passed=True))
             self.handoff(cid)
@@ -46,5 +47,17 @@ class HostWiring(fixture.AcceptanceEvidence):
             self.assertEqual(result['state'],'ACCEPTED')
             detail=json.loads(h.control.db.execute("SELECT detail_json FROM model_audit WHERE action='CANDIDATE_EVIDENCE_BOUND' AND target_id=?",(cid,)).fetchone()[0])
             self.assertEqual(detail['read_location_ref_sha256'],hashlib.sha256(('lifecycle-artifact:'+digest).encode()).hexdigest())
+
+
+class LifecycleProducerArgs(unittest.TestCase):
+    def test_readback_mismatch_is_not_submission_digest(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=os.path.join(root,'bundle')
+            with open(path,'wb') as out:out.write(b'original')
+            receipt=lifecycle(root,'apply',path,{'verified':True})
+            digest=receipt['state']['active']
+            with open(os.path.join(root,'artifacts',digest),'wb') as out:out.write(b'changed')
+            with self.assertRaisesRegex(ValueError,'ACTIVE_LIFECYCLE_ARTIFACT_REQUIRED'):
+                candidate_submission_args(root,'task','attempt','a'*64)
 
 if __name__=='__main__':unittest.main()

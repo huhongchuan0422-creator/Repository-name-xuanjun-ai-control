@@ -71,6 +71,21 @@ def lifecycle(root,command,artifact=None,verified=None,operation_id=None,
     finally:
         fcntl.flock(lock,fcntl.LOCK_UN); lock.close()
 
+def candidate_submission_args(root, task_id, attempt_id, checklist_sha256):
+    """Map the existing active lifecycle output to the original MCP input.
+
+    Called by the host-side producer with its already authorized root. This is
+    not an MCP endpoint and grants no identity, task or release authority.
+    """
+    observed=lifecycle(root,'inspect')
+    state=observed['state']
+    digest=state.get('active')
+    if (state.get('status')!='ACTIVE' or not isinstance(digest,str) or
+            observed.get('active_observed')!=digest):
+        raise ValueError('ACTIVE_LIFECYCLE_ARTIFACT_REQUIRED')
+    return {'task_id':task_id,'attempt_id':attempt_id,'artifact_sha256':digest,
+            'checklist_sha256':checklist_sha256}
+
 def _lifecycle_locked(root,command,artifact=None,verified=None,operation_id=None,
                       expected_generation=None,expected_status=None):
     state_path=os.path.join(root,'state.json'); receipts=os.path.join(root,'receipts')
