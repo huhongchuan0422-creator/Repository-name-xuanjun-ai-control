@@ -114,6 +114,44 @@ class RegisteredDispatch(unittest.TestCase):
         first=self.rpc('task_dispatch',self.args)
         self.db.execute("UPDATE model_request_bindings SET source_metadata_json=? WHERE request_id=?",('{"kind":"MODEL_DIRECT_V1"}',first['request_id']));self.db.commit()
         adapter=Adapter();self.assertEqual(self.scheduler(adapter,False).run_once()['state'],'HOLD');self.assertEqual(adapter.calls,0)
+    def test_duplicate_assignment_drift_at_locked_boundary_rejected(self):
+        from unittest.mock import patch
+        from model_orchestration import ModelControl
+        first=self.rpc('task_dispatch',self.args)
+        original=ModelControl.validate_registered_provenance
+        variants=[('principal_id','other-principal'),('provider_id','other-provider'),
+                  ('model_id','other-model'),('role_version','v999'),
+                  ('role_id','other-role'),('state','REVOKED')]
+        for field,changed in variants:
+            self.db.execute("UPDATE model_assignments SET principal_id='developer-1',provider_id='fixture',model_id='fixture-chat',role_version='v1',role_id='developer',state='ASSIGNED' WHERE task_id='demo-b'");self.db.commit()
+            before_request=tuple(self.db.execute('SELECT * FROM model_requests WHERE request_id=?',(first['request_id'],)).fetchone())
+            before_events=self.db.execute("SELECT count(*) FROM events WHERE task_id='demo-b'").fetchone()[0]
+            before_outbox=self.db.execute("SELECT count(*) FROM outbox WHERE task_id='demo-b'").fetchone()[0]
+            before_audit=self.db.execute("SELECT count(*) FROM model_audit").fetchone()[0]
+            before_attempts=self.db.execute('SELECT count(*) FROM model_call_attempts').fetchone()[0]
+            calls=[]
+            def drift(control,row,expected,principal):
+                value=original(control,row,expected,principal);calls.append(1)
+                if len(calls)==1:
+                    def before_begin(statement):
+                        if statement.strip().upper()=='BEGIN IMMEDIATE':
+                            control.db.set_trace_callback(None)
+                            self.db.execute('UPDATE model_assignments SET '+field+'=? WHERE task_id=?',(changed,'demo-b'));self.db.commit()
+                    control.db.set_trace_callback(before_begin)
+                return value
+            with self.subTest(field=field),patch.object(ModelControl,'validate_registered_provenance',drift):
+                with self.assertRaisesRegex(ValueError,'MCP_DUPLICATE_ASSIGNMENT_CHANGED'):
+                    self.rpc('task_dispatch',self.args)
+            self.assertEqual(len(calls),1)
+            self.assertEqual(tuple(self.db.execute('SELECT * FROM model_requests WHERE request_id=?',(first['request_id'],)).fetchone()),before_request)
+            self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE task_id='demo-b'").fetchone()[0],before_events)
+            self.assertEqual(self.db.execute("SELECT count(*) FROM outbox WHERE task_id='demo-b'").fetchone()[0],before_outbox)
+            self.assertEqual(self.db.execute("SELECT count(*) FROM model_audit").fetchone()[0],before_audit)
+            self.assertEqual(self.db.execute('SELECT count(*) FROM model_call_attempts').fetchone()[0],before_attempts)
+        self.db.execute("UPDATE model_assignments SET principal_id='developer-1',provider_id='fixture',model_id='fixture-chat',role_version='v1',role_id='developer',state='ASSIGNED' WHERE task_id='demo-b'");self.db.commit()
+        result=self.rpc('task_dispatch',self.args)
+        self.assertTrue(result['duplicate']);self.assertEqual(result['request_id'],first['request_id'])
+
     def test_unknown_retry_is_fact_only(self):
         first=self.rpc('task_dispatch',self.args);adapter=Adapter();adapter.failure='TIMEOUT_UNKNOWN'
         self.assertEqual(self.scheduler(adapter).run_once()['state'],'UNKNOWN');self.assertEqual(adapter.calls,1)

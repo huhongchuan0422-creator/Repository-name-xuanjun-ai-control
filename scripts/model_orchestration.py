@@ -1292,6 +1292,22 @@ class ModelControl(object):
                 self.db.execute('BEGIN IMMEDIATE')
                 try:
                     if expected_intake_guard is None:raise ValueError('MCP_REGISTERED_GUARD_REQUIRED')
+                    fresh_assignment=self.db.execute('''SELECT * FROM model_assignments
+                      WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
+                      (self.tenant_id,task_id,expected_attempt_id,role_id)).fetchone()
+                    fields=('role_version','principal_id','provider_id','model_id')
+                    detail_fields={'role_version':'role_version','principal_id':'role_principal',
+                      'provider_id':'provider_id','model_id':'model_id'}
+                    if (expected_assignment_binding is None or fresh_assignment is None or
+                        fresh_assignment['state']!='ASSIGNED' or
+                        registered_mcp_audit.get('task_id')!=task_id or
+                        registered_mcp_audit.get('attempt_id')!=expected_attempt_id or
+                        registered_mcp_audit.get('role_id')!=role_id or
+                        registered_mcp_audit.get('project_id')!=expected_project_id or
+                        any(fresh_assignment[k]!=expected_assignment_binding[k] or
+                            fresh_assignment[k]!=registered_mcp_audit.get(detail_fields[k])
+                            for k in fields)):
+                        raise ValueError('MCP_DUPLICATE_ASSIGNMENT_CHANGED')
                     expected_intake_guard(self.db)
                     self._assert_expected_project(task_id,expected_project_id)
                     current=self.gateway.supervisor._task(task_id)
