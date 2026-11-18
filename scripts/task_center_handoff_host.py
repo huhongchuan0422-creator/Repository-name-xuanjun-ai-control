@@ -293,6 +293,8 @@ class HandoffHost(object):
                     if first is None:raise ValueError('HANDOFF_CAUSATION_MISSING')
                     first=json.loads(first['payload_json'])
                     if any(first[k]==payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('INDEPENDENT_PARTY_REQUIRED')
+            contract_record={k:payload[k] for k in ('tenant_id','task_id','attempt_id','event_id','handoff_id','handoff_version','backup_cycle_id','snapshot_digest','backup_manifest_sha256','provider_ref','issuer','contract_id','contract_version','contract_sha256')}
+            db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],'handoff-contract:'+value['event_id'],'HANDOFF_CONTRACT_BOUND',now,'PHASE_EXECUTION','HOST_AUTHENTICATED',canonical(contract_record)))
             db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],key,kind,now,'PHASE_EXECUTION','HOST_AUTHENTICATED',canonical(payload)))
             db.commit();return {'state':'RECORDED','event_id':value['event_id']}
         except Exception:
@@ -323,6 +325,16 @@ class HandoffHost(object):
         if alert:row=alert_rows[-1]
         if row is None:raise ValueError('RECEIPT_UNAVAILABLE')
         payload=json.loads(row['payload_json'])
+        contract_fields=('contract_id','contract_version','contract_sha256')
+        if any(k in payload for k in contract_fields) and not all(k in payload for k in contract_fields):raise ValueError('RECEIPT_UNAVAILABLE')
+        marker=self.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='HANDOFF_CONTRACT_BOUND'",(task_id,attempt_id,'handoff-contract:'+event_id)).fetchone()
+        if marker is not None and not alert:
+            try:bound=json.loads(marker['payload_json'])
+            except (ValueError,TypeError):raise ValueError('RECEIPT_UNAVAILABLE')
+            bound_fields=('tenant_id','task_id','attempt_id','handoff_id','handoff_version','backup_cycle_id','snapshot_digest','backup_manifest_sha256','provider_ref')+contract_fields
+            if (not isinstance(bound,dict) or bound.get('issuer')!=self.issuer or bound.get('event_id')!=event_id or
+                any(k not in payload or bound.get(k)!=payload[k] for k in bound_fields)):
+                raise ValueError('RECEIPT_UNAVAILABLE')
         if alert:
             if (payload.get('action')!='HANDOFF_CONTEXT_INCOMPLETE' or payload.get('tenant_id')!=self.tenant_id or payload.get('task_id')!=task_id or payload.get('attempt_id')!=attempt_id):raise ValueError('RECEIPT_UNAVAILABLE')
         elif not self.verify_recorded(self.tenant_id,task_id,attempt_id,event_id,payload):raise ValueError('RECEIPT_UNAVAILABLE')
@@ -365,7 +377,7 @@ class HandoffHost(object):
                 any(a.get(k)!=payload.get(k) for k in ('snapshot_digest','backup_manifest_sha256','provider_ref'))):raise ValueError('RECEIPT_UNAVAILABLE')
             contract_fields=('contract_id','contract_version','contract_sha256')
             if any(k in a for k in contract_fields):
-                if any(k not in a for k in contract_fields) or (all(k in payload for k in contract_fields) and any(a[k]!=payload[k] for k in contract_fields)):
+                if any(k not in a for k in contract_fields) or (not alert and any(k not in payload for k in contract_fields)) or (all(k in payload for k in contract_fields) and any(a[k]!=payload[k] for k in contract_fields)):
                     raise ValueError('RECEIPT_UNAVAILABLE')
             history.append({'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'})
         if alert:

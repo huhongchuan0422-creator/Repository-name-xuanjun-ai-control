@@ -100,7 +100,7 @@ class HostDelta(unittest.TestCase):
         with self.assertRaises(ValueError):self.host.record('alice',self.req('RECEIVE','event-2','event-1'))
         self.db.execute("INSERT INTO writer_operations VALUES('task-1','UNKNOWN')");self.db.commit()
         self.assertEqual(self.host.record('bob',self.req('RECEIVE','event-2','event-1'))['reason'],'UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED')
-        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind!='HANDOFF_REFERENCE_ISSUED'").fetchone()[0],2)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind NOT IN ('HANDOFF_REFERENCE_ISSUED','HANDOFF_CONTRACT_BOUND')").fetchone()[0],2)
         self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],1)
     def test_incomplete_checklist_unknown_backup_and_revoked_claims(self):
         self.auth.backup=None
