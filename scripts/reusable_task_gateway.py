@@ -400,8 +400,7 @@ class GatewayKernel(object):
             if limit>0 and len(result)>=limit:break
         return result
 
-    def deliver_handoff_alert(self, context, outbox_id, host_adapter=None):
-        """Trusted host sends only the original alert; unknown effects never replay."""
+    def _prepare_handoff_alert(self, context, outbox_id, host_adapter):
         row,packet=self._handoff_alert_packet(context,outbox_id)
         if row['delivered_at'] is not None:return {'state':'SENT_ACK_UNKNOWN','outbox_id':outbox_id,'dispatch_performed':False}
         if row['attempts'] and row['last_error']!='HANDOFF_ALERT_RETRY_READY':
@@ -422,11 +421,9 @@ class GatewayKernel(object):
             self.db.execute("UPDATE outbox SET attempts=?,last_error='HANDOFF_ALERT_DISPATCHING_NO_RETRY' WHERE outbox_id=?",(attempt,outbox_id));self.db.commit()
         except Exception:
             self.db.rollback();raise
-        try:
-            raw=host_adapter.send(destination,dict(packet));receipt=host_adapter.interpret_result(destination,dict(packet),raw)
-            state=receipt.get('state') if isinstance(receipt,dict) else None;ref=receipt.get('receipt_ref') if isinstance(receipt,dict) else None
-            if state not in ('SENT','FAILED') or not isinstance(ref,str) or not ref.strip() or ref!=ref.strip() or len(ref)>256:state='UNKNOWN';ref=None
-        except Exception:state='UNKNOWN';ref=None
+        return row,packet,destination,attempt
+
+    def _finish_handoff_alert(self,context,outbox_id,row,attempt,state,ref):
         now=_finite(self.clock(),'time');self.db.execute('BEGIN IMMEDIATE')
         try:
             current,_=self._handoff_alert_packet(context,outbox_id)
@@ -440,6 +437,45 @@ class GatewayKernel(object):
             self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],rid,'HANDOFF_ALERT_RESULT',now,'PHASE_EXECUTION',ref or 'UNKNOWN',canonical(result)));self.db.commit()
             return dict(result,dispatch_performed=True)
         except Exception:self.db.rollback();raise
+
+    def deliver_handoff_alert(self, context, outbox_id, host_adapter=None):
+        """Synchronous entry; incompatible async tools never consume intent."""
+        if host_adapter is not None and getattr(host_adapter,'requires_async',False):
+            return {'state':'ASYNC_HOST_REQUIRED','outbox_id':outbox_id,'dispatch_performed':False}
+        prepared=self._prepare_handoff_alert(context,outbox_id,host_adapter)
+        if isinstance(prepared,dict):return prepared
+        row,packet,destination,attempt=prepared
+        try:
+            import inspect
+            raw=host_adapter.send(destination,dict(packet))
+            if inspect.isawaitable(raw):
+                if inspect.iscoroutine(raw):raw.close()
+                state='UNKNOWN';ref=None
+            else:
+                receipt=host_adapter.interpret_result(destination,dict(packet),raw)
+                state=receipt.get('state') if isinstance(receipt,dict) else None;ref=receipt.get('receipt_ref') if isinstance(receipt,dict) else None
+                if state not in ('SENT','FAILED') or not isinstance(ref,str) or not ref.strip() or ref!=ref.strip() or len(ref)>256:state='UNKNOWN';ref=None
+        except Exception:state='UNKNOWN';ref=None
+        return self._finish_handoff_alert(context,outbox_id,row,attempt,state,ref)
+
+    async def deliver_handoff_alert_async(self,context,outbox_id,host_adapter=None):
+        """Run on the host's existing loop; never create or block an event loop."""
+        prepared=self._prepare_handoff_alert(context,outbox_id,host_adapter)
+        if isinstance(prepared,dict):return prepared
+        row,packet,destination,attempt=prepared
+        try:
+            import inspect
+            raw=host_adapter.send(destination,dict(packet))
+            if inspect.isawaitable(raw):raw=await raw
+            receipt=host_adapter.interpret_result(destination,dict(packet),raw)
+            state=receipt.get('state') if isinstance(receipt,dict) else None;ref=receipt.get('receipt_ref') if isinstance(receipt,dict) else None
+            if state not in ('SENT','FAILED') or not isinstance(ref,str) or not ref.strip() or ref!=ref.strip() or len(ref)>256:state='UNKNOWN';ref=None
+        except __import__('asyncio').CancelledError:
+            raise
+        except Exception:state='UNKNOWN';ref=None
+        # Cancellation or process interruption propagates with durable intent,
+        # so a possibly executed call is UNKNOWN and is never blindly retried.
+        return self._finish_handoff_alert(context,outbox_id,row,attempt,state,ref)
 
     def reconcile_handoff_alert(self,context,outbox_id,host_adapter=None):
         """Trusted platform readback of the specific attempt; never accepts body evidence."""

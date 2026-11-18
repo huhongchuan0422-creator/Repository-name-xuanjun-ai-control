@@ -4,10 +4,11 @@ Only the hosting runtime can supply the real messaging callable and trusted
 scope/binding resolvers. This module neither accesses OpenClaw RPC nor grants
 permissions, and does not install itself in a server or job.
 """
+import inspect
 from task_center_owner_alert_adapter import OwnerAlertAdapter
 
 
-def parse_message_result(raw):
+def parse_message_result(raw, expected_target=None):
     """Map observed Feishu send results conservatively; SENT never means ACK.
 
     A successful call, sentAt or a source-reply flag alone does not prove the
@@ -17,6 +18,13 @@ def parse_message_result(raw):
     if not isinstance(raw,dict) or raw.get('ok') is not True or raw.get('channel')!='feishu' or raw.get('action')!='send':return None
     delivery=raw.get('messageDelivery')
     if not isinstance(delivery,dict) or delivery.get('status')!='settled':return None
+    # Optional observed fields are evidence only when present; never invent
+    # destination proof. An explicit mismatch cannot become SENT.
+    if 'chatId' in raw:
+        if expected_target is None or raw['chatId']!=(expected_target[5:] if expected_target.startswith('user:') else expected_target):return None
+    if 'deliveredTargets' in delivery:
+        targets=delivery['deliveredTargets']
+        if expected_target is None or not isinstance(targets,list) or not targets or any(x!=(expected_target[5:] if expected_target.startswith('user:') else expected_target) for x in targets):return None
     receipt=raw.get('receipt')
     receipt_id=receipt.get('primaryPlatformMessageId') if isinstance(receipt,dict) else None
     message_id=raw.get('messageId')
@@ -40,4 +48,11 @@ def make_owner_message_adapter(owner_destination, authorize_task, resolve_bindin
         # The observed action=send schema has no idempotency-key field: do not
         # pretend outbox_id/attempt were registered with the platform.
         return message_tool(action='send',target=destination,message=text)
-    return OwnerAlertAdapter(owner_destination,authorize_task,resolve_binding,invoke,parse_message_result)
+    adapter=OwnerAlertAdapter(owner_destination,authorize_task,resolve_binding,invoke,
+                              lambda raw:parse_message_result(raw,owner_destination))
+    # Callable objects can hide async __call__; only known ordinary functions
+    # are treated as sync. The async entry accepts both return forms.
+    adapter.requires_async=(inspect.iscoroutinefunction(message_tool) or
+        inspect.iscoroutinefunction(getattr(message_tool,'__call__',None)) or
+        not (inspect.isfunction(message_tool) or inspect.ismethod(message_tool)))
+    return adapter
