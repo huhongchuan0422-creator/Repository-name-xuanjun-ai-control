@@ -10,6 +10,7 @@ on:
       - 'scripts/community_*.py'
       - 'scripts/community_*.cjs'
       - 'tests/test_community_*.py'
+      - 'tests/community_mini_development_operation.test.cjs'
       - 'clients/community-mini/**'
       - 'deploy/community-preview/hangzhou-snapshot/**'
       - 'demos/community-stage/**'
