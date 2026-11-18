@@ -42,6 +42,23 @@ class ContractProvenanceDelta(unittest.TestCase):
         self.db.execute('UPDATE events SET payload_json=? WHERE event_id=?',(json.dumps(doc),self.key));self.db.commit();before=self.dump()
         status,body=get();self.assertEqual(status,404);self.assertNotIn(b'contract-',body);self.assertEqual(before,self.dump())
 
+    def test_ambiguous_unmarked_history_is_held_without_mutation(self):
+        self.db.execute('DELETE FROM events WHERE event_id=?',('handoff-contract:'+self.req['event_id'],))
+        self.db.execute("DELETE FROM events WHERE kind='SUPERVISION_ACTION'")
+        for downgrade in (False,True):
+            doc=json.loads(self.raw)
+            if downgrade:
+                for k in ('contract_id','contract_version','contract_sha256'):del doc[k]
+                doc['checked']=sorted(LEGACY_CONTEXT)
+            self.db.execute('UPDATE events SET payload_json=? WHERE event_id=?',(json.dumps(doc),self.key));self.db.commit();before=self.dump()
+            with self.assertRaisesRegex(ValueError,'HISTORICAL_RECONCILIATION_REQUIRED'):
+                self.host.read_receipt('bob','task-2','attempt-1',self.req['event_id'])
+            self.assertEqual(before,self.dump())
+
+    def test_unmarked_history_with_independent_matching_contract_alert(self):
+        self.db.execute('DELETE FROM events WHERE event_id=?',('handoff-contract:'+self.req['event_id'],));self.db.commit()
+        self.assertEqual(self.host.read_receipt('bob','task-2','attempt-1',self.req['event_id'])['state'],'HISTORICAL_RECORDED')
+
     def test_existing_bound_alert_prevents_downgrade_without_new_marker(self):
         self.db.execute('DELETE FROM events WHERE event_id=?',('handoff-contract:'+self.req['event_id'],))
         doc=json.loads(self.raw)

@@ -328,6 +328,18 @@ class HandoffHost(object):
         contract_fields=('contract_id','contract_version','contract_sha256')
         if any(k in payload for k in contract_fields) and not all(k in payload for k in contract_fields):raise ValueError('RECEIPT_UNAVAILABLE')
         marker=self.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='HANDOFF_CONTRACT_BOUND'",(task_id,attempt_id,'handoff-contract:'+event_id)).fetchone()
+        if marker is None and not alert:
+            # Older success records lack an independent issuance/version fact.
+            # A contract-bearing historical alert is independent evidence; an
+            # unmarked, uncorroborated legacy-shaped row is irreducibly
+            # ambiguous and must stay historical-reconciliation-required.
+            corroborated=False
+            for prior in alert_rows:
+                try:prior_payload=json.loads(prior['payload_json'])
+                except (ValueError,TypeError):raise ValueError('RECEIPT_UNAVAILABLE')
+                if (isinstance(prior_payload,dict) and all(k in prior_payload and k in payload and prior_payload[k]==payload[k] for k in contract_fields)):
+                    corroborated=True
+            if not corroborated:raise ValueError('HISTORICAL_RECONCILIATION_REQUIRED')
         if marker is not None and not alert:
             try:bound=json.loads(marker['payload_json'])
             except (ValueError,TypeError):raise ValueError('RECEIPT_UNAVAILABLE')
