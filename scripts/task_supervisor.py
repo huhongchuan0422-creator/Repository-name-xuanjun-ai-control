@@ -1313,7 +1313,8 @@ class Supervisor(object):
         return hashlib.sha256(canonical(ticket).encode('utf-8')).hexdigest()
 
     def claim_writer(self, task_id, attempt_id, owner, entry, caller,
-                     lease_id, lock_provider_id, resource_keys, valid_until):
+                     lease_id, lock_provider_id, resource_keys, valid_until,
+                     admission_check=None):
         now = self.clock()
         caller = self._caller(caller)
         keys = self._exact_resource_keys(resource_keys)
@@ -1325,6 +1326,7 @@ class Supervisor(object):
         scope_digest = self._scope_digest(keys)
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check(self.db)
             task = self._task(task_id)
             if (task['authority_state'] != 'NONE' or task['state'] != 'READY'
                     or not self._dependencies_done(task)):

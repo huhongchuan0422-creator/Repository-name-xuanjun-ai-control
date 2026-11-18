@@ -1084,7 +1084,7 @@ class TestOnlyExecutor(object):
                 'gateway_id': 'test-gateway'}
 
     def start(self, task_id, attempt_id, resources, valid_until,
-              checkpoint_id=None, resume_grant_id=None):
+              checkpoint_id=None, resume_grant_id=None, admission_check=None):
         now = self.clock()
         self.gateway.assert_start_allowed(
             self.context, task_id, resources, checkpoint_id,
@@ -1093,7 +1093,8 @@ class TestOnlyExecutor(object):
         caller = self._caller(attempt_id)
         ticket = self.fence.claim(
             task_id, attempt_id, task['owner'], task['entry'], caller,
-            'lease-' + attempt_id, resources, valid_until)
+            'lease-' + attempt_id, resources, valid_until,
+            admission_check=admission_check)
         if self.start_claim_hook is not None:
             self.start_claim_hook(task_id, attempt_id, ticket)
         try:

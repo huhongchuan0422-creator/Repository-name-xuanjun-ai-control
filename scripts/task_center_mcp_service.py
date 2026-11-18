@@ -153,6 +153,7 @@ class MCPTaskService(object):
         self.clock=clock or time.time
         self.phase_hook=phase_hook
         self.execution_enabled=bool(execution_enabled)
+        self.intake_guard=None
 
     def _open(self):
         supervisor=Supervisor(self.db_path)
@@ -332,19 +333,23 @@ class MCPTaskService(object):
         fence=Fence(supervisor,self.db_path+'.test-only-locks')
         try:
             TestOnlyExecutor(gateway,fence,context).start(task_id,attempt_id,
-              gateway.canonical_resources(task_id),now+600)
+              gateway.canonical_resources(task_id),now+600,
+              admission_check=self.intake_guard)
         finally:fence.close()
 
     def _ensure_assignment(self,supervisor,control,task_id,attempt_id,
                            connection,now):
-        row=supervisor.db.execute('''SELECT principal_id,provider_id,model_id
+        row=supervisor.db.execute('''SELECT principal_id,provider_id,model_id,role_version,state
           FROM model_assignments WHERE tenant_id=? AND task_id=? AND
           attempt_id=? AND role_id=?''',(self.tenant_id,task_id,attempt_id,
           ROLE_ID)).fetchone()
-        expected=('mcp-worker',connection['provider_id'],connection['model_id'])
+        expected=('mcp-worker',connection['provider_id'],connection['model_id'],ROLE_VERSION,'ASSIGNED')
         if row is None:
             control.assign(task_id,ROLE_ID,ROLE_VERSION,'mcp-worker',False,now,
-              connection['provider_id'],connection['model_id']);return
+              connection['provider_id'],connection['model_id'],
+              expected_attempt_id=attempt_id if self.intake_guard else None,
+              expected_project_id=self.project_id if self.intake_guard else None,
+              expected_intake_guard=self.intake_guard);return
         if tuple(row)!=expected:raise ValueError('MCP_ASSIGNMENT_CONFLICT')
 
     def _reconcile_queued(self,supervisor,binding,request,value):
@@ -437,13 +442,18 @@ class MCPTaskService(object):
               'idempotency':'mcp:'+self.principal_id+':'+value['idempotency_key']}
             request_id=hashlib.sha256(canonical(request_identity).encode()).hexdigest()
             if existing is None:
-                supervisor.db.execute('''INSERT INTO mcp_task_bindings VALUES
-                  (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,
-                  self.principal_id,self.project_id,value['idempotency_key'],task_id,
-                  request_id,input_sha,request_sha,value['connection_id'],
-                  connection['provider_id'],connection['model_id'],
-                  value['max_output_tokens'],'PREPARING',now,now))
-                supervisor.db.commit()
+                supervisor.db.execute('BEGIN IMMEDIATE')
+                try:
+                    if self.intake_guard is not None:self.intake_guard(supervisor.db)
+                    supervisor.db.execute('''INSERT INTO mcp_task_bindings VALUES
+                      (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,
+                      self.principal_id,self.project_id,value['idempotency_key'],task_id,
+                      request_id,input_sha,request_sha,value['connection_id'],
+                      connection['provider_id'],connection['model_id'],
+                      value['max_output_tokens'],'PREPARING',now,now))
+                    supervisor.db.commit()
+                except Exception:
+                    supervisor.db.rollback();raise
                 self._phase(supervisor,task_id,'BINDING_PERSISTED')
             else:
                 if (existing['request_id']!=request_id or
@@ -494,7 +504,13 @@ class MCPTaskService(object):
               {'role':'system','content':'Return JSON with keys label and reason.'},
               {'role':'user','content':value['input_text']}],
               'mcp:'+self.principal_id+':'+value['idempotency_key'],
-              value['max_output_tokens'],value['connection_id'],now=now)
+              value['max_output_tokens'],value['connection_id'],now=now,
+              expected_intake_guard=self.intake_guard,
+              expected_attempt_id=attempt_id if self.intake_guard else None,
+              expected_project_id=self.project_id if self.intake_guard else None,
+              expected_assignment_binding=({'role_version':ROLE_VERSION,
+                'principal_id':'mcp-worker','provider_id':connection['provider_id'],
+                'model_id':connection['model_id']} if self.intake_guard else None))
             if queued['request_id']!=request_id:
                 raise ValueError('MCP_REQUEST_ID_RECONCILIATION_FAILED')
             if self.phase_hook is not None:self.phase_hook('REQUEST_COMMITTED')

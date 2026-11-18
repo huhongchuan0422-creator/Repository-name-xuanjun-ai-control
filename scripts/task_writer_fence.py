@@ -388,11 +388,11 @@ class Fence(object):
         self.locks.close()
 
     def claim(self, task_id, attempt_id, owner, entry, caller, lease_id,
-              resources, valid_until):
+              resources, valid_until, admission_check=None):
         keys = self.adapter.normalize_many(resources)
         return self.supervisor.claim_writer(
             task_id, attempt_id, owner, entry, caller, lease_id,
-            self.locks.provider_id, keys, valid_until)
+            self.locks.provider_id, keys, valid_until, admission_check=admission_check)
 
     def prepare(self, ticket, caller, operation):
         operation = dict(operation)

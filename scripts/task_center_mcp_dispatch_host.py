@@ -121,7 +121,15 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
             resolver=RoleContractResolver(db,role_contract.contracts,role_contract.intake_plans)
             resolver.resolve_intake(service,identity,params['arguments'],roles)
         finally:db.close()
-        return RemoteTaskCenterMCP(service).rpc(value)
+        # The initial read is not an authorization grant. Each original
+        # persistent boundary must re-read the current registrations under
+        # the same SQLite write transaction as its effect.
+        def intake_guard(db):
+            resolver=RoleContractResolver(db,role_contract.contracts,role_contract.intake_plans)
+            resolver.resolve_intake(service,identity,params['arguments'],roles_for(config,identity))
+        service.intake_guard=intake_guard
+        try:return RemoteTaskCenterMCP(service).rpc(value)
+        finally:service.intake_guard=None
     if method=='tools/list':
         result=RemoteTaskCenterMCP(service).rpc(value)
         if roles:

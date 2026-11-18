@@ -162,6 +162,125 @@ class MCPIntakeDelta(unittest.TestCase):
         self.assertEqual(count(),1)
         self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],1)
         self.assertEqual(fx.fixture.ModelFixture.calls,0) # no worker provider calls
+    def test_preflight_to_binding_role_drift_rejected_and_recovers(self):
+        from unittest.mock import patch
+        from task_center_mcp import RemoteTaskCenterMCP
+        original=RemoteTaskCenterMCP.rpc
+        db=self.f.control.db
+        for column,changed in [('capabilities_json','[]'),('enabled',0)]:
+            def drift(rpc,value):
+                db.execute('UPDATE role_templates SET '+column+'=? WHERE role_id=?',(changed,'mcp-text-executor'));db.commit()
+                return original(rpc,value)
+            with patch.object(RemoteTaskCenterMCP,'rpc',drift):
+                with self.assertRaisesRegex(ValueError,'TASK_INTAKE_ROLE_REQUIRED'):self.invoke()
+            self.assertEqual(db.execute('SELECT count(*) FROM mcp_task_bindings').fetchone()[0],0)
+            db.execute('UPDATE role_templates SET capabilities_json=?,enabled=1 WHERE role_id=?',('["general"]','mcp-text-executor'));db.commit()
+        first=json.loads(self.invoke()['result']['content'][0]['text'])
+        self.assertEqual(first['state'],'QUEUED')
+        self.assertTrue(json.loads(self.invoke()['result']['content'][0]['text'])['duplicate'])
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],1)
+
+    def test_assignment_and_queue_drift_preserve_checkpoint_and_resume(self):
+        db=self.f.control.db
+        def change(phase):
+            if phase=='WRITER_STARTED':
+                db.execute("UPDATE role_templates SET capabilities_json='[]' WHERE role_id='mcp-text-executor'");db.commit()
+        self.service.phase_hook=change
+        with self.assertRaisesRegex(ValueError,'TASK_INTAKE_ROLE_REQUIRED'):self.invoke()
+        self.assertEqual(db.execute('SELECT submit_state FROM mcp_task_bindings').fetchone()[0],'WRITER_STARTED')
+        self.assertEqual(db.execute('SELECT count(*) FROM model_assignments').fetchone()[0],0)
+        db.execute("UPDATE role_templates SET capabilities_json='[\"general\"]' WHERE role_id='mcp-text-executor'");db.commit()
+        def change_connection(phase):
+            if phase=='MODEL_ASSIGNED':
+                db.execute("UPDATE service_connections SET status='REAUTH_REQUIRED' WHERE connection_id='fixture-connection'");db.commit()
+        self.service.phase_hook=change_connection
+        with self.assertRaisesRegex(ValueError,'ACTIVE_PROVIDER_CONNECTION_REQUIRED|TASK_INTAKE_ENTRY_REQUIRED'):self.invoke()
+        self.assertEqual(db.execute('SELECT count(*) FROM model_assignments').fetchone()[0],1)
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],0)
+        db.execute("UPDATE service_connections SET status='ACTIVE' WHERE connection_id='fixture-connection'");db.commit()
+        self.service.phase_hook=None
+        result=json.loads(self.invoke()['result']['content'][0]['text'])
+        self.assertEqual(result['state'],'QUEUED')
+        self.assertEqual(db.execute('SELECT count(*) FROM mcp_task_bindings').fetchone()[0],1)
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],1)
+
+    def test_revoked_writer_admission_preserves_plan_and_recovers(self):
+        from unittest.mock import patch
+        from task_writer_fence import Fence
+        db=self.f.control.db
+        original=Fence.claim
+        for field,changed,expected in [('capabilities_json','[]','TASK_INTAKE_ROLE_REQUIRED'),
+                                       ('enabled',0,'TASK_INTAKE_ROLE_REQUIRED')]:
+            def drift(fence,*args,**kwargs):
+                db.execute('UPDATE role_templates SET '+field+'=? WHERE role_id=?',(changed,'mcp-text-executor'));db.commit()
+                return original(fence,*args,**kwargs)
+            with patch.object(Fence,'claim',drift):
+                with self.assertRaisesRegex(ValueError,expected):self.invoke()
+            task=db.execute("SELECT state,authority_state FROM tasks WHERE task_id LIKE 'mcp-%'").fetchone()
+            self.assertEqual(tuple(task),('READY','NONE'))
+            self.assertEqual(db.execute('SELECT count(*) FROM resource_claims').fetchone()[0],1) # fixture demo-b only
+            self.assertEqual(db.execute('SELECT count(*) FROM model_assignments').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],0)
+            db.execute('UPDATE role_templates SET capabilities_json=?,enabled=1 WHERE role_id=?',('["general"]','mcp-text-executor'));db.commit()
+        def drift_connection(fence,*args,**kwargs):
+            db.execute("UPDATE service_connections SET status='REAUTH_REQUIRED' WHERE connection_id='fixture-connection'");db.commit()
+            return original(fence,*args,**kwargs)
+        with patch.object(Fence,'claim',drift_connection):
+            with self.assertRaisesRegex(ValueError,'TASK_INTAKE_ENTRY_REQUIRED'):self.invoke()
+        self.assertEqual(db.execute("SELECT authority_state FROM tasks WHERE task_id LIKE 'mcp-%'").fetchone()[0],'NONE')
+        db.execute("UPDATE service_connections SET status='ACTIVE' WHERE connection_id='fixture-connection'");db.commit()
+        first=json.loads(self.invoke()['result']['content'][0]['text'])
+        self.assertEqual(first['state'],'QUEUED')
+        self.assertTrue(json.loads(self.invoke()['result']['content'][0]['text'])['duplicate'])
+        self.assertEqual(db.execute('SELECT count(*) FROM mcp_task_bindings').fetchone()[0],1)
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],1)
+        self.assertEqual(fx.fixture.ModelFixture.calls,0)
+
+    def test_existing_writer_and_assignment_revocation_never_queues(self):
+        db=self.f.control.db
+        def stop_writer(phase):
+            if phase=='WRITER_STARTED':raise RuntimeError('checkpoint writer')
+        self.service.phase_hook=stop_writer
+        with self.assertRaisesRegex(RuntimeError,'checkpoint writer'):self.invoke()
+        before=db.execute("SELECT attempt_id,fence,authority_state FROM tasks WHERE task_id LIKE 'mcp-%'").fetchone()
+        db.execute("UPDATE role_templates SET enabled=0 WHERE role_id='mcp-text-executor'");db.commit()
+        self.service.phase_hook=None
+        with self.assertRaisesRegex(ValueError,'TASK_INTAKE_ROLE_REQUIRED'):self.invoke()
+        self.assertEqual(tuple(db.execute("SELECT attempt_id,fence,authority_state FROM tasks WHERE task_id LIKE 'mcp-%'").fetchone()),tuple(before))
+        self.assertEqual(db.execute('SELECT count(*) FROM model_assignments').fetchone()[0],0)
+        db.execute("UPDATE role_templates SET enabled=1 WHERE role_id='mcp-text-executor'");db.commit()
+        def stop_assignment(phase):
+            if phase=='MODEL_ASSIGNED':raise RuntimeError('checkpoint assignment')
+        self.service.phase_hook=stop_assignment
+        with self.assertRaisesRegex(RuntimeError,'checkpoint assignment'):self.invoke()
+        self.service.phase_hook=None
+        db.execute("UPDATE role_templates SET capabilities_json='[]' WHERE role_id='mcp-text-executor'");db.commit()
+        with self.assertRaisesRegex(ValueError,'TASK_INTAKE_ROLE_REQUIRED'):self.invoke()
+        self.assertEqual(db.execute('SELECT count(*) FROM model_assignments').fetchone()[0],1)
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],0)
+        db.execute("UPDATE role_templates SET capabilities_json='[\"general\"]' WHERE role_id='mcp-text-executor'");db.commit()
+        first=json.loads(self.invoke()['result']['content'][0]['text'])
+        self.assertEqual(first['state'],'QUEUED')
+        self.assertTrue(json.loads(self.invoke()['result']['content'][0]['text'])['duplicate'])
+        self.assertEqual(db.execute('SELECT count(*) FROM mcp_task_bindings').fetchone()[0],1)
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],1)
+        self.assertEqual(fx.fixture.ModelFixture.calls,0)
+
+    def test_scope_drift_after_assignment_stops_queue_transaction(self):
+        db=self.f.control.db
+        def change(phase):
+            if phase=='MODEL_ASSIGNED':
+                db.execute("UPDATE role_templates SET capabilities_json='[]' WHERE role_id='mcp-text-executor'");db.commit()
+        self.service.phase_hook=change
+        with self.assertRaisesRegex(ValueError,'TASK_INTAKE_ROLE_REQUIRED'):self.invoke()
+        self.assertEqual(db.execute('SELECT count(*) FROM model_assignments').fetchone()[0],1)
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],0)
+        db.execute("UPDATE role_templates SET capabilities_json='[\"general\"]' WHERE role_id='mcp-text-executor'");db.commit()
+        self.service.phase_hook=None
+        result=json.loads(self.invoke()['result']['content'][0]['text'])
+        self.assertEqual(result['state'],'QUEUED')
+        self.assertEqual(db.execute('SELECT count(*) FROM model_requests').fetchone()[0],1)
+
     def test_http_submit_with_trusted_fixture_plan_and_worker_stopped(self):
         from task_center_handoff_host import HandoffHost,HostAuthAdapter
         from task_center_app import make_server

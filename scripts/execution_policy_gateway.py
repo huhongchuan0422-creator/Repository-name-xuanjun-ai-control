@@ -19,10 +19,10 @@ ACTION_SCOPE_MAP={'READ_SOURCE':'READ_SOURCE','WRITE_SOURCE':'WRITE_SOURCE',
 
 
 class ExecutionPolicyGateway(object):
-    def __init__(self,gateway,context,clock=None):
+    def __init__(self,gateway,context,clock=None,initialize=True):
         self.gateway=gateway;self.db=gateway.db;self.context=context
         self.tenant_id=gateway.tenants.verify(context);self.clock=clock or time.time
-        self._schema()
+        if initialize:self._schema()
 
     def _schema(self):
         statements=(

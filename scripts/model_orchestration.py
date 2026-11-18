@@ -1037,13 +1037,17 @@ class ModelControl(object):
 
     def assign(self, task_id, role_id, role_version, principal_id,
                allow_paid=False, now=None, provider_id=None, model_id=None,
-               expected_attempt_id=None,expected_project_id=None,expected_role_contract=None):
+               expected_attempt_id=None,expected_project_id=None,expected_role_contract=None,
+               expected_intake_guard=None):
         # Opt-in bounded facade CAS: lock before reading current authority.
+        if expected_intake_guard is not None and expected_attempt_id is None:
+            raise ValueError('MCP_INTAKE_ATTEMPT_REQUIRED')
         if expected_attempt_id is None:
             return self._assign_existing(task_id, role_id, role_version,
                 principal_id, allow_paid, now, provider_id, model_id)
         self.db.execute('BEGIN IMMEDIATE')
         try:
+            if expected_intake_guard is not None:expected_intake_guard(self.db)
             self._assert_expected_project(task_id, expected_project_id)
             task = self.gateway.supervisor._task(task_id)
             if task['attempt_id'] != expected_attempt_id:
@@ -1059,7 +1063,8 @@ class ModelControl(object):
                 self._audit(self._principal(),'ROLE_CONTRACT_PLANNED',task_id,
                     {k:planned[k] for k in ('contract_id','contract_version','contract_sha256','role_id','role_version','provider_id','required_categories','not_applicable')},self.clock())
             result = self._assign_existing(task_id, role_id, role_version,
-                principal_id, allow_paid, now, provider_id, model_id)
+                principal_id, allow_paid, now, provider_id, model_id,
+                skip_policy_schema=expected_intake_guard is not None)
             self.db.commit()
             return result
         except Exception:
@@ -1067,7 +1072,8 @@ class ModelControl(object):
             raise
 
     def _assign_existing(self, task_id, role_id, role_version, principal_id,
-               allow_paid=False, now=None, provider_id=None, model_id=None):
+               allow_paid=False, now=None, provider_id=None, model_id=None,
+               skip_policy_schema=False):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
@@ -1075,7 +1081,7 @@ class ModelControl(object):
           '''SELECT 1 FROM execution_units WHERE tenant_id=? AND task_id=?''',(
           self.tenant_id,task_id)).fetchone() is not None:
             from execution_policy_gateway import ExecutionPolicyGateway
-            ExecutionPolicyGateway(self.gateway,self.context).require_dispatch_ready(task_id)
+            ExecutionPolicyGateway(self.gateway,self.context,initialize=not skip_policy_schema).require_dispatch_ready(task_id)
         task=self.gateway.supervisor._task(task_id)
         role=self.db.execute('''SELECT * FROM role_templates WHERE tenant_id=?
           AND role_id=? AND version=? AND enabled=1''',
@@ -1157,7 +1163,7 @@ class ModelControl(object):
     def queue_request(self, task_id, role_id, messages, idempotency_key,
                       max_output_tokens=None,connection_id=None,now=None,
                       expected_attempt_id=None,expected_assignment_binding=None,
-                      expected_project_id=None):
+                      expected_project_id=None,expected_intake_guard=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
@@ -1265,6 +1271,7 @@ class ModelControl(object):
         expected_input=max(1,len(body.encode('utf-8'))//4)
         self.db.execute('BEGIN IMMEDIATE')
         try:
+            if expected_intake_guard is not None:expected_intake_guard(self.db)
             self._assert_expected_project(task_id, expected_project_id)
             fresh_provider=self.db.execute('''SELECT config_version,enabled,
               base_url FROM model_providers WHERE tenant_id=? AND provider_id=?''',
@@ -1287,7 +1294,9 @@ class ModelControl(object):
                 if (fresh_assignment is None or any(
                         fresh_assignment[key] != expected_assignment_binding[key]
                         or fresh_assignment[key] != assignment[key]
-                        for key in binding_fields)):
+                        for key in binding_fields) or
+                        (expected_intake_guard is not None and
+                         fresh_assignment['state']!='ASSIGNED')):
                     raise ValueError('ASSIGNMENT_CHANGED_BEFORE_QUEUE_COMMIT')
             if expected_attempt_id is not None:
                 current = self.gateway.supervisor._task(task_id)
