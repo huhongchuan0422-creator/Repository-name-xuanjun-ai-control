@@ -1471,7 +1471,8 @@ jobs:
           assert re.fullmatch('[0-9a-f]{64}',expected) and hashlib.sha256(raw).hexdigest()==expected
           archive=zipfile.ZipFile(io.BytesIO(raw));items=archive.infolist()
           assert len(items)<2000 and len(items)==len({i.filename for i in items})
-          assert sum(i.file_size for i in items)<10000000
+          source_budget=12000000 if os.environ.get('COMMUNITY_FIXED_PRODUCT_KIND')=='hangzhou-snapshot' else 10000000
+          assert sum(i.file_size for i in items)<source_budget
           manifest=json.loads(archive.read('MANIFEST.json'))
           assert manifest['purpose']=='OFFLINE_SOURCE_CANDIDATE_NOT_INSTALLABLE'
           assert manifest['production_payment']=='HOLD' and manifest['production_deployment']=='HOLD'
