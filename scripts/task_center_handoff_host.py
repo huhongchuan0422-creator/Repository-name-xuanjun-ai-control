@@ -48,14 +48,15 @@ class HostAuthAdapter(object):
         A concrete trusted host must independently read the candidate bundle
         and resolve its protected read location; request bodies are not proof.
         """
-        return None
+        readback=getattr(self, '_lifecycle_candidate_readback', None)
+        return readback(binding) if readback is not None else None
 
     def assess_provider(self, binding):
         """Resolve an existing admitted MCP provider binding; default disconnected."""
         return None
 
 class HandoffHost(object):
-    def __init__(self, db, tenant_id, issuer, adapter, clock=time.time, mcp_config=None, role_contract=None):
+    def __init__(self, db, tenant_id, issuer, adapter, clock=time.time, mcp_config=None, role_contract=None, candidate_lifecycle_root=None):
         from task_center_mcp_dispatch_host import validate_config
         if not isinstance(adapter,HostAuthAdapter) or type(adapter) is HostAuthAdapter:
             raise ValueError('HOST_AUTH_ADAPTER_REQUIRED')
@@ -68,6 +69,11 @@ class HandoffHost(object):
         from task_center_role_contract import RoleContractResolver
         if role_contract is not None and (type(role_contract) is not RoleContractResolver or role_contract.db is not db):raise ValueError('ORIGINAL_ROLE_CONTRACT_RESOLVER_REQUIRED')
         self.role_contract=role_contract
+        if candidate_lifecycle_root is not None:
+            from task_center_candidate_readback import LifecycleCandidateReadback
+            if type(adapter).assess_candidate_bundle is not HostAuthAdapter.assess_candidate_bundle:
+                raise ValueError('CANDIDATE_ADAPTER_ALREADY_CONFIGURED')
+            adapter._lifecycle_candidate_readback=LifecycleCandidateReadback(db,tenant_id,candidate_lifecycle_root)
 
     def _mcp_registered(self, binding):
         if not self.mcp_config['enabled']:return False
