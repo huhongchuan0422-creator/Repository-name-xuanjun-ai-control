@@ -410,7 +410,7 @@ class HandoffHost(object):
                     or proof['state']!='SENT' or proof['settled'] is not True or proof['message_id']!=ref):return 'UNKNOWN'
                 matches+=1
             return 'SENT_ACK_UNKNOWN' if matches==1 else 'UNKNOWN'
-        except (sqlite3.Error,ValueError,TypeError,KeyError,OverflowError):return 'UNKNOWN'
+        except (sqlite3.Error,ValueError,TypeError,KeyError,IndexError,OverflowError):return 'UNKNOWN'
 
     def read_receipt(self, session, task_id, attempt_id, event_id):
         if any(not isinstance(x,str) or not ID.fullmatch(x) for x in (task_id,attempt_id,event_id)):
