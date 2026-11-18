@@ -8,7 +8,7 @@ class OwnerMessageTool(OriginalAlertDelivery):
         def tool(**kwargs):calls.append(kwargs);return result
         def authorized(tenant,task,attempt):return (tenant,task,attempt)==('tenant-1','demo-b','attempt-1')
         def binding(tenant,task,attempt):return 'user:fixture-owner'
-        return make_owner_message_adapter('user:fixture-owner',authorized,binding,tool),calls
+        return make_owner_message_adapter('user:fixture-owner',authorized,binding,tool,message_mode='sync'),calls
 
     def test_actual_observed_send_shape_settled_and_receipt(self):
         raw={'ok':True,'channel':'feishu','action':'send','messageId':'fixture-platform-id',
@@ -40,7 +40,7 @@ class OwnerMessageTool(OriginalAlertDelivery):
 
     def test_confirmed_destination_never_grants_task_authority(self):
         calls=[]
-        adapter=make_owner_message_adapter('user:fixture-owner',lambda *args:False,lambda *args:'user:fixture-owner',lambda **kwargs:calls.append(kwargs))
+        adapter=make_owner_message_adapter('user:fixture-owner',lambda *args:False,lambda *args:'user:fixture-owner',lambda **kwargs:calls.append(kwargs),message_mode='sync')
         self.assertEqual(self.g.due_handoff_alerts(self.context,now=1000,host_adapter=adapter),[])
         self.assertEqual(self.g.deliver_handoff_alert(self.context,self.oid,adapter)['state'],'DESTINATION_UNAVAILABLE')
         self.assertEqual(calls,[]);self.assertEqual(self.s.db.execute('SELECT attempts FROM outbox WHERE outbox_id=?',(self.oid,)).fetchone()[0],0)

@@ -4,7 +4,6 @@ Only the hosting runtime can supply the real messaging callable and trusted
 scope/binding resolvers. This module neither accesses OpenClaw RPC nor grants
 permissions, and does not install itself in a server or job.
 """
-import inspect
 from task_center_owner_alert_adapter import OwnerAlertAdapter
 
 
@@ -34,7 +33,7 @@ def parse_message_result(raw, expected_target=None):
     return {'state':'SENT','settled':True,'message_id':identifier}
 
 
-def make_owner_message_adapter(owner_destination, authorize_task, resolve_binding, message_tool):
+def make_owner_message_adapter(owner_destination, authorize_task, resolve_binding, message_tool, message_mode=None):
     """The host injects the existing functions.message capability, not an RPC.
 
     ``message_tool`` must be a host callable for the actual main tool. The
@@ -44,15 +43,16 @@ def make_owner_message_adapter(owner_destination, authorize_task, resolve_bindin
     if not isinstance(owner_destination,str) or not owner_destination.startswith('user:') or len(owner_destination)<=5:
         raise ValueError('OWNER_DIRECT_DESTINATION_REQUIRED')
     if not callable(message_tool):raise ValueError('HOST_MESSAGE_TOOL_REQUIRED')
+    # Mode is a trusted host registration fact, never a request-body field.
+    # Do not probe by invoking a callback or guess from Python function type.
+    if message_mode not in ('sync','async'):raise ValueError('HOST_MESSAGE_MODE_REQUIRED')
     def invoke(destination,text,outbox_id,delivery_attempt):
         # The observed action=send schema has no idempotency-key field: do not
         # pretend outbox_id/attempt were registered with the platform.
         return message_tool(action='send',target=destination,message=text)
     adapter=OwnerAlertAdapter(owner_destination,authorize_task,resolve_binding,invoke,
                               lambda raw:parse_message_result(raw,owner_destination))
-    # Callable objects can hide async __call__; only known ordinary functions
-    # are treated as sync. The async entry accepts both return forms.
-    adapter.requires_async=(inspect.iscoroutinefunction(message_tool) or
-        inspect.iscoroutinefunction(getattr(message_tool,'__call__',None)) or
-        not (inspect.isfunction(message_tool) or inspect.ismethod(message_tool)))
+    # Main's message-tool host must register 'async'. A known legacy synchronous
+    # host may explicitly register 'sync'; no code executes during selection.
+    adapter.requires_async=(message_mode=='async')
     return adapter
