@@ -1024,7 +1024,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     if ledger_bridge is not None and value.get('ledger_event') is not None and result.get('state') in ('RECORDED','ALREADY_RECORDED'):
                         try:
                             publication=ledger_bridge.flush(value['task_id'],value['attempt_id'],value['event_id'])
-                            result['ledger_publication']='CONFLICT' if publication['flush']['conflict'] else 'PUBLISHED'
+                            current=publication['current']
+                            result['ledger_publication']=('PUBLISHED' if current in ('APPENDED','DUPLICATE') else 'CONFLICT' if current=='CONFLICT' else 'PENDING_RECOVERY')
+                            counts=publication['flush']
+                            if counts is not None:
+                                other=counts['conflict']-(1 if current=='CONFLICT' else 0)
+                                if other:result['ledger_other_conflicts']=other
                         except Exception:
                             # The authenticated DB transaction already committed;
                             # caller must reconcile/retry, never report rollback.

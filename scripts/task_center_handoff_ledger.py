@@ -4,7 +4,7 @@ The database is the durable outbox; file publication is retryable and checked
 against exact committed bytes on enqueue, flush and read. No network in txn.
 """
 import json
-from task_delivery_ledger.core import validate, canonical, ident, parse_time, Store
+from task_delivery_ledger.core import validate, canonical, ident, parse_time, Store, Conflict
 
 PHASES={'PROPOSE':'handoff_propose','NOMINATE':'handoff_nominate',
         'RECEIVE':'handoff_received','ALIGNED':'handoff_aligned',
@@ -82,5 +82,10 @@ class HandoffLedgerBridge:
             event=json.loads(row['payload_json'])
         finally:db.close()
         store=Store(self.root,self.writer,authority=self)
-        enqueued=store.enqueue(event)
-        return {'enqueue':enqueued,'flush':store.flush(self.namespace)}
+        try:enqueued=store.enqueue(event)
+        except Conflict:
+            # The conflicting immutable outbox is a deterministic reconciliation
+            # issue, not a transient interruption and not safe to overwrite.
+            return {'enqueue':'CONFLICT','current':'CONFLICT','flush':None}
+        counts=store.flush(self.namespace,event_id=event_id)
+        return {'enqueue':enqueued,'current':counts['current'],'flush':counts}

@@ -165,16 +165,20 @@ class Store:
                 if p.read_bytes()==data: return 'DUPLICATE'
                 raise Conflict('event content conflict; original preserved')
         finally: os.unlink(tmp)
-    def flush(self, namespace):
+    def flush(self, namespace, event_id=None):
         ident(namespace); folder=self.root/'outbox'/namespace
+        if event_id is not None: ident(event_id)
         counts={'appended':0,'duplicate':0,'conflict':0}
+        if event_id is not None:counts['current']=None
         for p in sorted(folder.glob('*.json')):
             e=load(p); offline_policy(e,self.writer,namespace,p.stem,authority=getattr(self,'authority',None))
             try:
                 outcome=self._append(self.root/'events'/namespace/p.name,canonical(e))
                 counts[outcome.lower()]+=1
+                if event_id is not None and p.stem==event_id:counts['current']=outcome
             except Conflict:
                 counts['conflict']+=1
+                if event_id is not None and p.stem==event_id:counts['current']='CONFLICT'
                 continue
             # Retain outbox receipt permanently; repeat is harmless and recoverable.
         return counts
