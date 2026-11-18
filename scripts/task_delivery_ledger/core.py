@@ -170,7 +170,10 @@ class Store:
         if event_id is not None: ident(event_id)
         counts={'appended':0,'duplicate':0,'conflict':0}
         if event_id is not None:counts['current']=None
-        for p in sorted(folder.glob('*.json')):
+        # Host publication owns one committed event, not the whole tenant's
+        # outbox. Legacy callers without an event id retain namespace scanning.
+        pattern=event_id+'.json' if event_id is not None else '*.json'
+        for p in sorted(folder.glob(pattern)):
             e=load(p); offline_policy(e,self.writer,namespace,p.stem,authority=getattr(self,'authority',None))
             try:
                 outcome=self._append(self.root/'events'/namespace/p.name,canonical(e))

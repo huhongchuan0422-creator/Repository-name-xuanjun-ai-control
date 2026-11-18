@@ -30,6 +30,8 @@ class TaskScope(PublicationConflicts):
             self.assertNotIn('ledger_other_conflicts',repeated)
             self.assertEqual(dest.read_bytes(),b'{}')
             internal=self.bridge.flush('task-1','attempt-1',p['event_id'])
-            self.assertEqual(internal['current'],'DUPLICATE');self.assertEqual(internal['flush']['conflict'],1)
+            self.assertEqual(internal['current'],'DUPLICATE');self.assertEqual(internal['flush']['conflict'],0)
+            # Existing trusted namespace-wide flush still reports the other conflict.
+            self.assertEqual(Store(self.bridge.root,'writer',authority=self.bridge).flush('tenant-ledger')['conflict'],1)
             self.assertEqual(dest.read_bytes(),b'{}')
         finally:self.stop_server()
