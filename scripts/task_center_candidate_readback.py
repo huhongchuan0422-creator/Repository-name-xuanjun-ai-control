@@ -48,7 +48,7 @@ class LifecycleCandidateReadback:
                 and payload.get('provider_ref')==binding['provider_ref']
                 and all(payload.get(k)==binding[k] for k in ('contract_id','contract_version','contract_sha256'))):
                 matches.append(payload.get('event_id'))
-        if len(matches)!=1: return None
+        if not matches: return None
         fd=os.open(os.path.join(self.artifacts,digest),os.O_RDONLY | getattr(os,'O_NOFOLLOW',0))
         try:
             if not stat.S_ISREG(os.fstat(fd).st_mode):return None
@@ -59,6 +59,8 @@ class LifecycleCandidateReadback:
         finally:
             if fd is not None:os.close(fd)
         if h.hexdigest()!=digest:return None
-        return {'candidate_id':binding['candidate_id'],'artifact_sha256':digest,
-          'snapshot_sha256':binding['snapshot_sha256'],'read_location_ref':'lifecycle-artifact:'+digest,
-          'handoff_event_id':matches[0]}
+        result={'candidate_id':binding['candidate_id'],'artifact_sha256':digest,
+          'snapshot_sha256':binding['snapshot_sha256'],'read_location_ref':'lifecycle-artifact:'+digest}
+        if len(matches)==1:result['handoff_event_id']=matches[0]
+        else:result['handoff_event_ids']=sorted(matches)
+        return result

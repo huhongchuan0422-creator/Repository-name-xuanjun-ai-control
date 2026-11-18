@@ -76,9 +76,13 @@ class CandidateAcceptanceEvidence:
           'contract_version':contract['contract_version'],'contract_sha256':contract['contract_sha256']}
         try:bundle=host.adapter.assess_candidate_bundle(dict(request))
         except Exception:bundle=None
-        if (not isinstance(bundle,dict) or set(bundle)!={'candidate_id','artifact_sha256','snapshot_sha256','read_location_ref','handoff_event_id'} or
+        common={'candidate_id','artifact_sha256','snapshot_sha256','read_location_ref'}
+        if (not isinstance(bundle,dict) or set(bundle) not in (common|{'handoff_event_id'},common|{'handoff_event_ids'}) or
           any(bundle.get(k)!=request[k] for k in ('candidate_id','artifact_sha256','snapshot_sha256')) or
-          any(not isinstance(bundle.get(k),str) or ID.fullmatch(bundle[k]) is None for k in ('read_location_ref','handoff_event_id'))):
+          not isinstance(bundle.get('read_location_ref'),str) or ID.fullmatch(bundle['read_location_ref']) is None):
+            raise ValueError('CANDIDATE_BUNDLE_READBACK_REQUIRED')
+        event_ids=([bundle['handoff_event_id']] if 'handoff_event_id' in bundle else bundle['handoff_event_ids'])
+        if not isinstance(event_ids,list) or not event_ids or any(not isinstance(x,str) or ID.fullmatch(x) is None for x in event_ids):
             raise ValueError('CANDIDATE_BUNDLE_READBACK_REQUIRED')
         def phase(event_id,kind):
             if not isinstance(event_id,str) or ID.fullmatch(event_id) is None:
@@ -103,39 +107,52 @@ class CandidateAcceptanceEvidence:
                 any(ref.get(k)!=payload.get(k) for k in ('tenant_id','task_id','attempt_id','event_id','handoff_id','handoff_version','backup_cycle_id','fence','epoch','issuer','principal_id','session_id','role_id'))):
                 raise ValueError('CANDIDATE_HANDOFF_RECEIPTS_REQUIRED')
             return payload
-        verified=phase(bundle['handoff_event_id'],'VERIFIED')
-        start=phase(verified.get('causation'),'SUPERVISION_START')
-        nomination=phase(start.get('causation'),'NOMINATE')
-        proposal=phase(nomination.get('causation'),'PROPOSE')
-        aligned=phase(verified.get('alignment_ref'),'ALIGNED')
-        received=phase(aligned.get('causation'),'RECEIVE')
-        shared=('tenant_id','task_id','attempt_id','handoff_id','handoff_version','backup_cycle_id',
-          'snapshot_digest','backup_manifest_sha256','backup_cycle_at','backup_state','provider_ref',
-          'fence','epoch','contract_id','contract_version','contract_sha256','checked')
-        if (proposal.get('causation')!='NONE' or received.get('causation')!=proposal.get('event_id') or nomination.get('target_ref')!=start.get('role_id') or
-            any(any(p.get(k)!=verified.get(k) for k in shared) for p in (start,nomination,proposal,aligned,received)) or
-            any(len({proposal.get(k),received.get(k),start.get(k)})!=3 for k in ('principal_id','session_id','role_id')) or
-            any(proposal.get(k)!=nomination.get(k) or received.get(k)!=aligned.get(k) or start.get(k)!=verified.get(k)
-                for k in ('principal_id','session_id','role_id')) or
-            verified.get('tenant_id')!=c.tenant_id or verified.get('task_id')!=row['task_id'] or
-            verified.get('attempt_id')!=row['attempt_id'] or verified.get('snapshot_digest')!=snapshot or
-            verified.get('provider_ref')!=actor['provider_id'] or verified.get('fence')!=task['fence'] or verified.get('epoch')!=task['epoch'] or
-            verified.get('backup_state')!='COMPLETE' or verified.get('checked')!=contract['required_checks'] or
-            any(verified.get(k)!=contract[k] for k in ('contract_id','contract_version','contract_sha256'))):
-            raise ValueError('CANDIDATE_HANDOFF_RECEIPTS_REQUIRED')
-        backup_binding={k:verified.get(k) for k in ('task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','provider_ref','checked','contract_id','contract_version','contract_sha256')}
-        backup_binding['applicability']={k:contract[k] for k in ('role_id','role_version','role_scope','required_categories','not_applicable','required_checks')}
-        try:backup=host.adapter.assess_backup(backup_binding)
-        except Exception:backup=None
-        now=c.clock()
-        if (not isinstance(backup,dict) or set(backup)!={'state','missing','cycle_at'} or backup['state']!='COMPLETE' or
-            backup['missing']!=[] or type(backup['cycle_at']) not in (int,float) or not math.isfinite(backup['cycle_at']) or
-            backup['cycle_at']!=verified.get('backup_cycle_at') or backup['cycle_at']>now or now-backup['cycle_at']>300):
-            raise ValueError('CANDIDATE_BACKUP_COMPLETE_REQUIRED')
+        def check_cycle(event_id):
+            verified=phase(event_id,'VERIFIED')
+            start=phase(verified.get('causation'),'SUPERVISION_START')
+            nomination=phase(start.get('causation'),'NOMINATE')
+            proposal=phase(nomination.get('causation'),'PROPOSE')
+            aligned=phase(verified.get('alignment_ref'),'ALIGNED')
+            received=phase(aligned.get('causation'),'RECEIVE')
+            shared=('tenant_id','task_id','attempt_id','handoff_id','handoff_version','backup_cycle_id',
+              'snapshot_digest','backup_manifest_sha256','backup_cycle_at','backup_state','provider_ref',
+              'fence','epoch','contract_id','contract_version','contract_sha256','checked')
+            if (proposal.get('causation')!='NONE' or received.get('causation')!=proposal.get('event_id') or nomination.get('target_ref')!=start.get('role_id') or
+                any(any(p.get(k)!=verified.get(k) for k in shared) for p in (start,nomination,proposal,aligned,received)) or
+                any(len({proposal.get(k),received.get(k),start.get(k)})!=3 for k in ('principal_id','session_id','role_id')) or
+                any(proposal.get(k)!=nomination.get(k) or received.get(k)!=aligned.get(k) or start.get(k)!=verified.get(k)
+                    for k in ('principal_id','session_id','role_id')) or
+                verified.get('tenant_id')!=c.tenant_id or verified.get('task_id')!=row['task_id'] or
+                verified.get('attempt_id')!=row['attempt_id'] or verified.get('snapshot_digest')!=snapshot or
+                verified.get('provider_ref')!=actor['provider_id'] or verified.get('fence')!=task['fence'] or verified.get('epoch')!=task['epoch'] or
+                verified.get('backup_state')!='COMPLETE' or verified.get('checked')!=contract['required_checks'] or
+                any(verified.get(k)!=contract[k] for k in ('contract_id','contract_version','contract_sha256'))):
+                raise ValueError('CANDIDATE_HANDOFF_RECEIPTS_REQUIRED')
+            backup_binding={k:verified.get(k) for k in ('task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','provider_ref','checked','contract_id','contract_version','contract_sha256')}
+            backup_binding['applicability']={k:contract[k] for k in ('role_id','role_version','role_scope','required_categories','not_applicable','required_checks')}
+            try:backup=host.adapter.assess_backup(backup_binding)
+            except Exception:backup=None
+            now=c.clock()
+            if (not isinstance(backup,dict) or set(backup)!={'state','missing','cycle_at'} or backup['state']!='COMPLETE' or
+                backup['missing']!=[] or type(backup['cycle_at']) not in (int,float) or not math.isfinite(backup['cycle_at']) or
+                backup['cycle_at']!=verified.get('backup_cycle_at') or backup['cycle_at']>now or now-backup['cycle_at']>300):
+                raise ValueError('CANDIDATE_BACKUP_COMPLETE_REQUIRED')
+        # Each candidate is independently validated by the original causal,
+        # contract and current host backup checks. IDs merely provide stable
+        # iteration; no timestamp or recency is treated as authority.
+        error=None
+        for event_id in sorted(set(event_ids)):
+            try:
+                check_cycle(event_id)
+                break
+            except ValueError as exc:
+                error=exc
+        else:
+            raise error
         return {'task_id':row['task_id'],'attempt_id':row['attempt_id'],'candidate_id':row['candidate_id'],
           'artifact_sha256':row['artifact_sha256'],'snapshot_sha256':snapshot,
           'read_location_ref_sha256':hashlib.sha256(bundle['read_location_ref'].encode()).hexdigest(),
-          'handoff_event_id':bundle['handoff_event_id'],'contract_sha256':contract['contract_sha256'],
+          'handoff_event_id':event_id,'contract_sha256':contract['contract_sha256'],
           'acceptor_contract_sha256':acceptor_contract['contract_sha256']}
 
 class CandidateLifecycleMCP:
