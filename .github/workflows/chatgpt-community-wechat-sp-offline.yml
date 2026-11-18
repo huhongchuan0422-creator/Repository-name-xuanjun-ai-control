@@ -107,7 +107,7 @@ jobs:
       source_sha256: ${{ steps.source_package.outputs.sha256 }}
       snapshot_binding_sha256: ${{ steps.hz_snapshot.outputs.binding_sha256 }}
       full_regression_outcome: ${{ steps.full_regression.outcome }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +119,7 @@ jobs:
         shell: bash
         env:
           BEFORE: ${{ github.event.before }}
-          FORCE_FULL_REGRESSION: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[community-image]') }}
+          FORCE_FULL_REGRESSION: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && (contains(github.event.head_commit.message, '[community-image]') || contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) }}
         run: |
           set -euo pipefail
           [[ "$BEFORE" =~ ^[0-9a-f]{40}$ ]] && [[ "$BEFORE" != "0000000000000000000000000000000000000000" ]] || exit 1
@@ -1424,9 +1424,6 @@ jobs:
     env:
       COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
       COMMUNITY_SNAPSHOT_BINDING_SHA256: ${{ needs.test.outputs.snapshot_binding_sha256 || inputs.snapshot_binding_sha256 }}
-      COMMUNITY_SNAPSHOT_INPUT: ${{ runner.temp }}/community-mini-hangzhou-input-${{ github.run_id }}-${{ github.run_attempt }}
-      COMMUNITY_SNAPSHOT_BINDING: ${{ runner.temp }}/community-mini-hangzhou-input-${{ github.run_id }}-${{ github.run_attempt }}/binding.json
-      COMMUNITY_SNAPSHOT_ROOT: ${{ runner.temp }}/community-mini-hangzhou-source-${{ github.run_id }}-${{ github.run_attempt }}
       COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) && 'true' || github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'true' || github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
       COMMUNITY_FIXED_PRODUCT_KIND: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) && 'hangzhou-snapshot' || github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'current-48df' || inputs.preview_product }}
       PREVIEW_CONTROL_SHA: ${{ github.event_name == 'push' && github.sha || inputs.preview_source_sha }}
@@ -1450,6 +1447,9 @@ jobs:
           test -x "$node_bin"
           "$node_bin" --version
           printf 'COMMUNITY_NODE_BINARY=%s\n' "$node_bin" >> "$GITHUB_ENV"
+          printf 'COMMUNITY_SNAPSHOT_INPUT=%s/community-mini-hangzhou-input-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+          printf 'COMMUNITY_SNAPSHOT_BINDING=%s/community-mini-hangzhou-input-%s-%s/binding.json\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+          printf 'COMMUNITY_SNAPSHOT_ROOT=%s/community-mini-hangzhou-source-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           name: community-phase-integration-evidence
