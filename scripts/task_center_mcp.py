@@ -362,11 +362,9 @@ class RegisteredTaskDispatchMCP(object):
         binding = self._role(args)
         if self.host_config is None or self.host_identity is None:
             raise ValueError('TASK_CONTRACT_UNKNOWN')
-        # The currently reviewed worker accepts only the original submit-bound
-        # text role; do not queue unsupported registered role engines.
-        if args['role_id']!='mcp-text-executor':
-            raise ValueError('TASK_DISPATCH_ROLE_NOT_SUPPORTED')
-        return self._dispatch_existing_mcp(args,binding)
+        if args['role_id']=='mcp-text-executor':
+            return self._dispatch_existing_mcp(args,binding)
+        return self._registered_dispatch(args,binding)
 
     def _dispatch_existing_mcp(self,args,binding):
         from task_center_mcp_service import MCPWorkerAdmission
@@ -408,8 +406,31 @@ class RegisteredTaskDispatchMCP(object):
         except Exception:
             db.rollback();raise
 
-    def _legacy_dispatch_unavailable(self,args):
-        binding = self._role(args)
+    def _registered_dispatch(self,args,binding):
+        from task_center_mcp_dispatch_host import roles_for
+        from task_center_role_contract import RoleContractResolver
+        if type(self.role_contract) is not RoleContractResolver:
+            raise ValueError('TASK_CONTRACT_UNKNOWN')
+        expected_contract={}
+        def check(db):
+            current=roles_for(self.host_config,self.host_identity) or {}
+            if current.get(args['role_id'])!=binding:
+                raise ValueError('MCP_DISPATCH_PERMISSION_REVOKED')
+            resolver=RoleContractResolver(db,self.role_contract.contracts,self.role_contract.intake_plans)
+            resolved=resolver.resolve(self.control.tenant_id,args['task_id'],args['attempt_id'],binding['provider_id'])
+            if resolved['role_id']!=args['role_id'] or resolved['role_version']!=binding['role_version']:
+                raise ValueError('TASK_CONTRACT_UNKNOWN')
+            if expected_contract and any(resolved[k]!=v for k,v in expected_contract.items()):
+                raise ValueError('TASK_CONTRACT_UNKNOWN')
+            row=db.execute("SELECT status,purpose,provider_id,secret_cipher IS NOT NULL FROM service_connections WHERE tenant_id=? AND connection_id=?",(self.control.tenant_id,binding['connection_id'])).fetchone()
+            if row is None or tuple(row)!=('ACTIVE','MODEL_INFERENCE',binding['provider_id'],1):
+                raise ValueError('MCP_DISPATCH_CONNECTION_REQUIRED')
+        try:check(self.control.db)
+        except ValueError as exc:
+            self._dispatch_context_alert(args,str(exc))
+            raise
+        resolved=self.role_contract.resolve(self.control.tenant_id,args['task_id'],args['attempt_id'],binding['provider_id'])
+        expected_contract.update({k:resolved[k] for k in ('contract_id','contract_version','contract_sha256')})
         assignment = self.control.db.execute('''SELECT * FROM model_assignments
             WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
             (self.control.tenant_id,args['task_id'],args['attempt_id'],
@@ -425,13 +446,54 @@ class RegisteredTaskDispatchMCP(object):
         if prior is not None and (prior['max_output_tokens'] != args['max_output_tokens']
                 or prior['connection_id'] != binding['connection_id']):
             raise ValueError('IDEMPOTENCY_BINDING_CONFLICT')
-        result = self.control.queue_request(args['task_id'],args['role_id'],
-            [{'role':'user','content':args['input_text']}],args['idempotency_key'],
-            args['max_output_tokens'],binding['connection_id'],
-            expected_attempt_id=args['attempt_id'],
-            expected_assignment_binding=binding,expected_project_id=self.project_id)
+        if prior is not None:
+            audit=self.control.db.execute('''SELECT a.principal_id FROM model_requests r JOIN model_audit a
+              ON a.tenant_id=r.tenant_id AND a.target_id=r.request_id AND a.action='MCP_REGISTERED_QUEUE'
+              WHERE r.tenant_id=? AND r.idempotency_key=?''',(self.control.tenant_id,args['idempotency_key'])).fetchall()
+            if len(audit)!=1 or audit[0]['principal_id']!=self.host_identity['principal_id']:
+                raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+        try:
+            result = self.control.queue_request(args['task_id'],args['role_id'],
+                [{'role':'user','content':args['input_text']}],args['idempotency_key'],
+                args['max_output_tokens'],binding['connection_id'],
+                expected_attempt_id=args['attempt_id'],
+                expected_assignment_binding=binding,expected_project_id=self.project_id,
+                expected_intake_guard=check,registered_mcp_audit={'task_id':args['task_id'],
+                  'attempt_id':args['attempt_id'],'role_id':args['role_id'],'project_id':self.project_id,
+                  'contract_id':resolved['contract_id'],'contract_version':resolved['contract_version'],
+                  'contract_sha256':resolved['contract_sha256']})
+        except ValueError as exc:
+            if str(exc) in ('TASK_CONTRACT_UNKNOWN','MCP_DISPATCH_PERMISSION_REVOKED',
+              'MCP_DISPATCH_CONNECTION_REQUIRED','STALE_TASK_ATTEMPT',
+              'WRITER_CHANGED_BEFORE_QUEUE_COMMIT','ASSIGNMENT_CHANGED_BEFORE_QUEUE_COMMIT'):
+                self._dispatch_context_alert(args,str(exc))
+            raise
         return dict(result, task_id=args['task_id'], attempt_id=args['attempt_id'],
                     dispatch_semantics='EXISTING_QUEUE_ADMISSION_NOT_EXECUTION')
+
+    def _dispatch_context_alert(self,args,reason):
+        # Only the already-registered task/attempt; no synthetic task or claim
+        # of delivery. A repeat of the same blocked request is idempotent.
+        import hashlib
+        from task_supervisor import canonical
+        db=self.control.db;now=self.control.clock()
+        safe=reason if reason in ('TASK_CONTRACT_UNKNOWN','MCP_DISPATCH_PERMISSION_REVOKED',
+          'MCP_DISPATCH_CONNECTION_REQUIRED','STALE_TASK_ATTEMPT',
+          'WRITER_CHANGED_BEFORE_QUEUE_COMMIT','ASSIGNMENT_CHANGED_BEFORE_QUEUE_COMMIT') else 'MCP_DISPATCH_CONTEXT_REQUIRED'
+        seed=canonical({'task':args['task_id'],'attempt':args['attempt_id'],
+          'role':args['role_id'],'key':args['idempotency_key'],'reason':safe})
+        event='mcp-dispatch-hold-'+hashlib.sha256(seed.encode()).hexdigest()
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            task=db.execute('SELECT attempt_id FROM tasks WHERE task_id=?',(args['task_id'],)).fetchone()
+            if task is not None and task['attempt_id']==args['attempt_id']:
+                payload={'state':'HOLD','action':'RECONCILE_BEFORE_CONTROLLED_REASSIGN',
+                  'reason':safe,'role_id':args['role_id'],'requires_effect_reconciliation':True,'takeover_allowed':False}
+                db.execute('INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?,?,?)',
+                  (args['task_id'],args['attempt_id'],event,'SUPERVISION_ACTION',now,'PHASE_EXECUTION','MCP_DISPATCH_CONTEXT_HOLD',canonical(payload)))
+                self.control.gateway.supervisor._enqueue(args['task_id'],args['attempt_id'],event,payload,now)
+            db.commit()
+        except Exception:db.rollback();raise
 
     def status(self, args):
         self._args(args, ('task_id','attempt_id','request_id'))

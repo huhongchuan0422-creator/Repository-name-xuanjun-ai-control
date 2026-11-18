@@ -1163,7 +1163,8 @@ class ModelControl(object):
     def queue_request(self, task_id, role_id, messages, idempotency_key,
                       max_output_tokens=None,connection_id=None,now=None,
                       expected_attempt_id=None,expected_assignment_binding=None,
-                      expected_project_id=None,expected_intake_guard=None):
+                      expected_project_id=None,expected_intake_guard=None,
+                      registered_mcp_audit=None):
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
@@ -1330,6 +1331,11 @@ class ModelControl(object):
               task_state['authority_caller_id'],task_state['fence'],task_state['epoch'],
               task_state['authority_valid_until'],skill_sha,spec_sha,
               module['version'] if module else 'legacy-test-only'))
+            if registered_mcp_audit is not None:
+                if expected_intake_guard is None or expected_attempt_id is None:
+                    raise ValueError('MCP_REGISTERED_GUARD_REQUIRED')
+                self._audit(self._principal(),'MCP_REGISTERED_QUEUE',request_id,
+                  registered_mcp_audit,now)
             self.db.commit()
         except Exception:
             self.db.rollback();raise
@@ -2606,9 +2612,7 @@ class ModelScheduler(object):
         missing=[]
         if self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_task_bindings'").fetchone():
             missing=list(self.db.execute('''SELECT r.tenant_id,r.request_id,r.task_id,r.attempt_id
-              FROM model_requests r JOIN mcp_task_bindings mb ON mb.tenant_id=r.tenant_id
-                AND mb.request_id=r.request_id AND mb.task_id=r.task_id
-              JOIN tasks t ON t.task_id=r.task_id
+              FROM model_requests r JOIN tasks t ON t.task_id=r.task_id
               LEFT JOIN gateway_task_metadata g ON g.task_id=r.task_id AND g.tenant_id=r.tenant_id
               LEFT JOIN model_request_bindings b ON b.tenant_id=r.tenant_id AND b.request_id=r.request_id
               LEFT JOIN model_providers p ON p.tenant_id=r.tenant_id AND p.provider_id=r.provider_id
@@ -2616,6 +2620,8 @@ class ModelScheduler(object):
               LEFT JOIN model_assignments a ON a.tenant_id=r.tenant_id AND a.task_id=r.task_id AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id
               LEFT JOIN role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id AND rt.version=a.role_version
               WHERE r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND r.next_attempt_at<=?
+                AND (EXISTS(SELECT 1 FROM mcp_task_bindings mb WHERE mb.tenant_id=r.tenant_id AND mb.request_id=r.request_id AND mb.task_id=r.task_id)
+                  OR EXISTS(SELECT 1 FROM model_audit au WHERE au.tenant_id=r.tenant_id AND au.target_id=r.request_id AND au.action='MCP_REGISTERED_QUEUE'))
                 AND (g.task_id IS NULL OR b.request_id IS NULL OR p.provider_id IS NULL OR m.model_id IS NULL OR a.role_id IS NULL OR rt.role_id IS NULL)
               ORDER BY r.created_at,r.request_id LIMIT 64''',(self.control.tenant_id,now)))
             for incomplete in missing:self._hold_mcp_request(incomplete,'MCP_WORKER_CONTEXT_MISSING',now)
@@ -2649,7 +2655,7 @@ class ModelScheduler(object):
         row=None;reservation=None;reserved_secret=None;last_limit=None
         for candidate in candidates:
             mcp_table=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_task_bindings'").fetchone()
-            is_mcp=bool(self.admission is not None or candidate['role_id']=='mcp-text-executor' or (mcp_table and self.db.execute("SELECT 1 FROM mcp_task_bindings WHERE tenant_id=? AND request_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone()))
+            is_mcp=bool(self.admission is not None or candidate['role_id']=='mcp-text-executor' or (mcp_table and self.db.execute("SELECT 1 FROM mcp_task_bindings WHERE tenant_id=? AND request_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone()) or self.db.execute("SELECT 1 FROM model_audit WHERE tenant_id=? AND action='MCP_REGISTERED_QUEUE' AND target_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone())
             task=self.control.gateway.supervisor._task(candidate['task_id'])
             fatal=None
             if (candidate['cancel_requested'] or task['attempt_id']!=candidate['attempt_id'] or

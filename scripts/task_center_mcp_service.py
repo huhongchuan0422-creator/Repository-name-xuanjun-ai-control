@@ -579,7 +579,8 @@ class MCPWorkerAdmission(object):
         row=db.execute('''SELECT principal_id,project_id,connection_id,provider_id,model_id
           FROM mcp_task_bindings WHERE tenant_id=? AND task_id=? AND request_id=?''',
           (candidate['tenant_id'],candidate['task_id'],candidate['request_id'])).fetchone()
-        if row is None:raise ValueError('MCP_WORKER_BINDING_REQUIRED')
+        if row is None:
+            return self._check_registered(db,candidate,now)
         principal,project,connection,provider,model=tuple(row)
         if (connection!=candidate['connection_id'] or provider!=candidate['provider_id'] or
                 model!=candidate['model_id']):raise ValueError('MCP_WORKER_BINDING_CHANGED')
@@ -614,6 +615,44 @@ class MCPWorkerAdmission(object):
           'mcp-worker',ROLE_VERSION,'ASSIGNED',provider,model,'ACTIVE','MODEL_INFERENCE',provider,
           candidate['connection_config_version'],1,model)
         if tuple(current)!=expected or now>=candidate['writer_valid_until']:
+            raise ValueError('MCP_WORKER_AUTHORITY_CHANGED')
+
+
+    def _check_registered(self,db,candidate,now):
+        """Use the original registered task, assignment and host role policy."""
+        from task_center_role_contract import RoleContractResolver
+        role=candidate['role_id'];tenant=candidate['tenant_id']
+        task=db.execute("SELECT t.attempt_id,t.state,t.authority_state,t.authority_valid_until,t.authority_caller_id,t.fence,t.epoch,t.entry,m.project_id FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id WHERE t.task_id=? AND m.tenant_id=?",(candidate['task_id'],tenant)).fetchone()
+        if task is None or (task['attempt_id']!=candidate['attempt_id'] or task['state']!='STARTED' or
+          task['authority_state']!='VALID' or task['authority_valid_until'] is None or now>=task['authority_valid_until'] or
+          task['authority_caller_id']!=candidate['writer_principal'] or task['fence']!=candidate['writer_fence'] or
+          task['epoch']!=candidate['writer_epoch'] or not task['entry']):
+            raise ValueError('MCP_WORKER_AUTHORITY_CHANGED')
+        assignment=db.execute("SELECT principal_id,role_version,provider_id,model_id,state FROM model_assignments WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?",(tenant,candidate['task_id'],candidate['attempt_id'],role)).fetchone()
+        if assignment is None or assignment['state']!='ASSIGNED':raise ValueError('MCP_WORKER_AUTHORITY_CHANGED')
+        expected={'role_version':assignment['role_version'],'principal_id':assignment['principal_id'],
+          'provider_id':candidate['provider_id'],'model_id':candidate['model_id'],
+          'connection_id':candidate['connection_id']}
+        if assignment['provider_id']!=candidate['provider_id'] or assignment['model_id']!=candidate['model_id']:
+            raise ValueError('MCP_WORKER_BINDING_CHANGED')
+        audits=db.execute("SELECT principal_id,detail_json FROM model_audit WHERE tenant_id=? AND action='MCP_REGISTERED_QUEUE' AND target_id=?",(tenant,candidate['request_id'])).fetchall()
+        if len(audits)!=1:raise ValueError('MCP_WORKER_BINDING_REQUIRED')
+        principal=audits[0]['principal_id']
+        matches=[x for x in self.config.get('bindings',[]) if self.config.get('enabled') and
+          x['tenant_id']==tenant and x['principal_id']==principal and x['project_id']==task['project_id'] and x['roles'].get(role)==expected]
+        if len(matches)!=1:raise ValueError('MCP_WORKER_PERMISSION_REVOKED')
+        resolver=RoleContractResolver(db,self.role_contract.contracts,self.role_contract.intake_plans)
+        contract=resolver.resolve(tenant,candidate['task_id'],candidate['attempt_id'],candidate['provider_id'])
+        if contract['role_id']!=role or contract['role_version']!=assignment['role_version']:
+            raise ValueError('MCP_WORKER_ROLE_NOT_SUPPORTED')
+        try:detail=json.loads(audits[0]['detail_json'])
+        except (ValueError,TypeError):raise ValueError('MCP_WORKER_BINDING_REQUIRED')
+        if detail!={'task_id':candidate['task_id'],'attempt_id':candidate['attempt_id'],
+            'role_id':role,'project_id':task['project_id'],'contract_id':contract['contract_id'],
+            'contract_version':contract['contract_version'],'contract_sha256':contract['contract_sha256']}:
+            raise ValueError('MCP_WORKER_BINDING_CHANGED')
+        connection=db.execute("SELECT status,purpose,provider_id,config_version,secret_cipher IS NOT NULL FROM service_connections WHERE tenant_id=? AND connection_id=?",(tenant,candidate['connection_id'])).fetchone()
+        if connection is None or tuple(connection)!=('ACTIVE','MODEL_INFERENCE',candidate['provider_id'],candidate['connection_config_version'],1):
             raise ValueError('MCP_WORKER_AUTHORITY_CHANGED')
 
 
