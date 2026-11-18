@@ -14,6 +14,24 @@ REQUIRED=frozenset(('schema_version','project_ref','receipt_id','source_ref','re
     'content_changed','file_hashes','excluded','limitations'))
 class BackupReceiptError(Exception):pass
 
+def coverage_handoff_reference(ref):
+    """Resolve one bounded handoff observation, never a live backup assertion."""
+    if ref != 'source-backup-1889-coverage-20261118':
+        return {'state':'UNAVAILABLE','reference':ref}
+    return {'state':'HISTORICAL_REPORTED_NOT_LIVE', 'reference':ref,
+        'evidence_ref':'workspace-platform-engineer/evidence/source-backup-1889-coverage-20261118.md',
+        'current_source_commit':'16ac19e53ed39804f942cf381eed859c6e92bc23',
+        'backup_branch':'backup/source-code-1889',
+        'observed_backup_tip':'4410f00032c9eaa769fb7b48d2b577733c3d1b5a',
+        'observed_manifest_sha256':'87ce52601015258a868433798bb650a6f70dbc17c2050cd9f6c3c66d7177dd6e',
+        'current_scope':'six specified tracked files compared 6/6; not full repository',
+        'historical_deleted_files_commit':'aedb23ddc9e76c68d6b3f0c7a6387aa046576ac1',
+        'historical_scope':'two deleted delivery-ledger files; historical export only',
+        'recovery':'Isolate export at recorded commit and path; check recorded hashes in evidence before any restore.',
+        'credential_entry':'Existing OpenClaw GitHub identity and gh auth git-credential; successor uses own authorization.',
+        'scheduler_identity':'UNKNOWN', 'data_config_permissions_recovery':'NOT_PROVEN',
+        'pending_effects':'UNKNOWN_RECONCILE_BEFORE_ACTION'}
+
 class LocalBackupReceiptReader(object):
     """Read a caller-bound local report; neither authenticate it nor expose raw fields."""
     def __init__(self,path):

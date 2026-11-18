@@ -110,6 +110,8 @@ def project_handoffs(events, verifier=None, now=None):
         continuation['status']='MISSING_REFERENCES' if continuation['missing'] else 'REFERENCES_UNVERIFIED'
         continuation['installed_version_check']='UNKNOWN'
         continuation['permission_expiry_revocation_check']='UNKNOWN'
+        from task_delivery_backup_receipt import coverage_handoff_reference
+        continuation['backup_observation']=coverage_handoff_reference(continuation['backup_ref'])
         continuation['instruction']='接手者须经原权限入口重新取得当次授权；先对账未决效果，勿继承令牌、租约或签据。版本、权限、恢复和验收须现场核实。'
         result[key]={'task_id':task_id,'handoff_id':hid,'version':version,'snapshot_digest':d['snapshot_digest'],'handoff_status':state,'scope_included':inc,'scope_excluded':exc,'unknown_items':unknown,'version_conflict':version_conflict,'outgoing':outgoing,'receiving':receiving,'supervisor':supervisor,'continuation':continuation,'summary':{'received_event_id':receiving,'alignment_event_id':a['event_id'] if a else 'UNKNOWN','supervision_start_event_id':supervisor,'verification_ref':v['event_id'] if v else 'UNKNOWN','reason':'接收事实不代表执行权；来源身份须独立验证'},'history':es}
     return result
