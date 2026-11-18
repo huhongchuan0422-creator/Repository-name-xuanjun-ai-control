@@ -228,7 +228,11 @@ class TaskCenterAppTests(unittest.TestCase):
         status, headers, body = self.get('/workbench/')
         self.assertEqual(status, 200)
         self.assertEqual(headers['Cache-Control'], 'no-store')
-        self.assertIn(b'owner-workbench-v2', body)
+        self.assertLess(body.index(b'src="catalog.js"'), body.index(b'src="task-read-adapter.js"'))
+        self.assertLess(body.index(b'src="task-read-adapter.js"'), body.index(b'src="shell.js"'))
+        status, _, legacy = self.get('/workbench/legacy.html')
+        self.assertEqual(status, 200)
+        self.assertIn(b'owner-workbench-v2', legacy)
         with self.assertRaises(HTTPError) as denied:
             self.get('/api/admin/workbench')
         self.assertEqual(denied.exception.code, 403)

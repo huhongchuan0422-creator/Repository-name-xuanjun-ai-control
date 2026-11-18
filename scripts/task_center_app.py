@@ -94,8 +94,14 @@ ASSETS = {
     '/research-workbench/preview.js': ('research-workbench/preview.js', 'application/javascript; charset=utf-8'),
 }
 WORKBENCH_ASSETS = {
-    '/workbench/': ('index.html', 'text/html; charset=utf-8'),
-    '/workbench/index.html': ('index.html', 'text/html; charset=utf-8'),
+    '/workbench/': ('admin-owner/index.html', 'text/html; charset=utf-8'),
+    '/workbench/index.html': ('admin-owner/index.html', 'text/html; charset=utf-8'),
+    '/workbench/legacy.html': ('index.html', 'text/html; charset=utf-8'),
+    '/workbench/catalog.js': ('admin-owner/catalog.js', 'application/javascript; charset=utf-8'),
+    '/workbench/task-read-adapter.js': ('admin-owner/task-read-adapter.js', 'application/javascript; charset=utf-8'),
+    '/workbench/shell.js': ('admin-owner/shell.js', 'application/javascript; charset=utf-8'),
+    '/workbench/shell.css': ('admin-owner/shell.css', 'text/css; charset=utf-8'),
+    '/workbench/fonts/NotoSansCJKsc-Regular.otf': ('admin-owner/fonts/NotoSansCJKsc-Regular.otf', 'font/otf'),
     '/workbench/app.js': ('app.js', 'application/javascript; charset=utf-8'),
     '/workbench/data.js': ('data.js', 'application/javascript; charset=utf-8'),
     '/workbench/styles.css': ('styles.css', 'text/css; charset=utf-8'),
@@ -798,7 +804,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                       'application/json; charset=utf-8')
                 return
             if (session_store is not None and path in ('/','/index.html',
-                    '/admin.html','/workbench/','/workbench/index.html') and
+                    '/admin.html','/workbench/','/workbench/index.html',
+                    '/workbench/legacy.html') and
                     self._session() is None):
                 self.send_response(302);self.send_header('Location',self._external_path('/login.html'))
                 self.send_header('Cache-Control','no-store');self.end_headers();return
