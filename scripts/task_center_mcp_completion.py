@@ -74,7 +74,7 @@ class CandidateAcceptanceEvidence:
           'attempt_id':row['attempt_id'],'candidate_id':row['candidate_id'],'artifact_sha256':row['artifact_sha256'],
           'snapshot_sha256':snapshot,'provider_ref':actor['provider_id'],'contract_id':contract['contract_id'],
           'contract_version':contract['contract_version'],'contract_sha256':contract['contract_sha256']}
-        try:bundle=host.adapter.assess_candidate_bundle(dict(request))
+        try:bundle=host.assess_candidate_bundle(dict(request))
         except Exception:bundle=None
         common={'candidate_id','artifact_sha256','snapshot_sha256','read_location_ref'}
         if (not isinstance(bundle,dict) or set(bundle) not in (common|{'handoff_event_id'},common|{'handoff_event_ids'}) or
