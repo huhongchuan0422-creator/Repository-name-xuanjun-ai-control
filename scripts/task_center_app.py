@@ -1720,7 +1720,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise
 
 
-def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
+def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
+         identity_provider=None, session_store=None, handoff_host=None, ledger_bridge=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
     authority = parser.add_mutually_exclusive_group(required=True)
@@ -1810,8 +1811,11 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
             raise ValueError('CODEX_TRANSPORT_REQUIRES_FIXTURE_OUTBOUND_FLAG')
         command=json.loads(args.codex_app_server_command_json)
         codex_transports['CODEX_APP_SERVER']=CodexAppServerTransport(command=command)
-    identity_provider=None;session_store=None
+    if (identity_provider is None)!=(session_store is None):
+        raise ValueError('HOST_IDENTITY_AND_SESSION_REQUIRED')
+    host_identity_injected=identity_provider is not None
     if args.test_identity_file:
+        if host_identity_injected:raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
         identity_provider=FileTestIdentityProvider(args.test_identity_file)
         def connect():
             db=sqlite3.connect(os.path.realpath(args.db),timeout=5)
@@ -1837,7 +1841,8 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
                          mcp_development_host=(load_development_host(args.mcp_development_config_file, execution_provider=execution_provider)
                            if args.mcp_development_config_file else None),
                          correction_observer_interval=args.correction_observer_interval,
-                         delivery_ledger_reader=delivery_ledger_reader)
+                         delivery_ledger_reader=delivery_ledger_reader,
+                         handoff_host=handoff_host,ledger_bridge=ledger_bridge)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)
@@ -1849,8 +1854,8 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None):
                                                 'DISABLED'),
                'model_admin_api': ('TEST_ONLY_ENABLED' if model_key else
                                    'DISABLED'),
-               'authentication': ('INJECTED_TEST_IDENTITY' if identity_provider
-                                  else 'LEGACY_TEST_TOKEN'),
+               'authentication': ('HOST_INJECTED_IDENTITY' if host_identity_injected else
+                                  'INJECTED_TEST_IDENTITY' if identity_provider else 'LEGACY_TEST_TOKEN'),
                'real_outbound': ('TEST_FIXTURE_ONLY' if
                                   args.allow_loopback_fixture_outbound else
                                   'DISABLED'),
