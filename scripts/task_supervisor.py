@@ -2447,6 +2447,7 @@ class Supervisor(object):
             AND last_error NOT LIKE 'HANDOFF_ALERT_%'
             AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task_id=outbox.task_id
               AND e.attempt_id=outbox.attempt_id AND ((e.event_id=outbox.event_id
+              AND e.kind='SUPERVISION_ACTION' AND e.evidence_ref='HANDOFF_CONTEXT_INCOMPLETE') OR (e.event_id=outbox.event_id
               AND e.kind='CORRECTION_PROPOSAL') OR (e.event_id='correction-intent-'||outbox.outbox_id AND e.kind='CORRECTION_INTENT') OR (e.event_id='handoff-alert-intent:'||outbox.outbox_id AND e.kind='HANDOFF_ALERT_INTENT')))
           ORDER BY next_attempt_at,outbox_id LIMIT ?''', (now, limit))]
 
