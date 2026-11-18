@@ -152,6 +152,16 @@ class HandoffHost(object):
         rows=self.db.execute("SELECT rowid AS recorded_order,event_id,payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='SUPERVISION_ACTION' AND (substr(event_id,1,?)=? OR event_id=?) ORDER BY rowid", (task_id,attempt_id,len(prefix),prefix,'handoff-missing:'+event_id)).fetchall()
         return prefix,rows
 
+    @staticmethod
+    def _alert_facts(reason, state, missing):
+        # This is the exact finite shape written by the original alert path.
+        if (reason not in ('HANDOFF_CONTEXT_INCOMPLETE','NOT_CONNECTED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED') or
+            state not in ('UNKNOWN','INCOMPLETE') or not isinstance(missing,list) or
+            any(not isinstance(x,str) or x not in REQUIRED_CONTEXT for x in missing) or missing!=sorted(set(missing)) or
+            (reason in ('NOT_CONNECTED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED') and (state!='UNKNOWN' or missing)) or
+            (reason=='HANDOFF_CONTEXT_INCOMPLETE' and ((state=='UNKNOWN' and missing) or (state=='INCOMPLETE' and not missing)))):
+            raise ValueError('HANDOFF_ALERT_INVALID')
+
     def _queue_alert(self, value, now, reason, assessment):
         # Only called inside the authenticated, fenced writer transaction.
         prefix,rows=self._alerts(value['task_id'],value['attempt_id'],value['event_id'])
@@ -162,6 +172,7 @@ class HandoffHost(object):
                'handoff_version':value['handoff_version'],'backup_cycle_id':value['backup_cycle_id'],
                'backup_manifest_sha256':value['backup_manifest_sha256'],
                'state':assessment['state'],'missing':sorted(assessment['missing'])}
+        self._alert_facts(alert['reason'],alert['state'],alert['missing'])
         encoded=canonical(alert)
         for row in rows:
             previous=json.loads(row['payload_json'])
@@ -324,14 +335,13 @@ class HandoffHost(object):
         history=[]
         for entry in alert_rows:
             a=json.loads(entry['payload_json'])
-            if (a.get('reason','HANDOFF_CONTEXT_INCOMPLETE') not in ('HANDOFF_CONTEXT_INCOMPLETE','NOT_CONNECTED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED') or
-                a.get('state') not in ('UNKNOWN','INCOMPLETE') or not isinstance(a.get('missing'),list) or
-                any(not isinstance(x,str) or x not in REQUIRED_CONTEXT for x in a['missing']) or
-                a['missing']!=sorted(set(a['missing'])) or
-                (a['state']=='INCOMPLETE' and not a['missing']) or
-                a.get('action')!='HANDOFF_CONTEXT_INCOMPLETE' or
+            try:
+                self._alert_facts(a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),a.get('state'),a.get('missing'))
+            except (ValueError,TypeError):raise ValueError('RECEIPT_UNAVAILABLE')
+            if (a.get('action')!='HANDOFF_CONTEXT_INCOMPLETE' or
                 a.get('tenant_id')!=self.tenant_id or a.get('task_id')!=task_id or a.get('attempt_id')!=attempt_id or
-                any(a.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id'))):raise ValueError('RECEIPT_UNAVAILABLE')
+                any(a.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id')) or
+                any(a.get(k)!=payload.get(k) for k in ('snapshot_digest','backup_manifest_sha256','provider_ref'))):raise ValueError('RECEIPT_UNAVAILABLE')
             history.append({'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'})
         if alert:
             return {'history':history,'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':'UNKNOWN',
