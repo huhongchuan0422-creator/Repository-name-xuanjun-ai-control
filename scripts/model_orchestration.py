@@ -332,12 +332,18 @@ def _host_lifecycle_transaction(method):
     """Opt-in host binding checked under the existing SQLite writer lock."""
     def guarded(self, *args, **kwargs):
         binding=kwargs.pop('_host_binding',None)
+        acceptance_check=kwargs.pop('_host_acceptance_check',None)
+        if acceptance_check is not None and (binding is None or method.__name__!='accept_candidate'):
+            raise ValueError('HOST_ACCEPTANCE_CHECK_SCOPE_REQUIRED')
         if binding is None:return method(self,*args,**kwargs)
         if self.db.in_transaction:raise ValueError('CLEAN_HOST_TRANSACTION_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         try:
             self.assert_host_lifecycle(binding)
+            evidence=acceptance_check() if acceptance_check is not None else None
             result=method(self,*args,**kwargs)
+            if acceptance_check is not None:
+                self._audit(binding['principal_id'],'CANDIDATE_EVIDENCE_BOUND',binding['candidate_id'],evidence,self.clock())
             self.db.commit()
             return result
         except Exception:
@@ -2364,6 +2370,40 @@ class ModelControl(object):
         return {'candidate_id':candidate_id,'state':state,
                 'finding_count':len(findings)}
 
+    def _require_candidate_review_receipts(self,row):
+        """Recheck both original independently assigned review records."""
+        reviews=self.db.execute('''SELECT * FROM candidate_reviews WHERE tenant_id=? AND candidate_id=?''',
+          (self.tenant_id,row['candidate_id'])).fetchall()
+        if len(reviews)!=2 or {x['review_kind'] for x in reviews}!={'QA','SECURITY'}:
+            raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+        if len({x['reviewer'] for x in reviews})!=2 or any(x['reviewer']==row['submitted_by'] for x in reviews):
+            raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+        for review in reviews:
+            try:findings=json.loads(review['findings_json'])
+            except (TypeError,ValueError):raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+            if findings!=[] or review['decision'] not in (review['review_kind']+'_PASSED','REVIEW_PASSED'):
+                raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+            body=canonical({'candidate_id':row['candidate_id'],'reviewer':review['reviewer'],
+              'review_kind':review['review_kind'],'decision':review['decision'],'findings':findings,
+              'observed_at':review['observed_at']})
+            if hashlib.sha256(body.encode()).hexdigest()!=review['review_id']:
+                raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+            assigned=self.db.execute('''SELECT a.state,r.enabled,r.phase,r.review_kind FROM model_assignments a
+              JOIN role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id AND r.version=a.role_version
+              WHERE a.tenant_id=? AND a.task_id=? AND a.attempt_id=? AND a.principal_id=?
+                AND r.phase='REVIEWER' AND r.review_kind=?''',
+              (self.tenant_id,row['task_id'],row['attempt_id'],review['reviewer'],review['review_kind'])).fetchall()
+            if len(assigned)!=1 or tuple(assigned[0])!=('ASSIGNED',1,'REVIEWER',review['review_kind']):
+                raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+            audits=self.db.execute('''SELECT detail_json FROM model_audit WHERE tenant_id=? AND principal_id=?
+              AND action='CANDIDATE_REVIEWED' AND target_id=?''',
+              (self.tenant_id,review['reviewer'],row['candidate_id'])).fetchall()
+            try:
+                if len(audits)!=1 or json.loads(audits[0]['detail_json'])!={'review_kind':review['review_kind'],
+                  'decision':review['decision'],'finding_count':0}:
+                    raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+            except (TypeError,ValueError):raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
+
     def validate_accept_candidate(self, candidate_id, acceptor):
         now=self.clock()
         row=self.db.execute('''SELECT rowid AS candidate_seq,* FROM delivery_candidates WHERE tenant_id=?
@@ -2385,6 +2425,7 @@ class ModelControl(object):
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
+        self._require_candidate_review_receipts(row)
         newer=self.db.execute('''SELECT 1 FROM delivery_candidates WHERE
           tenant_id=? AND task_id=? AND attempt_id=? AND rowid>?
           LIMIT 1''',(self.tenant_id,row['task_id'],row['attempt_id'],
@@ -2420,6 +2461,7 @@ class ModelControl(object):
         if acceptor!=self._principal():
             raise ValueError('AUTHENTICATED_ACCEPTOR_REQUIRED')
         if row['state']!='REVIEW_PASSED':raise ValueError('REVIEW_PASS_REQUIRED')
+        self._require_candidate_review_receipts(row)
         newer=self.db.execute('''SELECT 1 FROM delivery_candidates WHERE
           tenant_id=? AND task_id=? AND attempt_id=? AND rowid>(SELECT rowid
           FROM delivery_candidates WHERE tenant_id=? AND candidate_id=?) LIMIT 1''',(

@@ -210,12 +210,16 @@ class CompletionHTTPTests(unittest.TestCase):
         for actor in ('qa','security'):
             h.rpc(h.token(principal=actor),'task_review_candidate',self.args(candidate_id=cid,findings=[],passed=True))
         accept_token=h.token(principal='acceptor')
-        result=h.rpc(accept_token,'task_accept_candidate',self.args(candidate_id=cid))
-        self.assertEqual(result['canonical_task_state'],'SUCCESS')
-        self.assertTrue(h.rpc(accept_token,'task_accept_candidate',self.args(candidate_id=cid))['duplicate'])
+        # This legacy HTTP fixture lacks an authenticated bundle, backup and
+        # six-phase handoff. It must not be treated as a complete handoff.
+        from urllib.error import HTTPError
+        with self.assertRaises(HTTPError):
+            h.rpc(accept_token,'task_accept_candidate',self.args(candidate_id=cid))
+        self.assertEqual(h.supervisor._task('demo-b')['state'],'STARTED')
+        self.assertGreater(h.control.db.execute("SELECT count(*) FROM outbox WHERE task_id='demo-b' AND delivered_at IS NULL").fetchone()[0],0)
         h.restart(None)
         self.assertNotIn('task_accept_candidate',[x['name'] for x in h.rpc(accept_token)])
-        self.assertEqual(h.supervisor._task('demo-b')['state'],'SUCCESS')
+        self.assertEqual(h.supervisor._task('demo-b')['state'],'STARTED')
     def test_http_readonly_and_unbound_identity_rejected(self):
         from urllib.error import HTTPError
         h=self.h;args=self.args(artifact_sha256='a'*64,checklist_sha256=self.check)

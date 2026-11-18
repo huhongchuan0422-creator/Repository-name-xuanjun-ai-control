@@ -89,7 +89,7 @@ def roles_for(config, identity):
     return None
 
 
-def dispatch_rpc(service, identity, config, value, worker_enabled, development_host=None, role_contract=None):
+def dispatch_rpc(service, identity, config, value, worker_enabled, development_host=None, role_contract=None, acceptance_host=None):
     """After existing OAuth verification only; binding is per authenticated token."""
     roles=roles_for(config,identity)
     completion=next((row for row in config.get('completion_bindings',[]) if config['enabled'] and
@@ -183,15 +183,14 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         if required not in identity.get('scopes',[]):raise ValueError('MCP_COMPLETION_SCOPE_REQUIRED')
         if service.tenant_id!=identity['tenant_id'] or service.project_id!=identity['project_id'] or service.principal_id!=identity['principal_id']:
             raise ValueError('MCP_COMPLETION_IDENTITY_MISMATCH')
-        if name=='task_accept_candidate':
-            raise ValueError('TASK_BACKUP_EVIDENCE_NOT_CONNECTED')
         supervisor,gateway,control,context=service._open()
         try:
             # Existing host-verified OAuth subject, not admin:mcp:<subject> and
             # never a principal supplied in tool arguments. No credentials minted.
             actor_context=gateway.tenants.issue(service.tenant_id,identity['principal_id'])
             actor_control=ModelControl(gateway,actor_context,service.master_key)
-            return CandidateLifecycleMCP(actor_control,completion,service.db_path+'.test-only-locks').rpc(value)
+            return CandidateLifecycleMCP(actor_control,completion,service.db_path+'.test-only-locks',
+              acceptance_host=acceptance_host,enforce_acceptance=(name in ('task_accept_candidate','task_candidate_status'))).rpc(value)
         finally:supervisor.close()
     if method!='tools/call' or name not in DISPATCH_TOOLS:
         return RemoteTaskCenterMCP(service).rpc(value)

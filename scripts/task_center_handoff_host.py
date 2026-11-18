@@ -3,7 +3,7 @@
 Not a production identity provider. A trusted host adapter must validate the
 session and current role/permission, including revocation, on every call.
 """
-import hashlib, json, math, re, secrets, sqlite3, time
+import hashlib, json, math, os, re, secrets, sqlite3, time
 from task_supervisor import canonical, Supervisor
 
 ID=re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,100}$')
@@ -42,6 +42,14 @@ class HostAuthAdapter(object):
         """
         return None
 
+    def assess_candidate_bundle(self, binding):
+        """Host-only artifact readback seam; base supplies no evidence.
+
+        A concrete trusted host must independently read the candidate bundle
+        and resolve its protected read location; request bodies are not proof.
+        """
+        return None
+
     def assess_provider(self, binding):
         """Resolve an existing admitted MCP provider binding; default disconnected."""
         return None
@@ -54,6 +62,8 @@ class HandoffHost(object):
         if not isinstance(issuer,str) or not ID.fullmatch(issuer) or issuer.upper().startswith('TEST'):
             raise ValueError('NON_TEST_HOST_ISSUER_REQUIRED')
         self.db=db;self.tenant_id=tenant_id;self.issuer=issuer;self.adapter=adapter;self.clock=clock
+        paths=[r[2] for r in db.execute('PRAGMA database_list') if r[1]=='main']
+        self.db_path=os.path.realpath(paths[0]) if len(paths)==1 and paths[0] else None
         self.mcp_config=validate_config(mcp_config)
         from task_center_role_contract import RoleContractResolver
         if role_contract is not None and (type(role_contract) is not RoleContractResolver or role_contract.db is not db):raise ValueError('ORIGINAL_ROLE_CONTRACT_RESOLVER_REQUIRED')

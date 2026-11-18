@@ -1477,7 +1477,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   else 'MCP_TOOL_CALL')
                 result=dispatch_rpc(service,identity,mcp_dispatch_config,value,
                                     mcp_model_worker_enabled,mcp_development_host,
-                                    handoff_host.role_contract if handoff_host is not None else None)
+                                    handoff_host.role_contract if handoff_host is not None else None,
+                                    acceptance_host=handoff_host)
                 if value.get('id') is None:
                     self._send(202,b'','application/json; charset=utf-8');return
                 self._send(200,_json_bytes(result),
