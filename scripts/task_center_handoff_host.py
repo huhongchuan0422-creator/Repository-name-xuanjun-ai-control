@@ -12,7 +12,8 @@ ACTIONS={'PROPOSE':None,'RECEIVE':'PROPOSE','SUPERVISE':'RECEIVE',
          'SUPERVISION_START':'NOMINATE','VERIFIED':'SUPERVISION_START'}
 REQUIRED_CONTEXT=frozenset(('ORIGIN_SCOPE','SOURCE','DIRTY_SCOPE','INSTALLED_VERSION','AUTH_ENTRY','PERMISSION_SCOPE',
                            'INSTALL_ENTRY','CREDENTIAL_REFERENCE','CREDENTIAL_RECOVERY','CONFIG_REFERENCE','RESTORE',
-                           'ACCEPTANCE','EFFECTS','WRITER_CUSTODY'))
+                           'ACCEPTANCE','EFFECTS','WRITER_CUSTODY','ARTIFACT'))
+LEGACY_CONTEXT=REQUIRED_CONTEXT-{'ARTIFACT'}
 
 class FormalHandoffIdentityProvider(object):
     """Host session provenance seam; no concrete production provider ships here."""
@@ -46,7 +47,7 @@ class HostAuthAdapter(object):
         return None
 
 class HandoffHost(object):
-    def __init__(self, db, tenant_id, issuer, adapter, clock=time.time, mcp_config=None):
+    def __init__(self, db, tenant_id, issuer, adapter, clock=time.time, mcp_config=None, role_contract=None):
         from task_center_mcp_dispatch_host import validate_config
         if not isinstance(adapter,HostAuthAdapter) or type(adapter) is HostAuthAdapter:
             raise ValueError('HOST_AUTH_ADAPTER_REQUIRED')
@@ -54,6 +55,9 @@ class HandoffHost(object):
             raise ValueError('NON_TEST_HOST_ISSUER_REQUIRED')
         self.db=db;self.tenant_id=tenant_id;self.issuer=issuer;self.adapter=adapter;self.clock=clock
         self.mcp_config=validate_config(mcp_config)
+        from task_center_role_contract import RoleContractResolver
+        if role_contract is not None and (type(role_contract) is not RoleContractResolver or role_contract.db is not db):raise ValueError('ORIGINAL_ROLE_CONTRACT_RESOLVER_REQUIRED')
+        self.role_contract=role_contract
 
     def _mcp_registered(self, binding):
         if not self.mcp_config['enabled']:return False
@@ -162,7 +166,7 @@ class HandoffHost(object):
             (reason=='HANDOFF_CONTEXT_INCOMPLETE' and ((state=='UNKNOWN' and missing) or (state=='INCOMPLETE' and not missing)))):
             raise ValueError('HANDOFF_ALERT_INVALID')
 
-    def _queue_alert(self, value, now, reason, assessment):
+    def _queue_alert(self, value, now, reason, assessment, contract=None):
         # Only called inside the authenticated, fenced writer transaction.
         prefix,rows=self._alerts(value['task_id'],value['attempt_id'],value['event_id'])
         alert={'action':'HANDOFF_CONTEXT_INCOMPLETE','reason':reason,'tenant_id':self.tenant_id,
@@ -172,6 +176,7 @@ class HandoffHost(object):
                'handoff_version':value['handoff_version'],'backup_cycle_id':value['backup_cycle_id'],
                'backup_manifest_sha256':value['backup_manifest_sha256'],
                'state':assessment['state'],'missing':sorted(assessment['missing'])}
+        if contract is not None:alert.update({k:contract[k] for k in ('contract_id','contract_version','contract_sha256')})
         self._alert_facts(alert['reason'],alert['state'],alert['missing'])
         encoded=canonical(alert)
         for row in rows:
@@ -227,6 +232,13 @@ class HandoffHost(object):
             except Exception:connected=False
             if not connected:
                 return self._queue_alert(value,now,'NOT_CONNECTED',{'state':'UNKNOWN','missing':[]})
+            try:
+                if self.role_contract is None:raise ValueError('TASK_CONTRACT_UNKNOWN')
+                contract=self.role_contract.resolve(self.tenant_id,value['task_id'],value['attempt_id'],value['provider_ref'])
+            except Exception:
+                return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',{'state':'UNKNOWN','missing':[]})
+            binding.update({k:contract[k] for k in ('contract_id','contract_version','contract_sha256')})
+            binding['applicability']={k:contract[k] for k in ('role_id','role_version','role_scope','required_categories','not_applicable','required_checks')}
             try:assessment=self.adapter.assess_backup(binding)
             except Exception:assessment=None
             if (not isinstance(assessment,dict) or set(assessment)!={'state','missing','cycle_at'} or
@@ -239,13 +251,15 @@ class HandoffHost(object):
                 assessment={'state':'UNKNOWN','missing':[],'cycle_at':None}
             if assessment['state']=='COMPLETE' and (type(assessment['cycle_at']) not in (int,float) or not math.isfinite(assessment['cycle_at']) or assessment['cycle_at']>now or now-assessment['cycle_at']>300):
                 assessment={'state':'UNKNOWN','missing':[],'cycle_at':None}
-            unchecked=REQUIRED_CONTEXT-set(value['checked'])
+            required_checks=set(contract['required_checks'])
+            if set(value['checked'])-required_checks:raise ValueError('TASK_CONTRACT_CHECKS_INVALID')
+            unchecked=required_checks-set(value['checked'])
             if unchecked:
                 assessment={'state':'INCOMPLETE','missing':sorted(set(assessment['missing'])|unchecked),'cycle_at':assessment['cycle_at']}
             if assessment['state']!='COMPLETE':
-                return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',assessment)
+                return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',assessment,contract)
             key='handoff-host:'+value['event_id'];kind='AUTHENTICATED_HANDOFF_'+value['action']
-            payload=dict(value,tenant_id=self.tenant_id,issuer=claims['issuer'],principal_id=claims['principal_id'],session_id=claims['session_id'],role_id=claims['role_id'],scope=claims['scope'],expires_at=claims['expires_at'],fence=task['fence'],epoch=task['epoch'],backup_cycle_at=assessment['cycle_at'],backup_state='COMPLETE')
+            payload=dict(value,tenant_id=self.tenant_id,issuer=claims['issuer'],principal_id=claims['principal_id'],session_id=claims['session_id'],role_id=claims['role_id'],scope=claims['scope'],expires_at=claims['expires_at'],fence=task['fence'],epoch=task['epoch'],backup_cycle_at=assessment['cycle_at'],backup_state='COMPLETE',contract_id=contract['contract_id'],contract_version=contract['contract_version'],contract_sha256=contract['contract_sha256'])
             prior=db.execute('SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],key)).fetchone()
             if prior is not None:
                 if prior['kind']!=kind or prior['payload_json']!=canonical(payload):raise ValueError('HANDOFF_EVENT_CONFLICT')
@@ -262,7 +276,7 @@ class HandoffHost(object):
                 parent=db.execute('SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],'handoff-host:'+value['causation'])).fetchone()
                 if parent is None or parent['kind']!='AUTHENTICATED_HANDOFF_'+parent_kind:raise ValueError('HANDOFF_CAUSATION_MISSING')
                 p=json.loads(parent['payload_json'])
-                if any(p[k]!=payload[k] for k in ('tenant_id','task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','backup_cycle_at','backup_state','checked','provider_ref','fence','epoch')):raise ValueError('HANDOFF_BINDING_MISMATCH')
+                if any(p[k]!=payload[k] for k in ('tenant_id','task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','backup_cycle_at','backup_state','checked','provider_ref','fence','epoch','contract_id','contract_version','contract_sha256')):raise ValueError('HANDOFF_BINDING_MISMATCH')
                 if value['action'] in ('NOMINATE','ALIGNED','VERIFIED'):
                     if any(p[k]!=payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('SAME_PARTY_REQUIRED')
                 elif any(p[k]==payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('INDEPENDENT_PARTY_REQUIRED')
@@ -272,7 +286,7 @@ class HandoffHost(object):
                     aligned=db.execute('SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],'handoff-host:'+value['alignment_ref'])).fetchone()
                     if aligned is None or aligned['kind']!='AUTHENTICATED_HANDOFF_ALIGNED':raise ValueError('ALIGNMENT_REQUIRED')
                     a=json.loads(aligned['payload_json'])
-                    if any(a[k]!=payload[k] for k in ('tenant_id','task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','backup_cycle_at','provider_ref','fence','epoch')):raise ValueError('HANDOFF_BINDING_MISMATCH')
+                    if any(a[k]!=payload[k] for k in ('tenant_id','task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','backup_cycle_at','provider_ref','fence','epoch','contract_id','contract_version','contract_sha256')):raise ValueError('HANDOFF_BINDING_MISMATCH')
                     if any(a[k]==payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('INDEPENDENT_PARTY_REQUIRED')
                 if value['action']=='SUPERVISE':
                     first=db.execute('SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],'handoff-host:'+p['causation'])).fetchone()
@@ -318,11 +332,18 @@ class HandoffHost(object):
         if not alert:
             if (payload.get('action') not in ACTIONS or payload.get('backup_state')!='COMPLETE' or
                 type(payload.get('backup_cycle_at')) not in (int,float) or not math.isfinite(payload['backup_cycle_at']) or payload['backup_cycle_at']<0 or
-                checked!=sorted(REQUIRED_CONTEXT)):
+                ('contract_sha256' not in payload and checked!=sorted(LEGACY_CONTEXT))):
                 raise ValueError('RECEIPT_UNAVAILABLE')
         if (any(payload.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id')) or
             not any(role['provider_id']==payload.get('provider_ref') for host in self.mcp_config['bindings'] if host['tenant_id']==self.tenant_id for role in host['roles'].values()) or
             any(not isinstance(payload.get(k),str) or not re.fullmatch(r'[0-9a-f]{64}',payload[k]) for k in ('snapshot_digest','backup_manifest_sha256'))):raise ValueError('RECEIPT_UNAVAILABLE')
+        if 'contract_sha256' in payload:
+            try:
+                if self.role_contract is None:raise ValueError('TASK_CONTRACT_UNKNOWN')
+                c=self.role_contract.resolve(self.tenant_id,task_id,attempt_id,payload['provider_ref'])
+                if any(payload.get(k)!=c[k] for k in ('contract_id','contract_version','contract_sha256')) or (not alert and checked!=c['required_checks']):
+                    raise ValueError('TASK_CONTRACT_UNKNOWN')
+            except Exception:raise ValueError('RECEIPT_UNAVAILABLE')
         binding={k:payload[k] for k in ('task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','provider_ref')}
         binding['checked']=payload.get('checked',[])
         claims=self.adapter.authenticate_and_authorize(session,'READ',binding)
@@ -342,6 +363,10 @@ class HandoffHost(object):
                 a.get('tenant_id')!=self.tenant_id or a.get('task_id')!=task_id or a.get('attempt_id')!=attempt_id or
                 any(a.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id')) or
                 any(a.get(k)!=payload.get(k) for k in ('snapshot_digest','backup_manifest_sha256','provider_ref'))):raise ValueError('RECEIPT_UNAVAILABLE')
+            contract_fields=('contract_id','contract_version','contract_sha256')
+            if any(k in a for k in contract_fields):
+                if any(k not in a for k in contract_fields) or (all(k in payload for k in contract_fields) and any(a[k]!=payload[k] for k in contract_fields)):
+                    raise ValueError('RECEIPT_UNAVAILABLE')
             history.append({'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'})
         if alert:
             return {'history':history,'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':'UNKNOWN',
@@ -357,4 +382,5 @@ class HandoffHost(object):
                 'backup_cycle_at':payload['backup_cycle_at'],'backup_state':payload['backup_state'],
                 'provider_ref':payload['provider_ref'],
                 'checked':payload['checked'],
-                'current_authority':'UNKNOWN'}
+                'current_authority':'UNKNOWN',
+                **({'contract':c} if 'contract_sha256' in payload else {})}

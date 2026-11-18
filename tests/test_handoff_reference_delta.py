@@ -31,7 +31,7 @@ class ReferenceDelta(unittest.TestCase):
         self.assertEqual(self.db.execute("SELECT count(*) FROM outbox").fetchone()[0],0)
     def test_registered_reference_cannot_cross_real_task(self):
         ref=self.issue()
-        self.db.execute("INSERT INTO tasks SELECT 'task-2',attempt_id,authority_state,authority_valid_until,fence,epoch,resource_scope_json,resource_scope_digest,last_trusted_time FROM tasks WHERE task_id='task-1'")
+        self.db.execute("INSERT INTO tasks SELECT 'task-2',attempt_id,authority_state,authority_valid_until,fence,epoch,resource_scope_json,resource_scope_digest,last_trusted_time,spec_sha256 FROM tasks WHERE task_id='task-1'")
         self.db.execute("INSERT INTO gateway_task_metadata VALUES('task-2','tenant-1','demo-project')")
         self.db.execute("INSERT INTO resource_claims SELECT 'task-2',resource_key,attempt_id,fence,epoch,state FROM resource_claims WHERE task_id='task-1'")
         self.db.commit()

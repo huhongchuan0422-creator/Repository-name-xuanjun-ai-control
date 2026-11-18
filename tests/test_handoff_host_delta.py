@@ -33,7 +33,13 @@ class HostDelta(unittest.TestCase):
           INSERT INTO model_assignments VALUES('tenant-1','task-1','attempt-1','role-agent','v1','agent','fixture-only','fixture-model','ASSIGNED');''')
         scope=hashlib.sha256(b'["repo"]').hexdigest()
         self.db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',('task-1','attempt-1','VALID',2000,1,1,'["repo"]',scope,900))
-        self.db.commit();self.auth=SimulatedHost();self.host=HandoffHost(self.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG);self.refs={};self.root_ref=None
+        self.db.execute('ALTER TABLE tasks ADD COLUMN spec_sha256 TEXT');self.db.execute("UPDATE tasks SET spec_sha256=?",('a'*64,))
+        self.db.execute('CREATE TABLE role_templates(tenant_id TEXT,role_id TEXT,version TEXT,capabilities_json TEXT,enabled INTEGER)')
+        self.db.execute('INSERT INTO role_templates VALUES(?,?,?,?,?)',('tenant-1','role-agent','v1',json.dumps(['code']),1))
+        self.db.commit();self.auth=SimulatedHost()
+        from task_center_role_contract import RoleContractResolver
+        self.policy=dict(contract_id='fixture-contract',contract_version=1,tenant_id='tenant-1',project_id='demo-project',task_id='task-1',attempt_id='attempt-1',task_spec_sha256='a'*64,role_id='role-agent',role_version='v1',role_scope=['code'],provider_id='fixture-only',required_categories=['ARTIFACT','AUTH_ENTRY','CONFIG_REFERENCE','CONTEXT','INSTALL','SOURCE'],not_applicable={})
+        self.host=HandoffHost(self.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG,role_contract=RoleContractResolver(self.db,[self.policy]));self.refs={};self.root_ref=None
     def tearDown(self):self.db.close();self.tmp.cleanup()
     def req(self,action='PROPOSE',eid='event-1',cause='NONE'):
         actor={'PROPOSE':'alice','NOMINATE':'alice','RECEIVE':'bob','ALIGNED':'bob','SUPERVISE':'carol','SUPERVISION_START':'carol','VERIFIED':'carol'}[action]
@@ -180,7 +186,11 @@ class HostDelta(unittest.TestCase):
                 s.claim_writer('demo-b','attempt-1','owner','entry',caller,'lease','provider',['fake:demo-b'],2000)
                 s.db.execute('CREATE TABLE model_assignments(tenant_id TEXT,task_id TEXT,attempt_id TEXT,role_id TEXT,role_version TEXT,principal_id TEXT,provider_id TEXT,model_id TEXT,state TEXT)')
                 s.db.execute("INSERT INTO model_assignments VALUES('tenant-1','demo-b','attempt-1','role-agent','v1','agent','fixture-only','fixture-model','ASSIGNED')");s.db.commit()
-                host=HandoffHost(s.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG)
+                from task_center_role_contract import RoleContractResolver
+                s.db.execute('CREATE TABLE role_templates(tenant_id TEXT,role_id TEXT,version TEXT,capabilities_json TEXT,enabled INTEGER)')
+                s.db.execute('INSERT INTO role_templates VALUES(?,?,?,?,?)',('tenant-1','role-agent','v1',json.dumps(['code']),1));s.db.commit()
+                policy=dict(self.policy,task_id='demo-b',task_spec_sha256=s.db.execute("SELECT spec_sha256 FROM tasks WHERE task_id='demo-b'").fetchone()[0])
+                host=HandoffHost(s.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG,role_contract=RoleContractResolver(s.db,[policy]))
                 req=self.req();req.update(host.issue_reference('alice','demo-b','attempt-1',1));req['task_id']='demo-b'
                 self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
                 self.assertEqual(host.record('alice',req)['alert_delivery'],'UNKNOWN')
