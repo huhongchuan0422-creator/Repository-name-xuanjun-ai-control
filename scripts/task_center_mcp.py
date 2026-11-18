@@ -271,7 +271,8 @@ class RegisteredTaskDispatchMCP(object):
     One host must serialize use of its existing SQLite connection as usual.
     Scheduling is queue admission; only the existing worker runs providers.
     """
-    def __init__(self, control, project_id, role_bindings, role_contract=None):
+    def __init__(self, control, project_id, role_bindings, role_contract=None,host_config=None,host_identity=None):
+        self.host_config=host_config;self.host_identity=host_identity
         self.role_contract=role_contract
         self.control = control
         self.project_id = project_id
@@ -358,6 +359,56 @@ class RegisteredTaskDispatchMCP(object):
                 not 1 <= args['max_output_tokens'] <= 128):
             raise ValueError('BOUNDED_OUTPUT_TOKENS_REQUIRED')
         self._task(args)
+        binding = self._role(args)
+        if self.host_config is None or self.host_identity is None:
+            raise ValueError('TASK_CONTRACT_UNKNOWN')
+        # The currently reviewed worker accepts only the original submit-bound
+        # text role; do not queue unsupported registered role engines.
+        if args['role_id']!='mcp-text-executor':
+            raise ValueError('TASK_DISPATCH_ROLE_NOT_SUPPORTED')
+        return self._dispatch_existing_mcp(args,binding)
+
+    def _dispatch_existing_mcp(self,args,binding):
+        from task_center_mcp_service import MCPWorkerAdmission
+        import hashlib
+        c=self.control;db=c.db
+        db.execute('BEGIN IMMEDIATE')
+        try:
+            row=db.execute('''SELECT b.principal_id,b.project_id,b.idempotency_key,b.input_sha256,
+              b.connection_id,b.max_output_tokens,r.*,rb.writer_fence,rb.writer_epoch,
+              rb.writer_principal,rb.writer_valid_until,rb.connection_config_version
+              FROM mcp_task_bindings b JOIN model_requests r
+                ON r.tenant_id=b.tenant_id AND r.request_id=b.request_id
+              JOIN model_request_bindings rb ON rb.tenant_id=r.tenant_id AND rb.request_id=r.request_id
+              WHERE b.tenant_id=? AND b.task_id=? AND r.attempt_id=? AND r.role_id=?''',
+              (c.tenant_id,args['task_id'],args['attempt_id'],args['role_id'])).fetchone()
+            if row is None:raise ValueError('TASK_DISPATCH_EXISTING_REQUEST_REQUIRED')
+            if (row['principal_id']!=self.host_identity['principal_id'] or row['project_id']!=self.project_id or
+                row['idempotency_key']!=args['idempotency_key'] or
+                row['input_sha256']!=hashlib.sha256(args['input_text'].encode()).hexdigest() or
+                row['max_output_tokens']!=args['max_output_tokens'] or row['connection_id']!=binding['connection_id']):
+                raise ValueError('IDEMPOTENCY_BINDING_CONFLICT')
+            # UNKNOWN and existing completed effects are readback facts, never
+            # authority to issue another call or fabricate an enqueue.
+            if row['state'] not in ('UNKNOWN','SUCCEEDED','FAILED','CANCELLED'):
+                try:
+                    MCPWorkerAdmission(self.role_contract,self.host_config).check(db,row,c.clock())
+                except ValueError as exc:
+                    db.rollback()
+                    # Existing task/attempt/request only; never fabricate a
+                    # supervisor task or claim that the outbox was delivered.
+                    from model_orchestration import ModelScheduler
+                    ModelScheduler(c)._hold_mcp_request(row,str(exc),c.clock())
+                    raise
+            db.commit()
+            return {'task_id':args['task_id'],'attempt_id':args['attempt_id'],
+                    'request_id':row['request_id'],'state':row['state'],'duplicate':True,
+                    'requires_effect_reconciliation':row['state']=='UNKNOWN',
+                    'dispatch_semantics':'EXISTING_QUEUE_ADMISSION_NOT_EXECUTION'}
+        except Exception:
+            db.rollback();raise
+
+    def _legacy_dispatch_unavailable(self,args):
         binding = self._role(args)
         assignment = self.control.db.execute('''SELECT * FROM model_assignments
             WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',

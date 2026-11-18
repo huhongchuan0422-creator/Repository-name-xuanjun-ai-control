@@ -82,7 +82,7 @@ class MCPRoleDelta(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'TASK_CONTRACT_UNKNOWN'):self.rpc('task_assign_role',args,False)
         self.assertEqual(self.f.control.db.execute('SELECT count(*) FROM model_assignments').fetchone()[0],0)
         self.assertEqual(self.rpc('task_assign_role',args)['state'],'ASSIGNED')
-        with self.assertRaisesRegex(ValueError,'TASK_BACKUP_EVIDENCE_NOT_CONNECTED'):
+        with self.assertRaisesRegex(ValueError,'TASK_DISPATCH_ROLE_NOT_SUPPORTED'):
             self.rpc('task_dispatch',dict(args,input_text='local',idempotency_key='mcp-role-test',max_output_tokens=8))
         self.assertEqual(self.f.control.db.execute('SELECT count(*) FROM model_requests').fetchone()[0],0)
         with self.assertRaisesRegex(ValueError,'EXACT_MCP_SUBMIT_REQUIRED'):

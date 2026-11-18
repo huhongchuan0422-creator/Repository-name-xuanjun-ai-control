@@ -200,12 +200,8 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         raise ValueError('MCP_DISPATCH_SUBMIT_SCOPE_REQUIRED')
     if name=='task_dispatch' and not worker_enabled:
         raise ValueError('MCP_DISPATCH_WORKER_DISABLED')
-    if name in ('task_assign_role','task_dispatch') and role_contract is None:
+    if name=='task_assign_role' and role_contract is None:
         raise ValueError('TASK_CONTRACT_UNKNOWN')
-    if name=='task_dispatch':
-        # A task/role plan is not a backup receipt or provider connection.
-        # The reviewed source bridge is not yet transaction-safe here.
-        raise ValueError('TASK_BACKUP_EVIDENCE_NOT_CONNECTED')
     if (service.tenant_id!=identity['tenant_id'] or
             service.project_id!=identity['project_id'] or
             service.principal_id!=identity['principal_id']):
@@ -217,11 +213,11 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         actor_context=gateway.tenants.issue(service.tenant_id,identity['principal_id'])
         actor_control=ModelControl(gateway,actor_context,service.master_key)
         resolver=None
-        if name=='task_assign_role':
+        if name in ('task_assign_role','task_dispatch') and role_contract is not None:
             from task_center_role_contract import RoleContractResolver
             if type(role_contract) is not RoleContractResolver:raise ValueError('TASK_CONTRACT_UNKNOWN')
-            resolver=RoleContractResolver(supervisor.db,role_contract.contracts)
-        return RegisteredTaskDispatchMCP(actor_control,identity['project_id'],roles,role_contract=resolver).rpc(value)
+            resolver=RoleContractResolver(supervisor.db,role_contract.contracts,role_contract.intake_plans)
+        return RegisteredTaskDispatchMCP(actor_control,identity['project_id'],roles,role_contract=resolver,host_config=config,host_identity=identity).rpc(value)
     finally:supervisor.close()
 
 
