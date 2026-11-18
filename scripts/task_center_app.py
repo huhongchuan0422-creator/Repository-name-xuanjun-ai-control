@@ -440,8 +440,15 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
-                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None):
+                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None,handoff_host=None):
     from task_delivery_observer import MetadataReader
+    if handoff_host is not None:
+        from task_center_handoff_host import HandoffHost
+        if type(handoff_host) is not HandoffHost or handoff_host.tenant_id!=tenant_id:
+            raise ValueError('EXACT_HANDOFF_HOST_REQUIRED')
+        databases=handoff_host.db.execute('PRAGMA database_list').fetchall()
+        if not any(row[1]=='main' and os.path.realpath(row[2])==os.path.realpath(db_path) for row in databases):
+            raise ValueError('HANDOFF_HOST_DATABASE_MISMATCH')
     if delivery_ledger_reader is not None and type(delivery_ledger_reader) is not MetadataReader:
         raise ValueError('EXACT_TEST_METADATA_READER_REQUIRED')
     if delivery_ledger_reader is not None and delivery_ledger_reader.tenant_id!=tenant_id:
@@ -647,6 +654,22 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             path = self._route_path()
             if path is None:
                 self._send(404,b'not found\n','text/plain; charset=utf-8');return
+            if path == '/api/admin/handoff-event':
+                from task_center_handoff_host import FormalHandoffIdentityProvider
+                if handoff_host is None or session_store is None or not isinstance(identity_provider,FormalHandoffIdentityProvider) or isinstance(identity_provider,FileTestIdentityProvider):
+                    self._send(503,_json_bytes({'error':'HANDOFF_HOST_UNAVAILABLE'}),'application/json; charset=utf-8');return
+                session=self._session()
+                if session is None:
+                    self._send(401,_json_bytes({'error':'LOGIN_REQUIRED'}),'application/json; charset=utf-8');return
+                try:
+                    if identity_provider.is_formal_session(session) is not True:raise ValueError('FORMAL_SESSION_REQUIRED')
+                    query=__import__('urllib.parse').parse.parse_qs(urlsplit(self.path).query,keep_blank_values=True)
+                    if set(query)!={'task_id','attempt_id','event_id'} or any(len(v)!=1 for v in query.values()):raise ValueError('EXACT_READ_REQUIRED')
+                    result=handoff_host.read_receipt(session,query['task_id'][0],query['attempt_id'][0],query['event_id'][0])
+                    self._send(200,_json_bytes(result),'application/json; charset=utf-8')
+                except Exception:
+                    self._send(404,_json_bytes({'error':'HANDOFF_RECEIPT_UNAVAILABLE'}),'application/json; charset=utf-8')
+                return
             if path == '/healthz':
                 worker=getattr(self.server,'mcp_worker',None)
                 worker_thread=getattr(worker,'thread',None)
@@ -919,6 +942,25 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store.COOKIE+'=; Path='+base_path+'; HttpOnly; SameSite=Strict; '+self._secure_cookie()+'Max-Age=0'),
                   ('Set-Cookie',session_store.CSRF_COOKIE+
                    '=; Path='+base_path+'; SameSite=Strict; '+self._secure_cookie()+'Max-Age=0')]);return
+            if path == '/api/admin/handoff-event':
+                from task_center_handoff_host import FormalHandoffIdentityProvider
+                if handoff_host is None or session_store is None or not isinstance(identity_provider,FormalHandoffIdentityProvider) or isinstance(identity_provider,FileTestIdentityProvider):
+                    self._send(503,_json_bytes({'error':'HANDOFF_HOST_UNAVAILABLE'}),'application/json; charset=utf-8');return
+                session=self._session()
+                if session is None:
+                    self._send(401,_json_bytes({'error':'LOGIN_REQUIRED'}),'application/json; charset=utf-8');return
+                if not session_store.verify_csrf(session,self.headers.get('X-CSRF-Token')):
+                    self._send(403,_json_bytes({'error':'CSRF_REQUIRED'}),'application/json; charset=utf-8');return
+                try:
+                    if identity_provider.is_formal_session(session) is not True:raise ValueError('FORMAL_SESSION_REQUIRED')
+                    length=int(self.headers.get('Content-Length','0'))
+                    if length<2 or length>8192:raise ValueError('BODY_LIMIT')
+                    value=json.loads(self.rfile.read(length).decode('utf-8'))
+                    result=handoff_host.record(session,value)
+                    self._send(200,_json_bytes(result),'application/json; charset=utf-8')
+                except Exception:
+                    self._send(409,_json_bytes({'error':'HANDOFF_NOT_RECORDED'}),'application/json; charset=utf-8')
+                return
             if path != '/api/admin/model-control':
                 self._send(405,b'read only\n','text/plain; charset=utf-8');return
             session=self._session()
@@ -1497,7 +1539,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None):
+                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if mcp_development_host is not None:
@@ -1558,7 +1600,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 identity_provider,session_store,outbound_enabled,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
-                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader)
+                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader,handoff_host)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None
