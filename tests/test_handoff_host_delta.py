@@ -52,6 +52,19 @@ class HostDelta(unittest.TestCase):
         payload['handoff_version']=2
         self.assertFalse(self.host.verify_recorded('tenant-1','task-1','attempt-1','event-2',payload))
         self.assertFalse(self.host.verify_recorded('other','task-1','attempt-1','event-2',payload))
+    def test_six_phases_are_separate_authenticated_records(self):
+        self.host.record('alice',self.req('PROPOSE','p1','NONE'))
+        nomination=self.req('NOMINATE','n1','p1');nomination['target_ref']='role-carol'
+        self.host.record('alice',nomination)
+        self.host.record('bob',self.req('RECEIVE','r1','p1'))
+        self.host.record('bob',self.req('ALIGNED','a1','r1'))
+        with self.assertRaises(ValueError):self.host.record('bob',self.req('SUPERVISION_START','bad','n1'))
+        self.host.record('carol',self.req('SUPERVISION_START','s1','n1'))
+        verified=self.req('VERIFIED','v1','s1');verified['alignment_ref']='missing'
+        with self.assertRaises(ValueError):self.host.record('carol',verified)
+        verified['alignment_ref']='a1';self.host.record('carol',verified)
+        rows=self.db.execute("SELECT kind FROM events WHERE kind LIKE 'AUTHENTICATED_HANDOFF_%'").fetchall()
+        self.assertEqual(len(rows),6)
     def test_reject_untrusted_or_mismatched(self):
         with self.assertRaises(ValueError):HandoffHost(self.db,'tenant-1','TEST_ONLY',self.auth)
         with self.assertRaises(ValueError):HandoffHost(self.db,'tenant-1','test-fixture',self.auth)

@@ -7,7 +7,9 @@ import hashlib, json, math, re, sqlite3, time
 from task_supervisor import canonical, Supervisor
 
 ID=re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,100}$')
-ACTIONS={'PROPOSE':None,'RECEIVE':'PROPOSE','SUPERVISE':'RECEIVE'}
+ACTIONS={'PROPOSE':None,'RECEIVE':'PROPOSE','SUPERVISE':'RECEIVE',
+         'NOMINATE':'PROPOSE','ALIGNED':'RECEIVE',
+         'SUPERVISION_START':'NOMINATE','VERIFIED':'SUPERVISION_START'}
 REQUIRED_CONTEXT=frozenset(('ORIGIN_SCOPE','SOURCE','DIRTY_SCOPE','INSTALLED_VERSION','AUTH_ENTRY','PERMISSION_SCOPE',
                            'INSTALL_ENTRY','CREDENTIAL_REFERENCE','CREDENTIAL_RECOVERY','CONFIG_REFERENCE','RESTORE',
                            'ACCEPTANCE','EFFECTS','WRITER_CUSTODY'))
@@ -72,7 +74,10 @@ class HandoffHost(object):
 
     def record(self, session, value):
         required={'task_id','attempt_id','handoff_id','handoff_version','event_id','action','causation','snapshot_digest','backup_cycle_id','backup_manifest_sha256','checked','provider_ref'}
-        if not isinstance(value,dict) or set(value)!=required:raise ValueError('EXACT_HANDOFF_REQUEST_REQUIRED')
+        if not isinstance(value,dict):raise ValueError('EXACT_HANDOFF_REQUEST_REQUIRED')
+        extra={'target_ref'} if value.get('action')=='NOMINATE' else {'alignment_ref'} if value.get('action')=='VERIFIED' else set()
+        if set(value)!=required|extra:raise ValueError('EXACT_HANDOFF_REQUEST_REQUIRED')
+        if any(not isinstance(value[k],str) or not ID.fullmatch(value[k]) for k in extra):raise ValueError('HANDOFF_REFERENCE_REQUIRED')
         ids=required-{'handoff_version','snapshot_digest','backup_manifest_sha256','checked'}
         if any(not isinstance(value[k],str) or not ID.fullmatch(value[k]) for k in ids):raise ValueError('HANDOFF_REFERENCE_REQUIRED')
         if (type(value['handoff_version']) is not int or value['handoff_version']<1 or value['action'] not in ACTIONS or
@@ -85,6 +90,7 @@ class HandoffHost(object):
             now=self.clock()
             if type(now) not in (int,float) or not math.isfinite(now):raise ValueError('TRUSTED_TIME_REQUIRED')
             binding={k:value[k] for k in ('task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','checked','provider_ref')}
+            binding.update({k:value[k] for k in extra})
             claims=self.adapter.authenticate_and_authorize(session,value['action'],binding)
             fields={'issuer','tenant_id','principal_id','session_id','role_id','expires_at','scope'}
             if not isinstance(claims,dict) or set(claims)!=fields:raise ValueError('AUTHENTICATED_HOST_CONTEXT_REQUIRED')
@@ -157,7 +163,17 @@ class HandoffHost(object):
                 if parent is None or parent['kind']!='AUTHENTICATED_HANDOFF_'+parent_kind:raise ValueError('HANDOFF_CAUSATION_MISSING')
                 p=json.loads(parent['payload_json'])
                 if any(p[k]!=payload[k] for k in ('tenant_id','task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','backup_cycle_at','backup_state','checked','provider_ref','fence','epoch')):raise ValueError('HANDOFF_BINDING_MISMATCH')
-                if any(p[k]==payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('INDEPENDENT_PARTY_REQUIRED')
+                if value['action'] in ('NOMINATE','ALIGNED','VERIFIED'):
+                    if any(p[k]!=payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('SAME_PARTY_REQUIRED')
+                elif any(p[k]==payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('INDEPENDENT_PARTY_REQUIRED')
+                if value['action']=='SUPERVISION_START' and p.get('target_ref')!=payload['role_id']:
+                    raise ValueError('NOMINATED_SUPERVISOR_REQUIRED')
+                if value['action']=='VERIFIED':
+                    aligned=db.execute('SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],'handoff-host:'+value['alignment_ref'])).fetchone()
+                    if aligned is None or aligned['kind']!='AUTHENTICATED_HANDOFF_ALIGNED':raise ValueError('ALIGNMENT_REQUIRED')
+                    a=json.loads(aligned['payload_json'])
+                    if any(a[k]!=payload[k] for k in ('tenant_id','task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','backup_cycle_at','provider_ref','fence','epoch')):raise ValueError('HANDOFF_BINDING_MISMATCH')
+                    if any(a[k]==payload[k] for k in ('principal_id','session_id','role_id')):raise ValueError('INDEPENDENT_PARTY_REQUIRED')
                 if value['action']=='SUPERVISE':
                     first=db.execute('SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],'handoff-host:'+p['causation'])).fetchone()
                     if first is None:raise ValueError('HANDOFF_CAUSATION_MISSING')
