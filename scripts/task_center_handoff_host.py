@@ -72,6 +72,41 @@ class HandoffHost(object):
                     for k in ('role_version','principal_id','provider_id','model_id'))):return True
         return False
 
+    def _alerts(self, task_id, attempt_id, event_id):
+        prefix='handoff-alert:'+hashlib.sha256(event_id.encode('utf-8')).hexdigest()+':'
+        rows=self.db.execute("SELECT rowid AS recorded_order,event_id,payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='SUPERVISION_ACTION' AND (substr(event_id,1,?)=? OR event_id=?) ORDER BY rowid", (task_id,attempt_id,len(prefix),prefix,'handoff-missing:'+event_id)).fetchall()
+        return prefix,rows
+
+    def _queue_alert(self, value, now, reason, assessment):
+        # Only called inside the authenticated, fenced writer transaction.
+        prefix,rows=self._alerts(value['task_id'],value['attempt_id'],value['event_id'])
+        alert={'action':'HANDOFF_CONTEXT_INCOMPLETE','reason':reason,'tenant_id':self.tenant_id,
+               'task_id':value['task_id'],'attempt_id':value['attempt_id'],
+               'snapshot_digest':value['snapshot_digest'],'handoff_id':value['handoff_id'],
+               'checked':value['checked'],'provider_ref':value['provider_ref'],
+               'handoff_version':value['handoff_version'],'backup_cycle_id':value['backup_cycle_id'],
+               'backup_manifest_sha256':value['backup_manifest_sha256'],
+               'state':assessment['state'],'missing':sorted(assessment['missing'])}
+        encoded=canonical(alert)
+        for row in rows:
+            previous=json.loads(row['payload_json'])
+            if any(previous.get(k)!=alert[k] for k in ('tenant_id','task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','provider_ref')):
+                raise ValueError('HANDOFF_ALERT_RECONCILIATION_REQUIRED')
+        success=self.db.execute('SELECT rowid AS recorded_order FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],'handoff-host:'+value['event_id'])).fetchone()
+        if not rows or rows[-1]['payload_json']!=encoded or (success is not None and success['recorded_order']>rows[-1]['recorded_order']):
+            sequence=1
+            for row in rows:
+                if row['event_id'].startswith(prefix):
+                    suffix=row['event_id'][len(prefix):]
+                    if not suffix.isdigit():raise ValueError('HANDOFF_ALERT_RECONCILIATION_REQUIRED')
+                    sequence=max(sequence,int(suffix)+1)
+            alert_id=prefix+str(sequence).zfill(10)
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],alert_id,'SUPERVISION_ACTION',now,'PHASE_EXECUTION','HANDOFF_CONTEXT_INCOMPLETE',encoded))
+            supervisor=Supervisor.__new__(Supervisor);supervisor.db=self.db
+            supervisor._enqueue(value['task_id'],value['attempt_id'],alert_id,alert,now)
+        self.db.commit()
+        return {'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','reason':reason,'alert_delivery':'UNKNOWN','event_id':value['event_id']}
+
     def record(self, session, value):
         required={'task_id','attempt_id','handoff_id','handoff_version','event_id','action','causation','snapshot_digest','backup_cycle_id','backup_manifest_sha256','checked','provider_ref'}
         if not isinstance(value,dict):raise ValueError('EXACT_HANDOFF_REQUEST_REQUIRED')
@@ -108,11 +143,12 @@ class HandoffHost(object):
                 hashlib.sha256(canonical(resources).encode('utf-8')).hexdigest()!=task['resource_scope_digest'] or
                 [r['resource_key'] for r in claims_rows]!=resources or any(r['attempt_id']!=task['attempt_id'] or r['fence']!=task['fence'] or r['epoch']!=task['epoch'] or r['state']!='VALID' for r in claims_rows)):
                 raise ValueError('WRITER_RESOURCE_SCOPE_INVALID')
-            if db.execute("SELECT 1 FROM writer_operations WHERE task_id=? AND state IN ('PREPARED','DISPATCHING','UNKNOWN') LIMIT 1",(value['task_id'],)).fetchone():raise ValueError('UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED')
+            if db.execute("SELECT 1 FROM writer_operations WHERE task_id=? AND state IN ('PREPARED','DISPATCHING','UNKNOWN') LIMIT 1",(value['task_id'],)).fetchone():
+                return self._queue_alert(value,now,'UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED',{'state':'UNKNOWN','missing':[]})
             try:connected=self._mcp_registered(binding) and self.adapter.assess_provider(binding)=='CONNECTED'
             except Exception:connected=False
             if not connected:
-                db.rollback();return {'state':'NOT_CONNECTED','event_id':value['event_id']}
+                return self._queue_alert(value,now,'NOT_CONNECTED',{'state':'UNKNOWN','missing':[]})
             try:assessment=self.adapter.assess_backup(binding)
             except Exception:assessment=None
             if (not isinstance(assessment,dict) or set(assessment)!={'state','missing','cycle_at'} or
@@ -129,21 +165,7 @@ class HandoffHost(object):
             if unchecked:
                 assessment={'state':'INCOMPLETE','missing':sorted(set(assessment['missing'])|unchecked),'cycle_at':assessment['cycle_at']}
             if assessment['state']!='COMPLETE':
-                alert_id='handoff-missing:'+value['event_id']
-                alert={'action':'HANDOFF_CONTEXT_INCOMPLETE','tenant_id':self.tenant_id,
-                       'task_id':value['task_id'],'attempt_id':value['attempt_id'],
-                       'snapshot_digest':value['snapshot_digest'],'handoff_id':value['handoff_id'],
-                       'checked':value['checked'],'provider_ref':value['provider_ref'],
-                       'handoff_version':value['handoff_version'],'backup_cycle_id':value['backup_cycle_id'],
-                       'backup_manifest_sha256':value['backup_manifest_sha256'],
-                       'state':assessment['state'],'missing':sorted(assessment['missing'])}
-                prior_alert=db.execute('SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],alert_id)).fetchone()
-                if prior_alert is not None and prior_alert['payload_json']!=canonical(alert):raise ValueError('HANDOFF_ALERT_RECONCILIATION_REQUIRED')
-                if prior_alert is None:
-                    db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],alert_id,'SUPERVISION_ACTION',now,'PHASE_EXECUTION','HANDOFF_CONTEXT_INCOMPLETE',canonical(alert)))
-                    supervisor=Supervisor.__new__(Supervisor);supervisor.db=db
-                    supervisor._enqueue(value['task_id'],value['attempt_id'],alert_id,alert,now)
-                db.commit();return {'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':'UNKNOWN','event_id':value['event_id']}
+                return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',assessment)
             key='handoff-host:'+value['event_id'];kind='AUTHENTICATED_HANDOFF_'+value['action']
             payload=dict(value,tenant_id=self.tenant_id,issuer=claims['issuer'],principal_id=claims['principal_id'],session_id=claims['session_id'],role_id=claims['role_id'],scope=claims['scope'],expires_at=claims['expires_at'],fence=task['fence'],epoch=task['epoch'],backup_cycle_at=assessment['cycle_at'],backup_state='COMPLETE')
             prior=db.execute('SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(value['task_id'],value['attempt_id'],key)).fetchone()
@@ -202,11 +224,10 @@ class HandoffHost(object):
         now=self.clock()
         meta=self.db.execute('SELECT tenant_id FROM gateway_task_metadata WHERE task_id=?',(task_id,)).fetchone()
         if meta is None or meta['tenant_id']!=self.tenant_id:raise ValueError('TASK_TENANT_ATTEMPT_MISMATCH')
-        row=self.db.execute('SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(task_id,attempt_id,'handoff-host:'+event_id)).fetchone()
-        alert=False
-        if row is None:
-            row=self.db.execute("SELECT kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='SUPERVISION_ACTION'",(task_id,attempt_id,'handoff-missing:'+event_id)).fetchone()
-            alert=True
+        row=self.db.execute('SELECT rowid AS recorded_order,kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(task_id,attempt_id,'handoff-host:'+event_id)).fetchone()
+        _,alert_rows=self._alerts(task_id,attempt_id,event_id)
+        alert=bool(alert_rows) and (row is None or alert_rows[-1]['recorded_order']>row['recorded_order'])
+        if alert:row=alert_rows[-1]
         if row is None:raise ValueError('RECEIPT_UNAVAILABLE')
         payload=json.loads(row['payload_json'])
         if alert:
@@ -221,14 +242,15 @@ class HandoffHost(object):
             claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or claims['scope']!='handoff:READ' or
             type(now) not in (int,float) or not math.isfinite(now) or type(claims['expires_at']) not in (int,float) or
             not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
+        history=[{'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'} for a in (json.loads(r['payload_json']) for r in alert_rows)]
         if alert:
-            return {'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':'UNKNOWN',
+            return {'history':history,'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':'UNKNOWN',
                     'task_id':task_id,'attempt_id':attempt_id,'event_id':event_id,
                     'handoff_id':payload['handoff_id'],'handoff_version':payload['handoff_version'],
                     'provider_ref':payload['provider_ref'],
                     'backup_cycle_id':payload['backup_cycle_id'],'backup_manifest_sha256':payload['backup_manifest_sha256'],
                     'missing':payload['missing'],'backup_state':payload['state']}
-        return {'state':'HISTORICAL_RECORDED','task_id':task_id,'attempt_id':attempt_id,'event_id':event_id,
+        return {'history':history,'state':'HISTORICAL_RECORDED','task_id':task_id,'attempt_id':attempt_id,'event_id':event_id,
                 'handoff_id':payload['handoff_id'],'handoff_version':payload['handoff_version'],
                 'action':payload['action'],'snapshot_digest':payload['snapshot_digest'],
                 'backup_cycle_id':payload['backup_cycle_id'],'backup_manifest_sha256':payload['backup_manifest_sha256'],

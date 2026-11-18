@@ -86,8 +86,9 @@ class HostDelta(unittest.TestCase):
         with self.assertRaises(ValueError):self.host.record('bob',wrong)
         with self.assertRaises(ValueError):self.host.record('alice',self.req('RECEIVE','event-2','event-1'))
         self.db.execute("INSERT INTO writer_operations VALUES('task-1','UNKNOWN')");self.db.commit()
-        with self.assertRaises(ValueError):self.host.record('bob',self.req('RECEIVE','event-2','event-1'))
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],1)
+        self.assertEqual(self.host.record('bob',self.req('RECEIVE','event-2','event-1'))['reason'],'UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],2)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],1)
     def test_incomplete_checklist_unknown_backup_and_revoked_claims(self):
         self.auth.backup=None
         result=self.host.record('alice',self.req());self.assertEqual(result['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED')
@@ -112,6 +113,40 @@ class HostDelta(unittest.TestCase):
         self.assertEqual(self.host.record('alice',self.req())['state'],'RECORDED')
         self.host.record('bob',self.req('RECEIVE','event-2','event-1'))
         self.host.record('carol',self.req('SUPERVISE','event-3','event-2'))
+    def test_alert_transitions_and_success_preserve_history(self):
+        for missing in (['RESTORE','INSTALL_ENTRY'],['RESTORE','INSTALL_ENTRY'],['INSTALL_ENTRY'],['RESTORE','INSTALL_ENTRY']):
+            self.auth.backup={'state':'INCOMPLETE','missing':missing,'cycle_at':990}
+            self.assertEqual(self.host.record('alice',self.req())['alert_delivery'],'UNKNOWN')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],3)
+        self.auth.backup={'state':'COMPLETE','missing':[],'cycle_at':990}
+        self.assertEqual(self.host.record('alice',self.req())['state'],'RECORDED')
+        receipt=self.host.read_receipt('bob','task-1','attempt-1','event-1')
+        self.assertEqual(receipt['state'],'HISTORICAL_RECORDED')
+        self.assertEqual([h['missing'] for h in receipt['history']],
+                         [['INSTALL_ENTRY','RESTORE'],['INSTALL_ENTRY'],['INSTALL_ENTRY','RESTORE']])
+        self.assertTrue(all(h['alert_delivery']=='UNKNOWN' for h in receipt['history']))
+        self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
+        self.host.record('alice',self.req())
+        self.assertEqual(self.host.read_receipt('bob','task-1','attempt-1','event-1')['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED')
+
+    def test_blocked_alert_requires_authenticated_fenced_writer(self):
+        self.db.execute("INSERT INTO writer_operations VALUES('task-1','UNKNOWN')");self.db.commit()
+        self.auth.enabled=False
+        with self.assertRaises(ValueError):self.host.record('alice',self.req())
+        self.auth.enabled=True
+        self.db.execute("UPDATE resource_claims SET state='REVOKED'");self.db.commit()
+        with self.assertRaises(ValueError):self.host.record('alice',self.req())
+        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],0)
+
+    def test_alert_outbox_error_rolls_back_event(self):
+        from unittest.mock import patch
+        self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
+        with patch('task_supervisor.Supervisor._enqueue',side_effect=RuntimeError('unavailable')):
+            with self.assertRaises(RuntimeError):self.host.record('alice',self.req())
+        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],0)
+
     def test_stale_or_future_cycle_is_not_complete(self):
         for i,stamp in enumerate((699,1001)):
             self.auth.backup={'state':'COMPLETE','missing':[],'cycle_at':stamp}
@@ -120,11 +155,11 @@ class HostDelta(unittest.TestCase):
             self.assertEqual(self.host.read_receipt('bob','task-1','attempt-1',event['event_id'])['backup_state'],'UNKNOWN')
     def test_unconnected_provider_never_produces_receipt(self):
         value=self.req();value['provider_ref']='dots'
-        self.assertEqual(self.host.record('alice',value)['state'],'NOT_CONNECTED')
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+        self.assertEqual(self.host.record('alice',value)['reason'],'NOT_CONNECTED')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],1)
         self.db.execute("UPDATE model_assignments SET role_version='wrong'");self.db.commit()
-        self.assertEqual(self.host.record('alice',self.req())['state'],'NOT_CONNECTED')
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+        self.assertEqual(self.host.record('alice',self.req(eid='event-2'))['reason'],'NOT_CONNECTED')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],2)
     def test_real_supervisor_schema_transaction_and_outbox(self):
         from task_supervisor import Supervisor
         from reusable_task_gateway import GatewayKernel, TestTenantAuthority
@@ -142,7 +177,7 @@ class HostDelta(unittest.TestCase):
                 req=self.req();req['task_id']='demo-b'
                 self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
                 self.assertEqual(host.record('alice',req)['alert_delivery'],'UNKNOWN')
-                self.assertIsNone(s.db.execute('SELECT delivered_at FROM outbox WHERE event_id=?',('handoff-missing:event-1',)).fetchone()[0])
+                self.assertIsNone(s.db.execute('SELECT delivered_at FROM outbox').fetchone()[0])
                 self.auth.backup={'state':'COMPLETE','missing':[],'cycle_at':990}
                 self.assertEqual(host.record('alice',req)['state'],'RECORDED')
                 self.assertEqual(host.read_receipt('bob','demo-b','attempt-1','event-1')['state'],'HISTORICAL_RECORDED')
