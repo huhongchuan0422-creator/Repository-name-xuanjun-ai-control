@@ -89,7 +89,7 @@ def roles_for(config, identity):
     return None
 
 
-def dispatch_rpc(service, identity, config, value, worker_enabled, development_host=None):
+def dispatch_rpc(service, identity, config, value, worker_enabled, development_host=None, role_contract=None):
     """After existing OAuth verification only; binding is per authenticated token."""
     roles=roles_for(config,identity)
     completion=next((row for row in config.get('completion_bindings',[]) if config['enabled'] and
@@ -97,6 +97,31 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
     recovery=next((row for row in config.get('recovery_bindings',[]) if config['enabled'] and all(row[k]==identity.get(k) for k in ('tenant_id','principal_id','project_id'))),None)
     method=value.get('method');params=value.get('params') or {}
     name=params.get('name') if isinstance(params,dict) else None
+    if method=='tools/call' and name=='task_submit':
+        # These checks are deliberately before opening the service database.
+        # HTTP authentication is also enforced by the caller, but direct RPC
+        # callers must not bypass the same identity and scope boundary.
+        if 'task:submit' not in identity.get('scopes',[]):
+            raise ValueError('MCP_SUBMIT_SCOPE_REQUIRED')
+        if any(getattr(service,k)!=identity.get(k) for k in
+               ('tenant_id','principal_id','project_id')):
+            raise ValueError('MCP_SUBMIT_IDENTITY_MISMATCH')
+        service._validate_submit(params.get('arguments'))
+        if params['arguments']['project_id']!=service.project_id:
+            raise ValueError('MCP_PROJECT_SCOPE_REJECTED')
+        from task_center_role_contract import RoleContractResolver
+        if type(role_contract) is not RoleContractResolver:
+            raise ValueError('TASK_CONTRACT_UNKNOWN')
+        # Read-only connection: do not initialize schemas or persist anything
+        # while assessing a pre-registration plan.
+        import os, sqlite3
+        from urllib.parse import quote
+        db=sqlite3.connect('file:'+quote(os.path.realpath(service.db_path))+'?mode=ro',uri=True)
+        try:
+            resolver=RoleContractResolver(db,role_contract.contracts,role_contract.intake_plans)
+            resolver.resolve_intake(service,identity,params['arguments'],roles)
+        finally:db.close()
+        return RemoteTaskCenterMCP(service).rpc(value)
     if method=='tools/list':
         result=RemoteTaskCenterMCP(service).rpc(value)
         if roles:
@@ -114,7 +139,7 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         contract=json.loads(result['result']['content'][0]['text'])
         listing=dispatch_rpc(service,identity,config,
                              {'method':'tools/list','id':value.get('id')},
-                             worker_enabled,development_host)
+                             worker_enabled,development_host,role_contract)
         visible=[tool['name'] for tool in listing['result']['tools']]
         # Classification only: development's own rpc treats every action
         # except these two readbacks as task:submit. Do not alter WRITE_TOOLS,
@@ -150,6 +175,8 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         if required not in identity.get('scopes',[]):raise ValueError('MCP_COMPLETION_SCOPE_REQUIRED')
         if service.tenant_id!=identity['tenant_id'] or service.project_id!=identity['project_id'] or service.principal_id!=identity['principal_id']:
             raise ValueError('MCP_COMPLETION_IDENTITY_MISMATCH')
+        if name=='task_accept_candidate':
+            raise ValueError('TASK_BACKUP_EVIDENCE_NOT_CONNECTED')
         supervisor,gateway,control,context=service._open()
         try:
             # Existing host-verified OAuth subject, not admin:mcp:<subject> and
@@ -165,6 +192,12 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         raise ValueError('MCP_DISPATCH_SUBMIT_SCOPE_REQUIRED')
     if name=='task_dispatch' and not worker_enabled:
         raise ValueError('MCP_DISPATCH_WORKER_DISABLED')
+    if name in ('task_assign_role','task_dispatch') and role_contract is None:
+        raise ValueError('TASK_CONTRACT_UNKNOWN')
+    if name=='task_dispatch':
+        # A task/role plan is not a backup receipt or provider connection.
+        # The reviewed source bridge is not yet transaction-safe here.
+        raise ValueError('TASK_BACKUP_EVIDENCE_NOT_CONNECTED')
     if (service.tenant_id!=identity['tenant_id'] or
             service.project_id!=identity['project_id'] or
             service.principal_id!=identity['principal_id']):
@@ -175,7 +208,12 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         # use _open()'s synthetic admin:mcp:<subject> for registered dispatch.
         actor_context=gateway.tenants.issue(service.tenant_id,identity['principal_id'])
         actor_control=ModelControl(gateway,actor_context,service.master_key)
-        return RegisteredTaskDispatchMCP(actor_control,identity['project_id'],roles).rpc(value)
+        resolver=None
+        if name=='task_assign_role':
+            from task_center_role_contract import RoleContractResolver
+            if type(role_contract) is not RoleContractResolver:raise ValueError('TASK_CONTRACT_UNKNOWN')
+            resolver=RoleContractResolver(supervisor.db,role_contract.contracts)
+        return RegisteredTaskDispatchMCP(actor_control,identity['project_id'],roles,role_contract=resolver).rpc(value)
     finally:supervisor.close()
 
 

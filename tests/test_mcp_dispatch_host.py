@@ -80,10 +80,28 @@ class HostHTTPTests(unittest.TestCase):
         self.start_host(config(),False)
         OfflineProvider.calls=0;fixture.ModelFixture.calls=0
     def start_host(self,cfg,worker):
+        # The existing fixture now supplies an explicit trusted task/role plan;
+        # admission must not require a completed output artifact.
+        from task_center_handoff_host import HandoffHost,HostAuthAdapter
+        from task_center_role_contract import RoleContractResolver
+        class LocalAdapter(HostAuthAdapter):pass
+        host=None
+        if cfg and cfg.get('enabled'):
+            policies=[];seen=set()
+            spec=self.supervisor.db.execute("SELECT spec_sha256 FROM tasks WHERE task_id='demo-b'").fetchone()[0]
+            for item in cfg['bindings']:
+                for role_id,role in item['roles'].items():
+                    scope=self.supervisor.db.execute('SELECT capabilities_json FROM role_templates WHERE tenant_id=? AND role_id=? AND version=?',(item['tenant_id'],role_id,role['role_version'])).fetchone()
+                    if scope is None:continue
+                    key=(item['tenant_id'],role_id,role['provider_id'])
+                    if key in seen:continue
+                    seen.add(key)
+                    policies.append({'contract_id':'fixture-'+role_id,'contract_version':1,'tenant_id':item['tenant_id'],'project_id':item['project_id'],'task_id':'demo-b','attempt_id':'attempt-b','task_spec_sha256':spec,'role_id':role_id,'role_version':role['role_version'],'role_scope':sorted(json.loads(scope[0])),'provider_id':role['provider_id'],'required_categories':['ARTIFACT','AUTH_ENTRY','CONFIG_REFERENCE','CONTEXT','INSTALL','SOURCE'],'not_applicable':{}})
+            host=HandoffHost(self.supervisor.db,'tenant-mcp','formal-fixture',LocalAdapter(),mcp_config=cfg,role_contract=RoleContractResolver(self.supervisor.db,policies))
         self.f.server=make_server(self.f.db,fixture.KEY,'tenant-mcp','owner',port=0,
             model_master_key=self.f.master,identity_provider=self.f.identity,session_store=self.f.sessions,
             outbound_enabled=False,external_origin='https://'+fixture.HOST,base_path='/task-center-test/',
-            mcp_enabled=True,mcp_model_worker_enabled=worker,mcp_dispatch_config=cfg,
+            mcp_enabled=True,mcp_model_worker_enabled=worker,mcp_dispatch_config=cfg,handoff_host=host,
             mcp_worker_adapters={'openai-compatible':OfflineProvider()})
         self.f.thread=threading.Thread(target=self.f.server.serve_forever);self.f.thread.daemon=True;self.f.thread.start()
         self.f.base='http://127.0.0.1:%d/task-center-test'%self.f.server.server_port

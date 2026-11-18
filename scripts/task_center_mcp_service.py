@@ -371,6 +371,21 @@ class MCPTaskService(object):
                 raise ValueError('MCP_QUEUED_BINDING_CAS_FAILED')
             supervisor.db.commit()
 
+    def intake_identity_spec(self, value):
+        """The same deterministic identity and task spec used by submit."""
+        self._validate_submit(value)
+        identity={'tenant_id':self.tenant_id,'principal_id':self.principal_id,
+          'project_id':self.project_id,'idempotency_key':value['idempotency_key']}
+        task_id='mcp-'+hashlib.sha256(canonical(identity).encode()).hexdigest()[:24]
+        spec={'project_id':self.project_id,'task_id':task_id,
+          'board_id':'research-development','goal':'Classify fixed test text',
+          'deliverables':['structured_model_result'],
+          'acceptance':['model_result_persisted'], 'dependencies':[],
+          'priority':50,'owner':'mcp-worker','delivery_stage':'mcp-test',
+          'feature_unit':'text-classification','scope':['MODEL_INFERENCE'],
+          'asset_version':'mcp-text-classification-v1'}
+        return task_id,'attempt-'+task_id[4:],spec
+
     def submit(self,value):
         self._validate_submit(value)
         if value['project_id']!=self.project_id:
@@ -379,10 +394,7 @@ class MCPTaskService(object):
         request_sha=hashlib.sha256(canonical({'task_type':value['task_type'],
           'input_sha256':input_sha,'connection_id':value['connection_id'],
           'max_output_tokens':value['max_output_tokens']}).encode()).hexdigest()
-        identity={'tenant_id':self.tenant_id,'principal_id':self.principal_id,
-          'project_id':self.project_id,'idempotency_key':value['idempotency_key']}
-        task_id='mcp-'+hashlib.sha256(canonical(identity).encode()).hexdigest()[:24]
-        attempt_id='attempt-'+task_id[4:]
+        task_id,attempt_id,spec=self.intake_identity_spec(value)
         supervisor,gateway,control,context=self._open()
         try:
             existing=supervisor.db.execute('''SELECT * FROM mcp_task_bindings
@@ -444,13 +456,6 @@ class MCPTaskService(object):
                 control.create_role({'role_id':ROLE_ID,'version':ROLE_VERSION,
                   'phase':'EXECUTOR','capabilities':['general'],
                   'writer_allowed':True,'enabled':True,'review_kind':None})
-            spec={'project_id':self.project_id,'task_id':task_id,
-              'board_id':'research-development','goal':'Classify fixed test text',
-              'deliverables':['structured_model_result'],
-              'acceptance':['model_result_persisted'], 'dependencies':[],
-              'priority':50,'owner':'mcp-worker','delivery_stage':'mcp-test',
-              'feature_unit':'text-classification','scope':['MODEL_INFERENCE'],
-              'asset_version':'mcp-text-classification-v1'}
             digest=hashlib.sha256(canonical(spec).encode()).hexdigest()
             graph={'graph_id':'graph-'+digest[:24],'tenant_id':self.tenant_id,
               'project_id':self.project_id,'graph_version':'v1-'+digest[:12],

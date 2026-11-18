@@ -611,6 +611,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
               'MCP_INPUT_LIMIT':'MCP_REQUEST_CONTRACT_REJECTED',
               'TASK_TYPE_NOT_SUPPORTED':'MCP_REQUEST_CONTRACT_REJECTED',
               'MCP_OUTPUT_LIMIT':'MCP_REQUEST_CONTRACT_REJECTED',
+              'TASK_CONTRACT_UNKNOWN':'TASK_CONTRACT_UNKNOWN',
+              'TASK_INTAKE_PERMISSION_REQUIRED':'TASK_INTAKE_PERMISSION_REQUIRED',
+              'TASK_INTAKE_ROLE_REQUIRED':'TASK_INTAKE_ROLE_REQUIRED',
+              'TASK_INTAKE_ENTRY_REQUIRED':'TASK_INTAKE_ENTRY_REQUIRED',
+              'MCP_SUBMIT_SCOPE_REQUIRED':'MCP_SUBMIT_SCOPE_REQUIRED',
+              'MCP_SUBMIT_IDENTITY_MISMATCH':'MCP_SUBMIT_IDENTITY_MISMATCH',
               'MCP_PROJECT_SCOPE_REJECTED':'MCP_PROJECT_SCOPE_REJECTED',
               'MCP_IDEMPOTENCY_CONFLICT':'MCP_IDEMPOTENCY_CONFLICT',
               'MCP_IDEMPOTENCY_BINDING_CONFLICT':'MCP_IDEMPOTENCY_CONFLICT',
@@ -644,6 +650,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 body={'error':'invalid_grant','error_description':detail}
             else:
                 body={'error':'invalid_request','error_description':detail}
+            if stage=='MCP_TASK_SUBMIT' and getattr(self,'_mcp_request_ref',None):
+                body['request_ref']=self._mcp_request_ref
+                body['supervisory_alert']='NOT_DELIVERED'
+                sys.stderr.write('task-center-app: intake request_ref=%s code=%s alert=NOT_DELIVERED\n'%(self._mcp_request_ref,detail))
             self._send(400,_json_bytes(body),'application/json; charset=utf-8',
               [('Connection','close')])
 
@@ -1452,11 +1462,15 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 service=MCPTaskService(db_path,authority_key,tenant_id,
                   model_master_key,identity['principal_id'],identity['project_id'],
                   execution_enabled=mcp_model_worker_enabled)
+                if method=='tools/call' and (value.get('params') or {}).get('name')=='task_submit':
+                    import secrets
+                    self._mcp_request_ref=secrets.token_hex(16)
                 rejection_stage=('MCP_TASK_SUBMIT' if method=='tools/call' and
                   (value.get('params') or {}).get('name')=='task_submit'
                   else 'MCP_TOOL_CALL')
                 result=dispatch_rpc(service,identity,mcp_dispatch_config,value,
-                                    mcp_model_worker_enabled,mcp_development_host)
+                                    mcp_model_worker_enabled,mcp_development_host,
+                                    handoff_host.role_contract if handoff_host is not None else None)
                 if value.get('id') is None:
                     self._send(202,b'','application/json; charset=utf-8');return
                 self._send(200,_json_bytes(result),

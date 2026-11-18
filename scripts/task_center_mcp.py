@@ -271,7 +271,8 @@ class RegisteredTaskDispatchMCP(object):
     One host must serialize use of its existing SQLite connection as usual.
     Scheduling is queue admission; only the existing worker runs providers.
     """
-    def __init__(self, control, project_id, role_bindings):
+    def __init__(self, control, project_id, role_bindings, role_contract=None):
+        self.role_contract=role_contract
         self.control = control
         self.project_id = project_id
         self.roles = {key: dict(value) for key, value in role_bindings.items()}
@@ -324,6 +325,8 @@ class RegisteredTaskDispatchMCP(object):
         self._args(args, ('task_id','attempt_id','role_id'))
         task = self._task(args)
         binding = self._role(args)
+        if self.role_contract is not None:
+            self.role_contract.resolve_planned(self.control.tenant_id,args['task_id'],args['attempt_id'],args['role_id'],binding['role_version'],binding['provider_id'])
         if (task['state'] != 'STARTED' or task['authority_state'] != 'VALID'
                 or task['authority_valid_until'] is None or
                 self.control.clock() >= task['authority_valid_until']):
@@ -336,12 +339,14 @@ class RegisteredTaskDispatchMCP(object):
             for key in ('role_version','principal_id','provider_id','model_id'):
                 if row[key] != binding[key]:
                     raise ValueError('ASSIGNMENT_BINDING_CONFLICT')
+            if self.role_contract is not None:
+                self.role_contract.resolve(self.control.tenant_id,args['task_id'],args['attempt_id'],binding['provider_id'])
             return {'task_id':args['task_id'],'attempt_id':args['attempt_id'],
                     'role_id':args['role_id'],'state':'ASSIGNED','duplicate':True}
         self.control.assign(args['task_id'],args['role_id'],
             binding['role_version'],binding['principal_id'],allow_paid=False,
             provider_id=binding['provider_id'],model_id=binding['model_id'],
-            expected_attempt_id=args['attempt_id'],expected_project_id=self.project_id)
+            expected_attempt_id=args['attempt_id'],expected_project_id=self.project_id,expected_role_contract=self.role_contract)
         return {'task_id':args['task_id'],'attempt_id':args['attempt_id'],
                 'role_id':args['role_id'],'state':'ASSIGNED','duplicate':False}
 

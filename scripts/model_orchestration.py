@@ -1037,7 +1037,7 @@ class ModelControl(object):
 
     def assign(self, task_id, role_id, role_version, principal_id,
                allow_paid=False, now=None, provider_id=None, model_id=None,
-               expected_attempt_id=None,expected_project_id=None):
+               expected_attempt_id=None,expected_project_id=None,expected_role_contract=None):
         # Opt-in bounded facade CAS: lock before reading current authority.
         if expected_attempt_id is None:
             return self._assign_existing(task_id, role_id, role_version,
@@ -1052,6 +1052,12 @@ class ModelControl(object):
                     or task['authority_valid_until'] is None or
                     self.clock() >= task['authority_valid_until']):
                 raise ValueError('CURRENT_ADMITTED_WRITER_REQUIRED')
+            if expected_role_contract is not None:
+                from task_center_role_contract import RoleContractResolver
+                if type(expected_role_contract) is not RoleContractResolver or expected_role_contract.db is not self.db:raise ValueError('TASK_CONTRACT_UNKNOWN')
+                planned=expected_role_contract.resolve_planned(self.tenant_id,task_id,expected_attempt_id,role_id,role_version,provider_id)
+                self._audit(self._principal(),'ROLE_CONTRACT_PLANNED',task_id,
+                    {k:planned[k] for k in ('contract_id','contract_version','contract_sha256','role_id','role_version','provider_id','required_categories','not_applicable')},self.clock())
             result = self._assign_existing(task_id, role_id, role_version,
                 principal_id, allow_paid, now, provider_id, model_id)
             self.db.commit()
