@@ -1026,10 +1026,9 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                             publication=ledger_bridge.flush(value['task_id'],value['attempt_id'],value['event_id'])
                             current=publication['current']
                             result['ledger_publication']=('PUBLISHED' if current in ('APPENDED','DUPLICATE') else 'CONFLICT' if current=='CONFLICT' else 'PENDING_RECOVERY')
-                            counts=publication['flush']
-                            if counts is not None:
-                                other=counts['conflict']-(1 if current=='CONFLICT' else 0)
-                                if other:result['ledger_other_conflicts']=other
+                            # Namespace-wide scan is not task-scoped authority.
+                            # Its aggregate remains with the internal flush result,
+                            # never in this task-authenticated HTTP response.
                         except Exception:
                             # The authenticated DB transaction already committed;
                             # caller must reconcile/retry, never report rollback.
