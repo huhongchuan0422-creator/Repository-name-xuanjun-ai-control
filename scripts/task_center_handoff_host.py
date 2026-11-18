@@ -301,6 +301,14 @@ class HandoffHost(object):
         if alert:
             if (payload.get('action')!='HANDOFF_CONTEXT_INCOMPLETE' or payload.get('tenant_id')!=self.tenant_id or payload.get('task_id')!=task_id or payload.get('attempt_id')!=attempt_id):raise ValueError('RECEIPT_UNAVAILABLE')
         elif not self.verify_recorded(self.tenant_id,task_id,attempt_id,event_id,payload):raise ValueError('RECEIPT_UNAVAILABLE')
+        checked=payload.get('checked')
+        if (not isinstance(checked,list) or any(not isinstance(x,str) or x not in REQUIRED_CONTEXT for x in checked) or
+            checked!=sorted(set(checked))):raise ValueError('RECEIPT_UNAVAILABLE')
+        if not alert:
+            if (payload.get('action') not in ACTIONS or payload.get('backup_state')!='COMPLETE' or
+                type(payload.get('backup_cycle_at')) not in (int,float) or not math.isfinite(payload['backup_cycle_at']) or payload['backup_cycle_at']<0 or
+                checked!=sorted(REQUIRED_CONTEXT)):
+                raise ValueError('RECEIPT_UNAVAILABLE')
         if (any(payload.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id')) or
             not any(role['provider_id']==payload.get('provider_ref') for host in self.mcp_config['bindings'] if host['tenant_id']==self.tenant_id for role in host['roles'].values()) or
             any(not isinstance(payload.get(k),str) or not re.fullmatch(r'[0-9a-f]{64}',payload[k]) for k in ('snapshot_digest','backup_manifest_sha256'))):raise ValueError('RECEIPT_UNAVAILABLE')
@@ -318,7 +326,11 @@ class HandoffHost(object):
             a=json.loads(entry['payload_json'])
             if (a.get('reason','HANDOFF_CONTEXT_INCOMPLETE') not in ('HANDOFF_CONTEXT_INCOMPLETE','NOT_CONNECTED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED') or
                 a.get('state') not in ('UNKNOWN','INCOMPLETE') or not isinstance(a.get('missing'),list) or
-                any(x not in REQUIRED_CONTEXT for x in a['missing']) or
+                any(not isinstance(x,str) or x not in REQUIRED_CONTEXT for x in a['missing']) or
+                a['missing']!=sorted(set(a['missing'])) or
+                (a['state']=='INCOMPLETE' and not a['missing']) or
+                a.get('action')!='HANDOFF_CONTEXT_INCOMPLETE' or
+                a.get('tenant_id')!=self.tenant_id or a.get('task_id')!=task_id or a.get('attempt_id')!=attempt_id or
                 any(a.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id'))):raise ValueError('RECEIPT_UNAVAILABLE')
             history.append({'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'})
         if alert:
