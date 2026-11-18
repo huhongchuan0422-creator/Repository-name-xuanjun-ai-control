@@ -78,7 +78,7 @@ class MetadataReader(object):
                 'handoffs':[{'id':h['handoff_id'],'version':h['version'],'status':h['handoff_status'],
                              'scope':h['scope_included'],'excluded':h['scope_excluded'],'gaps':h['unknown_items'],
                              'outgoing':h['outgoing'],'receiving':h['receiving'],'supervisor':h['supervisor'],
-                             'summary':h['summary']} for h in v['handoffs'].values() if h['task_id']==tid]})
+                             'summary':h['summary'],'continuation':h.get('continuation',{'status':'MISSING_REFERENCES'})} for h in v['handoffs'].values() if h['task_id']==tid]})
         try: observation=self.export_observations()
         except ObservationUnavailable: observation={'state':'UNAVAILABLE','writer_verification':'UNKNOWN','records':[]}
         return {'mode':'TEST_ONLY','source_trust':'UNAVAILABLE','writer_verification':'UNKNOWN',

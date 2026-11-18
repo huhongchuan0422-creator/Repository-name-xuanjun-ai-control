@@ -11,6 +11,10 @@ SNAPSHOT_FIELDS=('goal_acceptance_ref','instruction_ref','repo_ref','branch','co
                  'manifest_ref','artifact_sha256','build_ref','deploy_refs','running_ref','runtime_source_ref','entry_ref',
                  'host_ref','verified_session_ref','permission_boundary','permission_evidence_ref','scope','expires_at','denial',
                  'writer_role_id','lease_ref','fence_ref','pending_operations','unresolved_effects','next_action')
+CONTINUATION_FIELDS=('installed_version_ref','permission_request_ref','install_channel_ref',
+                     'protected_config_ref','credential_ref','effects_receipt_ref','backup_ref',
+                     'restore_ref','acceptance_entry_ref','acceptance_identity_ref',
+                     'acceptance_actions_ref')
 COMMON=('handoff_id','handoff_version','snapshot_digest','actor_ref','role_id',
         'session_ref','identity_evidence_ref','permission_evidence_ref','permission_expires_at')
 UNKNOWN={'UNKNOWN','STALE','UNAVAILABLE','DENIED','NONE',''}
@@ -31,8 +35,8 @@ def validate_handoff(e):
     if e['type']=='handoff_propose':
         if any(k not in d for k in ('snapshot_data','scope_included','scope_excluded','scope_authorization_ref')): raise LedgerError('missing snapshot')
         snap=d['snapshot_data']; included=d['scope_included']; excluded=d['scope_excluded']
-        if not isinstance(snap,dict) or set(snap)!=set(SNAPSHOT_FIELDS): raise LedgerError('incomplete snapshot structure')
-        if not isinstance(included,list) or not isinstance(excluded,list) or not included or set(included)&set(excluded) or set(included)|set(excluded)!=set(SNAPSHOT_FIELDS) or len(set(included))!=len(included) or len(set(excluded))!=len(excluded): raise LedgerError('invalid handoff scope')
+        if not isinstance(snap,dict) or set(snap) not in (set(SNAPSHOT_FIELDS),set(SNAPSHOT_FIELDS+CONTINUATION_FIELDS)): raise LedgerError('incomplete snapshot structure')
+        if not isinstance(included,list) or not isinstance(excluded,list) or not included or set(included)&set(excluded) or set(included)|set(excluded)!=set(snap) or len(set(included))!=len(included) or len(set(excluded))!=len(excluded): raise LedgerError('invalid handoff scope')
         if digest(canonical(snap))!=d['snapshot_digest']: raise LedgerError('snapshot digest mismatch')
     else:
         ident(d.get('proposal_event_id'))
@@ -100,5 +104,12 @@ def project_handoffs(events, verifier=None, now=None):
             if not version_conflict and not (gap or reject or incomplete or unknown) and identity_unique and same_nominator and same_receiver and same_supervisor and checks and times_ok and all(_usable(x,verifier,now) for x in verdicts): state='交接完成(范围)'
             elif state!='有缺项': state='有缺项'
         key=task_id+':'+hid
-        result[key]={'task_id':task_id,'handoff_id':hid,'version':version,'snapshot_digest':d['snapshot_digest'],'handoff_status':state,'scope_included':inc,'scope_excluded':exc,'unknown_items':unknown,'version_conflict':version_conflict,'outgoing':outgoing,'receiving':receiving,'supervisor':supervisor,'summary':{'received_event_id':receiving,'alignment_event_id':a['event_id'] if a else 'UNKNOWN','supervision_start_event_id':supervisor,'verification_ref':v['event_id'] if v else 'UNKNOWN','reason':'接收事实不代表执行权；来源身份须独立验证'},'history':es}
+        continuation={k:snap.get(k,'UNKNOWN') if k in inc else 'UNKNOWN' for k in CONTINUATION_FIELDS}
+        continuation['snapshot_refs']={k:snap.get(k,'UNKNOWN') if k in inc else 'UNKNOWN' for k in SNAPSHOT_FIELDS}
+        continuation['missing']=[k for k in CONTINUATION_FIELDS if not known(continuation[k])]
+        continuation['status']='MISSING_REFERENCES' if continuation['missing'] else 'REFERENCES_UNVERIFIED'
+        continuation['installed_version_check']='UNKNOWN'
+        continuation['permission_expiry_revocation_check']='UNKNOWN'
+        continuation['instruction']='接手者须经原权限入口重新取得当次授权；先对账未决效果，勿继承令牌、租约或签据。版本、权限、恢复和验收须现场核实。'
+        result[key]={'task_id':task_id,'handoff_id':hid,'version':version,'snapshot_digest':d['snapshot_digest'],'handoff_status':state,'scope_included':inc,'scope_excluded':exc,'unknown_items':unknown,'version_conflict':version_conflict,'outgoing':outgoing,'receiving':receiving,'supervisor':supervisor,'continuation':continuation,'summary':{'received_event_id':receiving,'alignment_event_id':a['event_id'] if a else 'UNKNOWN','supervision_start_event_id':supervisor,'verification_ref':v['event_id'] if v else 'UNKNOWN','reason':'接收事实不代表执行权；来源身份须独立验证'},'history':es}
     return result
