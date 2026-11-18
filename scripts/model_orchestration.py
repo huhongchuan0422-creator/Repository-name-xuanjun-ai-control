@@ -2513,11 +2513,62 @@ class ModelControl(object):
 
 
 class ModelScheduler(object):
-    def __init__(self, control, adapters=None, clock=None, worker_id='worker-local'):
+    def __init__(self, control, adapters=None, clock=None, worker_id='worker-local', admission=None):
         self.control=control;self.db=control.db;self.clock=clock or time.time
         self.worker_id=_text(worker_id,'worker_id')
+        self.admission=admission
         self.adapters=adapters or {'siliconflow':SiliconFlowAdapter(),
           'openai-compatible':OpenAICompatibleAdapter()}
+
+    def _hold_mcp_request(self,candidate,reason,now):
+        """Atomic original queue hold and supervised, not-delivered alert."""
+        safe=(reason if isinstance(reason,str) and len(reason)<=80 and
+              all(c.isupper() or c.isdigit() or c=='_' for c in reason)
+              else 'MCP_WORKER_ADMISSION_REJECTED')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            changed=self.db.execute('''UPDATE model_requests SET state='HOLD',error_kind=?,updated_at=?
+              WHERE tenant_id=? AND request_id=? AND state IN ('QUEUED','RETRY_WAIT')''',
+              (safe,now,candidate['tenant_id'],candidate['request_id'])).rowcount
+            if changed:
+                event_id='mcp-worker-hold-'+candidate['request_id']
+                payload={'state':'HOLD','action':'RECONCILE_BEFORE_CONTROLLED_REASSIGN',
+                  'request_id':candidate['request_id'],'reason':safe,
+                  'requires_effect_reconciliation':True,'takeover_allowed':False}
+                self.db.execute('''INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?,?,?)''',
+                  (candidate['task_id'],candidate['attempt_id'],event_id,'SUPERVISION_ACTION',
+                   now,'PHASE_EXECUTION','MCP_WORKER_ADMISSION_HOLD',canonical(payload)))
+                self.control.gateway.supervisor._enqueue(candidate['task_id'],candidate['attempt_id'],event_id,payload,now)
+            self.db.commit()
+        except Exception:self.db.rollback();raise
+
+    def resume_mcp_no_call_hold(self,request_id,now=None):
+        """Explicit admin recovery only when original ledger proves zero calls."""
+        principal=self.control._admin()
+        now=self.clock() if now is None else now
+        if self.admission is None:raise ValueError('MCP_WORKER_TRUSTED_PLAN_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=self.db.execute('''SELECT r.*,b.connection_id,b.connection_config_version,
+                b.writer_fence,b.writer_epoch,b.writer_principal,b.writer_valid_until
+              FROM model_requests r JOIN model_request_bindings b ON b.tenant_id=r.tenant_id
+              AND b.request_id=r.request_id WHERE r.tenant_id=? AND r.request_id=?''',
+              (self.control.tenant_id,request_id)).fetchone()
+            if row is None or row['state']!='HOLD' or row['attempts']!=0:
+                raise ValueError('MCP_NO_CALL_HOLD_REQUIRED')
+            if (self.db.execute('SELECT 1 FROM model_call_attempts WHERE tenant_id=? AND request_id=?',
+                  (self.control.tenant_id,request_id)).fetchone() or
+                self.db.execute('SELECT 1 FROM model_call_reservations WHERE tenant_id=? AND request_id=?',
+                  (self.control.tenant_id,request_id)).fetchone() or
+                not self.db.execute("SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='SUPERVISION_ACTION' AND evidence_ref='MCP_WORKER_ADMISSION_HOLD'",(row['task_id'],row['attempt_id'],'mcp-worker-hold-'+request_id)).fetchone()):
+                raise ValueError('MCP_NO_CALL_EVIDENCE_REQUIRED')
+            self.admission.check(self.db,row,now)
+            changed=self.db.execute("UPDATE model_requests SET state='QUEUED',error_kind=NULL,next_attempt_at=?,updated_at=? WHERE tenant_id=? AND request_id=? AND state='HOLD' AND attempts=0",(now,now,self.control.tenant_id,request_id)).rowcount
+            if changed!=1:raise ValueError('MCP_HOLD_CHANGED')
+            self.control._audit(principal,'MCP_WORKER_NO_CALL_REAUTHORIZED',request_id,{'task_id':row['task_id'],'attempt_id':row['attempt_id']},now)
+            self.db.commit()
+            return {'request_id':request_id,'state':'QUEUED','provider_called':False}
+        except Exception:self.db.rollback();raise
 
     def run_once(self, now=None):
         now=self.clock() if now is None else now
@@ -2570,6 +2621,8 @@ class ModelScheduler(object):
         if not candidates:return {'state':'IDLE'}
         row=None;reservation=None;reserved_secret=None;last_limit=None
         for candidate in candidates:
+            mcp_table=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_task_bindings'").fetchone()
+            is_mcp=bool(self.admission is not None or candidate['role_id']=='mcp-text-executor' or (mcp_table and self.db.execute("SELECT 1 FROM mcp_task_bindings WHERE tenant_id=? AND request_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone()))
             task=self.control.gateway.supervisor._task(candidate['task_id'])
             fatal=None
             if (candidate['cancel_requested'] or task['attempt_id']!=candidate['attempt_id'] or
@@ -2637,10 +2690,13 @@ class ModelScheduler(object):
                     fatal='ROLE_INSTANCE_NOT_ACCEPTING'
             if fatal:
                 last_limit=fatal
-                self.db.execute('''UPDATE model_requests SET state='HOLD',error_kind=?,
-                  updated_at=? WHERE tenant_id=? AND request_id=? AND state IN
-                  ('QUEUED','RETRY_WAIT')''',(fatal,now,candidate['tenant_id'],
-                  candidate['request_id']));self.db.commit();continue
+                if is_mcp:self._hold_mcp_request(candidate,fatal,now)
+                else:
+                    self.db.execute('''UPDATE model_requests SET state='HOLD',error_kind=?,
+                      updated_at=? WHERE tenant_id=? AND request_id=? AND state IN
+                      ('QUEUED','RETRY_WAIT')''',(fatal,now,candidate['tenant_id'],
+                      candidate['request_id']));self.db.commit()
+                continue
             try:
                 self.db.execute('BEGIN IMMEDIATE')
                 fresh=self.db.execute('''SELECT state,cancel_requested FROM
@@ -2649,6 +2705,9 @@ class ModelScheduler(object):
                 if fresh is None or fresh['state'] not in ('QUEUED','RETRY_WAIT'):
                     raise ValueError('LOST_RACE')
                 if fresh['cancel_requested']:raise ValueError('CANCELLED_BEFORE_CALL')
+                if is_mcp:
+                    if self.admission is None:raise ValueError('MCP_WORKER_TRUSTED_PLAN_REQUIRED')
+                    self.admission.check(self.db,candidate,now)
                 _secret,_version,current_generation,current_fingerprint=(
                   self.control._binding_credential(candidate['provider_id'],
                     candidate['connection_id'],candidate['base_url'],now))
@@ -2687,10 +2746,12 @@ class ModelScheduler(object):
                 if str(exc) not in ('LOCAL_RPM_LIMIT','LOCAL_TPM_LIMIT',
                                     'LOCAL_CONCURRENCY_LIMIT','CIRCUIT_OPEN',
                                     'TENANT_BUDGET_EXHAUSTED','TASK_BUDGET_EXHAUSTED'):
-                    self.db.execute('''UPDATE model_requests SET state='HOLD',
-                      error_kind=?,updated_at=? WHERE tenant_id=? AND request_id=?
-                      AND state IN ('QUEUED','RETRY_WAIT')''',(str(exc),now,
-                      candidate['tenant_id'],candidate['request_id']));self.db.commit()
+                    if is_mcp:self._hold_mcp_request(candidate,str(exc),now)
+                    else:
+                        self.db.execute('''UPDATE model_requests SET state='HOLD',
+                          error_kind=?,updated_at=? WHERE tenant_id=? AND request_id=?
+                          AND state IN ('QUEUED','RETRY_WAIT')''',(str(exc),now,
+                          candidate['tenant_id'],candidate['request_id']));self.db.commit()
                 continue
         if row is None:
             return {'state':last_limit if last_limit=='CIRCUIT_OPEN' else
@@ -2698,6 +2759,30 @@ class ModelScheduler(object):
                     'LOCAL_TPM_LIMIT','LOCAL_CONCURRENCY_LIMIT',
                     'TENANT_BUDGET_EXHAUSTED','TASK_BUDGET_EXHAUSTED') else
                     'QUEUED_LIMIT'),'reason':last_limit}
+        # Re-read at the final local boundary too. Revocation after a committed
+        # reservation but before the call is a known no-call hold, not UNKNOWN.
+        if is_mcp:
+            try:
+                self.db.execute('BEGIN IMMEDIATE')
+                self.admission.check(self.db,row,self.clock())
+                current=self.db.execute("SELECT state,lease_owner,attempts,cancel_requested FROM model_requests WHERE tenant_id=? AND request_id=?",(row['tenant_id'],row['request_id'])).fetchone()
+                if current is None or tuple(current)!=('RUNNING',self.worker_id,row['attempts']+1,0):
+                    raise ValueError('MCP_WORKER_RESERVATION_CHANGED')
+                self.db.commit()
+            except ValueError as exc:
+                self.db.rollback()
+                self.db.execute('BEGIN IMMEDIATE')
+                try:
+                    changed=self.db.execute("UPDATE model_requests SET state='HOLD',error_kind='MCP_WORKER_AUTHORITY_CHANGED',lease_owner=NULL,lease_until=NULL,updated_at=? WHERE tenant_id=? AND request_id=? AND state='RUNNING' AND lease_owner=? AND attempts=?",(self.clock(),row['tenant_id'],row['request_id'],self.worker_id,row['attempts']+1)).rowcount
+                    if changed:
+                        self.control._settle_reservation_locked(reservation['reservation_id'],'CANCELLED',self.clock(),UNKNOWN,None)
+                        event_id='mcp-worker-hold-'+row['request_id']
+                        payload={'state':'HOLD','action':'RECONCILE_BEFORE_CONTROLLED_REASSIGN','request_id':row['request_id'],'reason':'MCP_WORKER_AUTHORITY_CHANGED','requires_effect_reconciliation':True,'takeover_allowed':False}
+                        self.db.execute('INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],event_id,'SUPERVISION_ACTION',self.clock(),'PHASE_EXECUTION','MCP_WORKER_ADMISSION_HOLD',canonical(payload)))
+                        self.control.gateway.supervisor._enqueue(row['task_id'],row['attempt_id'],event_id,payload,self.clock())
+                    self.db.commit()
+                except Exception:self.db.rollback();raise
+                return {'request_id':row['request_id'],'state':'HOLD' if changed else UNKNOWN,'reason':'MCP_WORKER_AUTHORITY_CHANGED' if changed else 'MCP_WORKER_RESERVATION_CHANGED'}
         secret=reserved_secret
         payload=json.loads(row['payload_json'])
         adapter=self.adapters[row['adapter_type']]

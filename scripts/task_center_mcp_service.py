@@ -566,11 +566,63 @@ class MCPTaskService(object):
         finally:supervisor.close()
 
 
+class MCPWorkerAdmission(object):
+    """Host-injected plan, checked on the scheduler's locked DB connection."""
+    def __init__(self,role_contract,config):
+        self.role_contract=role_contract;self.config=config
+
+    def check(self,db,candidate,now):
+        from task_center_role_contract import RoleContractResolver
+        from task_center_mcp_dispatch_host import roles_for
+        if type(self.role_contract) is not RoleContractResolver:
+            raise ValueError('MCP_WORKER_TRUSTED_PLAN_REQUIRED')
+        row=db.execute('''SELECT principal_id,project_id,connection_id,provider_id,model_id
+          FROM mcp_task_bindings WHERE tenant_id=? AND task_id=? AND request_id=?''',
+          (candidate['tenant_id'],candidate['task_id'],candidate['request_id'])).fetchone()
+        if row is None:raise ValueError('MCP_WORKER_BINDING_REQUIRED')
+        principal,project,connection,provider,model=tuple(row)
+        if (connection!=candidate['connection_id'] or provider!=candidate['provider_id'] or
+                model!=candidate['model_id']):raise ValueError('MCP_WORKER_BINDING_CHANGED')
+        identity={'tenant_id':candidate['tenant_id'],'principal_id':principal,'project_id':project}
+        roles=roles_for(self.config,identity) or {}
+        binding=roles.get(ROLE_ID)
+        if binding!={'role_version':ROLE_VERSION,'principal_id':'mcp-worker',
+                     'provider_id':provider,'model_id':model,'connection_id':connection}:
+            raise ValueError('MCP_WORKER_PERMISSION_REVOKED')
+        resolver=RoleContractResolver(db,self.role_contract.contracts,self.role_contract.intake_plans)
+        contract=resolver.resolve(candidate['tenant_id'],candidate['task_id'],candidate['attempt_id'],provider)
+        if contract['role_id']!=ROLE_ID or contract['role_version']!=ROLE_VERSION:
+            raise ValueError('MCP_WORKER_ROLE_NOT_SUPPORTED')
+        plans=[p for p in resolver.intake_plans if p['contract_id']==contract['contract_id'] and
+               p['principal_id']==principal and p['connection_id']==connection and
+               p['execution_entry']=='model-scheduler-runtime']
+        if len(plans)!=1:raise ValueError('MCP_WORKER_TRUSTED_PLAN_REQUIRED')
+        current=db.execute('''SELECT t.attempt_id,t.state,t.authority_state,t.authority_valid_until,
+          t.authority_caller_id,t.fence,t.epoch,m.project_id,a.principal_id,a.role_version,a.state,
+          a.provider_id,a.model_id,c.status,c.purpose,c.provider_id,c.config_version,
+          c.secret_cipher IS NOT NULL,o.model_id
+          FROM tasks t JOIN gateway_task_metadata m ON m.task_id=t.task_id
+          JOIN model_assignments a ON a.tenant_id=m.tenant_id AND a.task_id=t.task_id
+            AND a.attempt_id=? AND a.role_id=?
+          JOIN service_connections c ON c.tenant_id=m.tenant_id AND c.connection_id=?
+          JOIN provider_onboarding_configs o ON o.tenant_id=c.tenant_id AND o.connection_id=c.connection_id
+          WHERE t.task_id=? AND m.tenant_id=?''',
+          (candidate['attempt_id'],ROLE_ID,connection,candidate['task_id'],candidate['tenant_id'])).fetchone()
+        if current is None:raise ValueError('MCP_WORKER_AUTHORITY_CHANGED')
+        expected=(candidate['attempt_id'],'STARTED','VALID',candidate['writer_valid_until'],
+          candidate['writer_principal'],candidate['writer_fence'],candidate['writer_epoch'],project,
+          'mcp-worker',ROLE_VERSION,'ASSIGNED',provider,model,'ACTIVE','MODEL_INFERENCE',provider,
+          candidate['connection_config_version'],1,model)
+        if tuple(current)!=expected or now>=candidate['writer_valid_until']:
+            raise ValueError('MCP_WORKER_AUTHORITY_CHANGED')
+
+
 class MCPModelWorkerLoop(object):
     """Persistent loop over the existing model_requests queue."""
     def __init__(self,db_path,authority_key,tenant_id,master_key,interval=1.0,
-                 adapters=None):
+                 adapters=None,role_contract=None,dispatch_config=None):
         import threading
+        self.admission=MCPWorkerAdmission(role_contract,dispatch_config or {'enabled':False,'bindings':[]})
         self.db_path=db_path;self.authority_key=authority_key
         self.tenant_id=tenant_id;self.master_key=master_key
         self.interval=interval;self.adapters=adapters
@@ -586,7 +638,7 @@ class MCPModelWorkerLoop(object):
             control=ModelControl(GatewayKernel(supervisor,authority),
               authority.issue(self.tenant_id,'admin:mcp-worker'),self.master_key)
             scheduler=ModelScheduler(control,adapters=self.adapters,
-              worker_id='mcp-worker')
+              worker_id='mcp-worker',admission=self.admission)
             while not self.stop_event.is_set():
                 result=scheduler.run_once()
                 if result.get('state') in ('IDLE','QUEUED_LIMIT','HOLD'):

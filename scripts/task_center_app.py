@@ -1235,7 +1235,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                           allow_paid=bool(value.get('allow_paid',False)))
                     elif action=='RUN_SCHEDULER_ONCE':
                         if not outbound_enabled:raise ValueError('REAL_OUTBOUND_DISABLED')
-                        result=ModelScheduler(control).run_once()
+                        from task_center_mcp_service import MCPWorkerAdmission
+                        result=ModelScheduler(control,admission=MCPWorkerAdmission(
+                          handoff_host.role_contract if handoff_host is not None else None,
+                          mcp_dispatch_config)).run_once()
                     elif action=='CREATE_CODEX_INTENT':
                         codex_context=dict(value['context'])
                         preference=control.projection().get(
@@ -1653,7 +1656,9 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         if mcp_model_worker_enabled:
             server.mcp_worker=MCPModelWorkerLoop(os.path.realpath(db_path),
               authority_key,tenant_id,model_master_key,
-              adapters=mcp_worker_adapters);server.mcp_worker.start()
+              adapters=mcp_worker_adapters,
+              role_contract=handoff_host.role_contract if handoff_host is not None else None,
+              dispatch_config=mcp_dispatch_config);server.mcp_worker.start()
         return server
     except Exception:
         if server is not None:server.server_close()
