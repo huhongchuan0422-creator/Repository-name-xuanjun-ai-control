@@ -371,6 +371,47 @@ class HandoffHost(object):
                 payload.get('attempt_id')==attempt_id and payload.get('event_id')==event_id and
                 row['kind']=='AUTHENTICATED_HANDOFF_'+str(payload.get('action')))
 
+    def _alert_delivery_status(self, task_id, attempt_id, alert_row):
+        """Read exact original outbox + gateway provenance, never dispatch."""
+        alert_event=alert_row['event_id']
+        outbox_id=hashlib.sha256(canonical({'task_id':task_id,'attempt_id':attempt_id,'event_id':alert_event}).encode('utf-8')).hexdigest()
+        try:
+            out=self.db.execute('SELECT * FROM outbox WHERE outbox_id=? AND task_id=? AND attempt_id=? AND event_id=?',(outbox_id,task_id,attempt_id,alert_event)).fetchone()
+            if (out is None or out['payload_json']!=alert_row['payload_json'] or type(out['attempts']) is not int or out['attempts']<1
+                or out['last_error']!='HANDOFF_ALERT_SENT_ACK_UNKNOWN' or type(out['delivered_at']) not in (int,float) or not math.isfinite(out['delivered_at'])):return 'UNKNOWN'
+            attempt=out['attempts'];suffix=':'+str(attempt) if attempt>1 else ''
+            intent=self.db.execute("SELECT kind,evidence_kind,evidence_ref,observed_at,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?",(task_id,attempt_id,'handoff-alert-intent:'+outbox_id+suffix)).fetchone()
+            receipt=self.db.execute("SELECT evidence_ref,observed_at FROM gateway_delivery_receipts WHERE task_id=? AND attempt_id=? AND event_id=? AND phase='SENT'",(task_id,attempt_id,alert_event)).fetchone()
+            if intent is None or receipt is None or intent['kind']!='HANDOFF_ALERT_INTENT' or intent['evidence_kind']!='PHASE_EXECUTION' or intent['evidence_ref']!='HOST_SELECTED_DESTINATION':return 'UNKNOWN'
+            i=json.loads(intent['payload_json'])
+            if (not isinstance(i,dict) or i.get('outbox_id')!=outbox_id or i.get('state')!='DISPATCHING_NO_RETRY'
+                or i.get('delivery_attempt',1)!=attempt or type(intent['observed_at']) not in (int,float)
+                or not math.isfinite(intent['observed_at']) or intent['observed_at']>out['delivered_at']
+                or receipt['observed_at']!=out['delivered_at']):return 'UNKNOWN'
+            ref=receipt['evidence_ref']
+            if (not isinstance(ref,str) or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}',ref) is None
+                or ref.upper() in ('UNKNOWN','UNAVAILABLE','NONE','NULL')):return 'UNKNOWN'
+            ids=(('handoff-alert-result:'+outbox_id+suffix,'HANDOFF_ALERT_RESULT'),('handoff-alert-reconcile:'+outbox_id+':'+str(attempt),'HANDOFF_ALERT_RECONCILED'))
+            matches=0
+            for eid,kind in ids:
+                r=self.db.execute('SELECT kind,evidence_kind,evidence_ref,observed_at,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(task_id,attempt_id,eid)).fetchone()
+                if r is None:continue
+                data=json.loads(r['payload_json'])
+                if (not isinstance(data,dict) or r['kind']!=kind or r['evidence_kind']!='PHASE_EXECUTION'
+                    or data.get('outbox_id')!=outbox_id):return 'UNKNOWN'
+                if kind=='HANDOFF_ALERT_RESULT' and data.get('state') in ('UNKNOWN_NO_RETRY','FAILED_NO_RETRY'):
+                    if type(r['observed_at']) not in (int,float) or not math.isfinite(r['observed_at']) or r['observed_at']>out['delivered_at']:return 'UNKNOWN'
+                    continue
+                if data.get('state')!='SENT_ACK_UNKNOWN':return 'UNKNOWN'
+                proof=data.get('platform_proof')
+                if (r['evidence_ref']!=ref or r['observed_at']!=out['delivered_at']
+                    or (kind=='HANDOFF_ALERT_RECONCILED' and data.get('delivery_attempt')!=attempt)
+                    or not isinstance(proof,dict) or set(proof)!={'state','settled','message_id'}
+                    or proof['state']!='SENT' or proof['settled'] is not True or proof['message_id']!=ref):return 'UNKNOWN'
+                matches+=1
+            return 'SENT_ACK_UNKNOWN' if matches==1 else 'UNKNOWN'
+        except (sqlite3.Error,ValueError,TypeError,KeyError,OverflowError):return 'UNKNOWN'
+
     def read_receipt(self, session, task_id, attempt_id, event_id):
         if any(not isinstance(x,str) or not ID.fullmatch(x) for x in (task_id,attempt_id,event_id)):
             raise ValueError('HANDOFF_REFERENCE_REQUIRED')
@@ -451,9 +492,9 @@ class HandoffHost(object):
             if any(k in a for k in contract_fields):
                 if any(k not in a for k in contract_fields) or (not alert and any(k not in payload for k in contract_fields)) or (all(k in payload for k in contract_fields) and any(a[k]!=payload[k] for k in contract_fields)):
                     raise ValueError('RECEIPT_UNAVAILABLE')
-            history.append({'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'})
+            history.append({'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':self._alert_delivery_status(task_id,attempt_id,entry)})
         if alert:
-            return {'history':history,'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':'UNKNOWN',
+            return {'history':history,'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':history[-1]['alert_delivery'],
                     'task_id':task_id,'attempt_id':attempt_id,'event_id':event_id,
                     'handoff_id':payload['handoff_id'],'handoff_version':payload['handoff_version'],
                     'provider_ref':payload['provider_ref'],

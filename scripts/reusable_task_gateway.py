@@ -423,7 +423,7 @@ class GatewayKernel(object):
             self.db.rollback();raise
         return row,packet,destination,attempt
 
-    def _finish_handoff_alert(self,context,outbox_id,row,attempt,state,ref):
+    def _finish_handoff_alert(self,context,outbox_id,row,attempt,state,ref,platform_proof=None):
         now=_finite(self.clock(),'time');self.db.execute('BEGIN IMMEDIATE')
         try:
             current,_=self._handoff_alert_packet(context,outbox_id)
@@ -434,7 +434,9 @@ class GatewayKernel(object):
                 self.db.execute("UPDATE outbox SET delivered_at=?,last_error='HANDOFF_ALERT_SENT_ACK_UNKNOWN' WHERE outbox_id=?",(now,outbox_id))
             else:self.db.execute('UPDATE outbox SET last_error=? WHERE outbox_id=?',('HANDOFF_ALERT_'+state+'_NO_RETRY',outbox_id))
             rid=self._handoff_attempt_id('handoff-alert-result:',outbox_id,attempt)
-            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],rid,'HANDOFF_ALERT_RESULT',now,'PHASE_EXECUTION',ref or 'UNKNOWN',canonical(result)));self.db.commit()
+            recorded=dict(result)
+            if platform_proof is not None:recorded['platform_proof']=platform_proof
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],rid,'HANDOFF_ALERT_RESULT',now,'PHASE_EXECUTION',ref or 'UNKNOWN',canonical(recorded)));self.db.commit()
             return dict(result,dispatch_performed=True)
         except Exception:self.db.rollback();raise
 
@@ -456,7 +458,14 @@ class GatewayKernel(object):
                 state=receipt.get('state') if isinstance(receipt,dict) else None;ref=receipt.get('receipt_ref') if isinstance(receipt,dict) else None
                 if state not in ('SENT','FAILED') or not isinstance(ref,str) or not ref.strip() or ref!=ref.strip() or len(ref)>256:state='UNKNOWN';ref=None
         except Exception:state='UNKNOWN';ref=None
-        return self._finish_handoff_alert(context,outbox_id,row,attempt,state,ref)
+        platform_proof=None
+        if state=='SENT':
+            try:
+                from task_center_owner_message_tool import parse_message_result
+                parsed=parse_message_result(raw,destination)
+                if parsed is not None and parsed.get('message_id')==ref:platform_proof=parsed
+            except Exception:pass
+        return self._finish_handoff_alert(context,outbox_id,row,attempt,state,ref,platform_proof)
 
     async def deliver_handoff_alert_async(self,context,outbox_id,host_adapter=None):
         """Run on the host's existing loop; never create or block an event loop."""
@@ -475,7 +484,14 @@ class GatewayKernel(object):
         except Exception:state='UNKNOWN';ref=None
         # Cancellation or process interruption propagates with durable intent,
         # so a possibly executed call is UNKNOWN and is never blindly retried.
-        return self._finish_handoff_alert(context,outbox_id,row,attempt,state,ref)
+        platform_proof=None
+        if state=='SENT':
+            try:
+                from task_center_owner_message_tool import parse_message_result
+                parsed=parse_message_result(raw,destination)
+                if parsed is not None and parsed.get('message_id')==ref:platform_proof=parsed
+            except Exception:pass
+        return self._finish_handoff_alert(context,outbox_id,row,attempt,state,ref,platform_proof)
 
     def reconcile_handoff_alert(self,context,outbox_id,host_adapter=None):
         """Trusted platform readback of the specific attempt; never accepts body evidence."""
@@ -495,6 +511,14 @@ class GatewayKernel(object):
                 or not isinstance(ref,str) or not ref.strip() or ref!=ref.strip() or len(ref)>256):state='UNKNOWN'
         except Exception:state='UNKNOWN'
         if state=='UNKNOWN':return {'state':'UNKNOWN_NO_RETRY','outbox_id':outbox_id,'dispatch_performed':False}
+        platform_proof=None
+        if state=='SENT':
+            try:
+                from task_center_owner_message_tool import parse_message_result
+                target=host_adapter.resolve_destination(dict(packet))
+                parsed=parse_message_result(proof.get('platform_result'),target)
+                if target is not None and parsed is not None and parsed.get('message_id')==ref:platform_proof=parsed
+            except Exception:pass
         self.db.execute('BEGIN IMMEDIATE')
         try:
             current,_=self._handoff_alert_packet(context,outbox_id)
@@ -509,7 +533,9 @@ class GatewayKernel(object):
             else:
                 self.db.execute("UPDATE outbox SET last_error='HANDOFF_ALERT_RETRY_READY',next_attempt_at=? WHERE outbox_id=?",(now,outbox_id));result='RETRY_READY'
             eid='handoff-alert-reconcile:'+outbox_id+':'+str(attempt)
-            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],eid,'HANDOFF_ALERT_RECONCILED',now,'PHASE_EXECUTION',ref,canonical({'outbox_id':outbox_id,'delivery_attempt':attempt,'state':result})))
+            recorded={'outbox_id':outbox_id,'delivery_attempt':attempt,'state':result}
+            if platform_proof is not None:recorded['platform_proof']=platform_proof
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],eid,'HANDOFF_ALERT_RECONCILED',now,'PHASE_EXECUTION',ref,canonical(recorded)))
             self.db.commit();return {'state':result,'outbox_id':outbox_id,'dispatch_performed':False}
         except Exception:self.db.rollback();raise
 
