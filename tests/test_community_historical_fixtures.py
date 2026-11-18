@@ -288,6 +288,8 @@ class HistoricalFixtureContract(unittest.TestCase):
 class ImagePushFullRegression(unittest.TestCase):
     """Execute the source classifier and evaluate its original GitHub predicates."""
     IMAGE_PUSH = "github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[community-image]')"
+    SNAPSHOT_PUSH = "github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')"
+    FORCE_FULL = "github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && (contains(github.event.head_commit.message, '[community-image]') || contains(github.event.head_commit.message, '[mini-hangzhou-upload]'))"
     FULL_STEPS = ('Retrieve and verify immutable nested 1d and 005c carrier fixtures',
                   'Verify original historical inputs for source tests',
                   'Install exact browser test runner',
@@ -355,7 +357,7 @@ class ImagePushFullRegression(unittest.TestCase):
         import sys
         block=self.step('Classify pushed changes')
         binding=block.split('FORCE_FULL_REGRESSION: ${{ ',1)[1].split(' }}',1)[0]
-        self.assertEqual(binding,self.IMAGE_PUSH)
+        self.assertEqual(binding,self.FORCE_FULL)
         program=block.split("          python3 - <<'CHECK'\n",1)[1].split('          CHECK',1)[0]
         program='\n'.join(line[10:] for line in program.splitlines())+'\n'
         with tempfile.TemporaryDirectory() as temp:
@@ -381,7 +383,10 @@ class ImagePushFullRegression(unittest.TestCase):
             expected=dict(zip(names,(str(v).lower() for v in values)))
             for context,force in [(self.context(),False),(self.context('[community-image]'),True),
                     (self.context('[community-image]',event='workflow_dispatch'),False),
-                    (self.context('[community-image]',ref='refs/heads/other'),False)]:
+                    (self.context('[community-image]',ref='refs/heads/other'),False),
+                    (self.context('[mini-hangzhou-upload]'),True),
+                    (self.context('[mini-hangzhou-upload]',event='workflow_dispatch'),False),
+                    (self.context('[mini-hangzhou-upload]',ref='refs/heads/other'),False)]:
                 with self.subTest(paths=paths,context=context):
                     actual=self.classify(paths,context)
                     self.assertEqual(actual,{k:('false' if force and k!='handoff_touched' else v) for k,v in expected.items()})
@@ -389,6 +394,22 @@ class ImagePushFullRegression(unittest.TestCase):
         for raw in (b'',b'no-nul',b'bad\npath\0',b'\0'):
             with self.subTest(raw=raw):
                 result,output_exists=self.classify([],self.context('[community-image]'),raw=raw)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('PUSH_DELTA_UNKNOWN',result.stderr)
+                self.assertFalse(output_exists)
+    def test_snapshot_force_runs_full_prerequisites_but_never_builds_backend(self):
+        context=self.context('[mini-hangzhou-upload]')
+        outputs=self.classify(['.github/workflows/chatgpt-community-wechat-sp-offline.yml'],context)
+        context.update({'steps.scope.outputs.'+k:v for k,v in outputs.items()})
+        for name in self.FULL_STEPS:
+            self.assertTrue(self.evaluate(self.condition(name),context),name)
+        condition=self.workflow.split('  community-backend-image:\n',1)[1].splitlines()[0].split('if:',1)[1].strip()
+        context.update({'needs.test.result':'success','needs.test.outputs.full_regression_outcome':'success'})
+        self.assertFalse(self.evaluate(condition,context))
+    def test_snapshot_marker_preserves_malformed_push_delta_rejection(self):
+        for raw in (b'',b'no-nul',b'bad\npath\0',b'\0'):
+            with self.subTest(raw=raw):
+                result,output_exists=self.classify([],self.context('[mini-hangzhou-upload]'),raw=raw)
                 self.assertNotEqual(result.returncode,0)
                 self.assertIn('PUSH_DELTA_UNKNOWN',result.stderr)
                 self.assertFalse(output_exists)

@@ -175,7 +175,10 @@ class Contracts(unittest.TestCase):
         test_branch="(github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-test-preview-354]') && !contains(github.event.head_commit.message, '[mini-upload]') && !contains(github.event.head_commit.message, '[mini-preview]'))"
         # The original preview expression remains the exact OR suffix; do not
         # replace or weaken its legacy product/target/control admission matrix.
-        self.assertEqual(sdk,test_branch+' || '+preview)
+        snapshot_branch="(github.event_name == 'push' && github.ref == 'refs/heads/"+p.BRANCH+"' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]'))"
+        self.assertTrue(preview.startswith(snapshot_branch+' || '))
+        legacy_preview=preview[len(snapshot_branch+' || '):]
+        self.assertEqual(sdk,snapshot_branch+' || '+test_branch+' || '+legacy_preview)
         base=dict(github=dict(event_name='workflow_dispatch',sha=CONTROL,ref='refs/heads/'+p.BRANCH,
            event={'head_commit':{'message':''}}),inputs=dict(preview_enabled=True,backend_image_enabled=False,
            preview_source_sha=CONTROL,preview_evidence_run_id=str(p.PRODUCT_RUN),preview_target=p.PROFILE,
@@ -196,6 +199,7 @@ class Contracts(unittest.TestCase):
         for message,sdk_wanted,preview_wanted,isolated_wanted,test_wanted in (
             ('[mini-test-preview-354]',True,False,True,True),
             ('ordinary change',False,False,False,False),
+            ('[mini-hangzhou-upload]',True,True,False,False),
             ('[mini-preview]',True,True,False,False),
             ('[mini-upload]',True,True,False,False),
             ('[mini-test-preview-354] [mini-preview]',True,True,False,False),
@@ -214,6 +218,21 @@ class Contracts(unittest.TestCase):
             row['github']['event']['head_commit']['message']='[mini-test-preview-354]'
             r=subprocess.run(['node','-e',program,json.dumps(dict(expr=isolated,cases=[dict(expected=False,**row)]))],capture_output=True,text=True,timeout=10)
             self.assertEqual(r.returncode,0,r.stderr)
+    def test_snapshot_job_guard_requires_exact_push_or_complete_manual_binding(self):
+        w=(ROOT/'.github/workflows/chatgpt-community-wechat-sp-offline.yml').read_text()
+        expressions=[w.split('  '+name+':\n',1)[1].splitlines()[0].strip().removeprefix('if: ') for name in ('mini-sdk','mini-preview')]
+        base=dict(github=dict(event_name='push',sha=CONTROL,ref='refs/heads/'+p.BRANCH,event={'head_commit':{'message':'[mini-hangzhou-upload]'}}),inputs={})
+        cases=[dict(expected=True,**copy.deepcopy(base))]
+        for key,value in [('ref','refs/heads/other'),('ref','refs/tags/f131'),('event_name','pull_request'),('event_name','workflow_dispatch')]:
+            row=copy.deepcopy(base);row['github'][key]=value;cases.append(dict(expected=False,**row))
+        manual=copy.deepcopy(base);manual['github']['event_name']='workflow_dispatch';manual['inputs']=dict(preview_enabled=True,backend_image_enabled=False,preview_source_sha=CONTROL,preview_target=p.PROFILE,preview_product='hangzhou-snapshot',snapshot_run_id='123',snapshot_artifact_id='456',snapshot_binding_sha256='b'*64)
+        cases.append(dict(expected=True,**copy.deepcopy(manual)))
+        for key,value in [('preview_enabled',False),('backend_image_enabled',True),('preview_source_sha','f'*40),('preview_target','legacy'),('snapshot_run_id',''),('snapshot_artifact_id',''),('snapshot_binding_sha256','')]:
+            row=copy.deepcopy(manual);row['inputs'][key]=value;cases.append(dict(expected=False,**row))
+        program="const p=JSON.parse(process.argv[1]);const f=new Function('github','inputs','contains','return ('+p.expr+')');for(const c of p.cases){if(f(c.github,c.inputs,(s,t)=>String(s||'').includes(t))!==c.expected)throw Error('SNAPSHOT_GUARD');}"
+        for expr in expressions:
+            result=subprocess.run(['node','-e',program,json.dumps(dict(expr=expr,cases=cases))],capture_output=True,text=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr)
     def test_download_only_fixed_github_token_request_then_clean_storage_request(self):
         from urllib.error import HTTPError
         requests=[]
