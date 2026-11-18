@@ -11,6 +11,7 @@ on:
       - 'scripts/community_*.cjs'
       - 'tests/test_community_*.py'
       - 'clients/community-mini/**'
+      - 'deploy/community-preview/hangzhou-snapshot/**'
       - 'demos/community-stage/**'
       - scripts/community_wechat_sp_offline_guard.py
       - scripts/community_wechat_sp_mock_checkout_view.py
@@ -38,6 +39,18 @@ on:
         description: 'Successful original push evidence for this exact image source SHA'
         type: string
         default: ''
+      snapshot_run_id:
+        description: 'Existing original-repository run owning exact reviewed snapshot artifact'
+        type: string
+        default: ''
+      snapshot_artifact_id:
+        description: 'Exact original-repository artifact ID containing snapshot.zip manifest.json binding.json'
+        type: string
+        default: ''
+      snapshot_binding_sha256:
+        description: 'Exact reviewed binding.json SHA256; never inferred from download'
+        type: string
+        default: ''
       preview_enabled:
         description: 'Explicitly run existing development preview upload (default off)'
         type: boolean
@@ -50,7 +63,7 @@ on:
       preview_product:
         description: 'Exact frozen mini product; R1 is current, legacy 4f remains an explicit separate guard'
         type: choice
-        options: [r1-7ca1ac2a, legacy-4f]
+        options: [r1-7ca1ac2a, legacy-4f, hangzhou-snapshot]
         default: r1-7ca1ac2a
       preview_product_source_sha:
         description: 'Exact R1 mini source commit; required for r1-7ca1ac2a'
@@ -82,6 +95,7 @@ on:
         type: string
         default: ''
 env:
+  COMMUNITY_SNAPSHOT_PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]') && 'true' || 'false' }}
   COMMUNITY_CURRENT_PRODUCT_PUSH: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'true' || 'false' }}
 permissions:
   contents: read
@@ -91,6 +105,7 @@ jobs:
     # Do not skip the job on commit text; select after checkout.
     outputs:
       source_sha256: ${{ steps.source_package.outputs.sha256 }}
+      snapshot_binding_sha256: ${{ steps.hz_snapshot.outputs.binding_sha256 }}
       full_regression_outcome: ${{ steps.full_regression.outcome }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -364,6 +379,18 @@ jobs:
           PYTHONPATH=.:tests python -B -m unittest test_community_mini_r1_input -v 2>&1 | tee community-tests.log
           node --test tests/community_mini_development_operation.test.cjs 2>&1 | tee -a community-tests.log
           python -B scripts/feature_compliance_check.py 2>&1 | tee -a community-tests.log
+      - name: Build exact repository Hangzhou input for this original push run
+        if: env.COMMUNITY_SNAPSHOT_PUSH == 'true'
+        id: hz_snapshot
+        run: python -I -B scripts/community_mini_snapshot_build.py
+      - name: Preserve exact current-run Hangzhou input
+        if: env.COMMUNITY_SNAPSHOT_PUSH == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-mini-hangzhou-input
+          path: hangzhou-snapshot-input/
+          if-no-files-found: error
+          retention-days: 1
       - name: Freeze current WeChat-status-compatible mini input for explicit development operation
         if: env.COMMUNITY_CURRENT_PRODUCT_PUSH == 'true'
         env:
@@ -1331,7 +1358,7 @@ jobs:
           retention-days: 7
 
   mini-sdk:
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-test-preview-354]') && !contains(github.event.head_commit.message, '[mini-upload]') && !contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]'))) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && ((inputs.preview_product == 'legacy-4f' && inputs.preview_evidence_run_id == '41101879920') || (inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha == '7ca1ac2a4e5a68704bb0cebe1c33049713070859' && inputs.preview_product_tree == '321134ffac48f3b960df051c53749a481aea872d' && inputs.preview_product_zip_sha256 == 'f23aeeb855559795658e15ee1158c1475219314f52b8ad98c3407fc44c6548af' && inputs.preview_binding_id == 'community-mini-original-path-20261031T1223Z')))
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-test-preview-354]') && !contains(github.event.head_commit.message, '[mini-upload]') && !contains(github.event.head_commit.message, '[mini-preview]')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]'))) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && ((inputs.preview_product == 'hangzhou-snapshot' && inputs.snapshot_run_id != '' && inputs.snapshot_artifact_id != '' && inputs.snapshot_binding_sha256 != '') || (inputs.preview_product == 'legacy-4f' && inputs.preview_evidence_run_id == '41101879920') || (inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha == '7ca1ac2a4e5a68704bb0cebe1c33049713070859' && inputs.preview_product_tree == '321134ffac48f3b960df051c53749a481aea872d' && inputs.preview_product_zip_sha256 == 'f23aeeb855559795658e15ee1158c1475219314f52b8ad98c3407fc44c6548af' && inputs.preview_binding_id == 'community-mini-original-path-20261031T1223Z')))
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1390,14 +1417,18 @@ jobs:
 
   # Fixed domestic egress: retain the existing WeChat upload IP allowlist.
   mini-preview:
-    if: (github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]'))) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && ((inputs.preview_product == 'legacy-4f' && inputs.preview_evidence_run_id == '41101879920') || (inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha == '7ca1ac2a4e5a68704bb0cebe1c33049713070859' && inputs.preview_product_tree == '321134ffac48f3b960df051c53749a481aea872d' && inputs.preview_product_zip_sha256 == 'f23aeeb855559795658e15ee1158c1475219314f52b8ad98c3407fc44c6548af' && inputs.preview_binding_id == 'community-mini-original-path-20261031T1223Z')))
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]'))) || (github.event_name == 'workflow_dispatch' && inputs.preview_enabled == true && inputs.backend_image_enabled != true && inputs.preview_source_sha == github.sha && inputs.preview_target == 'uk-path-candidate' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && ((inputs.preview_product == 'hangzhou-snapshot' && inputs.snapshot_run_id != '' && inputs.snapshot_artifact_id != '' && inputs.snapshot_binding_sha256 != '') || (inputs.preview_product == 'legacy-4f' && inputs.preview_evidence_run_id == '41101879920') || (inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha == '7ca1ac2a4e5a68704bb0cebe1c33049713070859' && inputs.preview_product_tree == '321134ffac48f3b960df051c53749a481aea872d' && inputs.preview_product_zip_sha256 == 'f23aeeb855559795658e15ee1158c1475219314f52b8ad98c3407fc44c6548af' && inputs.preview_binding_id == 'community-mini-original-path-20261031T1223Z')))
     needs: [test, mini-sdk]
     runs-on: [self-hosted, Linux, X64, xuanjun-domestic-ops]
     timeout-minutes: 12
     env:
       COMMUNITY_PREVIEW_PROFILE: uk-path-candidate
-      COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'true' || github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
-      COMMUNITY_FIXED_PRODUCT_KIND: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'current-48df' || inputs.preview_product }}
+      COMMUNITY_SNAPSHOT_BINDING_SHA256: ${{ needs.test.outputs.snapshot_binding_sha256 || inputs.snapshot_binding_sha256 }}
+      COMMUNITY_SNAPSHOT_INPUT: ${{ runner.temp }}/community-mini-hangzhou-input-${{ github.run_id }}-${{ github.run_attempt }}
+      COMMUNITY_SNAPSHOT_BINDING: ${{ runner.temp }}/community-mini-hangzhou-input-${{ github.run_id }}-${{ github.run_attempt }}/binding.json
+      COMMUNITY_SNAPSHOT_ROOT: ${{ runner.temp }}/community-mini-hangzhou-source-${{ github.run_id }}-${{ github.run_attempt }}
+      COMMUNITY_FIXED_PRODUCT_PREVIEW: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) && 'true' || github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'true' || github.event_name == 'workflow_dispatch' && inputs.preview_enabled && 'true' || 'false' }}
+      COMMUNITY_FIXED_PRODUCT_KIND: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) && 'hangzhou-snapshot' || github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'current-48df' || inputs.preview_product }}
       PREVIEW_CONTROL_SHA: ${{ github.event_name == 'push' && github.sha || inputs.preview_source_sha }}
       PREVIEW_SOURCE_SHA: ${{ github.event_name == 'push' && (contains(github.event.head_commit.message, '[mini-preview]') || contains(github.event.head_commit.message, '[mini-upload]')) && 'b024a90465205e18dedf3f7296a470ae7035c30a' || inputs.preview_product == 'r1-7ca1ac2a' && inputs.preview_product_source_sha || '4f1c3aea2c01ead25c5bd075535b8ce7bd9cd5f5' }}
       PREVIEW_PRODUCT_TREE: ${{ inputs.preview_product_tree }}
@@ -1528,6 +1559,25 @@ jobs:
           cp "$RUNNER_TEMP/community-mini-current-input-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/current-mini-receipt.json" .
           /usr/bin/python3 -I -B scripts/community_mini_current_input.py stage
           printf 'COMMUNITY_PREVIEW_PRODUCT_CONTEXT=%s/community-mini-current-context-%s-%s.json\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Receive exact Hangzhou artifact built in this same original run
+        if: env.COMMUNITY_SNAPSHOT_PUSH == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: community-mini-hangzhou-input
+          path: ${{ runner.temp }}/community-mini-hangzhou-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Receive exact reviewed Hangzhou snapshot in original runner
+        if: inputs.preview_product == 'hangzhou-snapshot'
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.snapshot_artifact_id }}
+          run-id: ${{ inputs.snapshot_run_id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/community-mini-hangzhou-input-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Stage exact Hangzhou bytes without rewriting app configuration
+        if: inputs.preview_product == 'hangzhou-snapshot' || env.COMMUNITY_SNAPSHOT_PUSH == 'true'
+        working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
+        run: /usr/bin/python3 -I -B scripts/community_mini_snapshot_input.py stage
       - name: Require live backend health before loading upload credentials
         working-directory: ${{ runner.temp }}/community-mini-preview-source-${{ github.run_id }}-${{ github.run_attempt }}
         run: /usr/bin/python3 -I -B scripts/community_preview_readiness.py --output "$RUNNER_TEMP/community-mini-preview/backend-readiness.json"
@@ -1541,8 +1591,8 @@ jobs:
         env:
           WECHAT_MINIPROGRAM_APPID: ${{ secrets.WECHAT_MINIPROGRAM_APPID }}
           WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
-          COMMUNITY_MINI_OPERATION: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'upload' || github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
-          COMMUNITY_MINI_PUSH_UPLOAD: ${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'true' || 'false' }}
+          COMMUNITY_MINI_OPERATION: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) && 'upload' || github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'upload' || github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
+          COMMUNITY_MINI_PUSH_UPLOAD: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) && 'true' || github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'true' || 'false' }}
           COMMUNITY_MINI_CI_MODULE_ROOT: ${{ runner.temp }}/community-mini-ci
           COMMUNITY_MINI_PROJECT_PATH: ${{ runner.temp }}/community-mini-connected-${{ github.run_id }}-${{ github.run_attempt }}
           COMMUNITY_PREVIEW_OUTPUT: ${{ runner.temp }}/community-mini-preview
@@ -1552,7 +1602,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: community-mini-development-${{ github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'upload' || github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
+          name: community-mini-development-${{ (github.event_name == 'push' && github.ref == 'refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017' && contains(github.event.head_commit.message, '[mini-hangzhou-upload]')) && 'upload' || github.event_name == 'push' && contains(github.event.head_commit.message, '[mini-upload]') && 'upload' || github.event_name == 'workflow_dispatch' && inputs.mini_operation || 'preview' }}
           path: ${{ runner.temp }}/community-mini-preview/
           retention-days: 7
 
@@ -1659,4 +1709,5 @@ jobs:
           name: community-mini-isolated-test-preview-354
           path: ${{ runner.temp }}/community-mini-isolated-354-receipt-${{ github.run_id }}-${{ github.run_attempt }}/
           retention-days: 7
+
 

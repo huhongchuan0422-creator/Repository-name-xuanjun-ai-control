@@ -17,7 +17,7 @@ async function main(){
  const exactPush=process.env.GITHUB_EVENT_NAME==='push'&&process.env.COMMUNITY_MINI_PUSH_UPLOAD==='true'&&
    process.env.GITHUB_SHA===identity.control_source_sha;
  if(operation==='upload'&&(!(explicitDispatch||exactPush)||!identity.fixed_product))throw Error('EXPLICIT_FIXED_PRODUCT_UPLOAD_REQUIRED');
- const version='ui-'+identity.product_source_sha.slice(0,12);
+ const version=(identity.snapshot_binding?'hz-':'ui-')+identity.product_source_sha.slice(0,12);
  const description='Community development product '+identity.product_source_sha.slice(0,12)+' control '+identity.control_source_sha.slice(0,12);
  const projectPath=path.resolve(process.env.COMMUNITY_MINI_PROJECT_PATH||'clients/community-mini');
  const config=JSON.parse(fs.readFileSync(path.join(projectPath,'project.config.json'),'utf8'));
@@ -34,20 +34,20 @@ async function main(){
      prepared.appid!==config.appid||prepared.scene!==null||prepared.entry_page!=='pages/home/index'||
      prepared.search_query!==''||prepared.entry_mode!=='EXISTING_SCENELESS_GUIDANCE'||
      prepared.frontend_source_sha!==identity.product_source_sha||prepared.control_source_sha!==identity.control_source_sha||prepared.commerce!==true||prepared.payments!==false||
-     !appSource.includes("baseUrl: '"+target.baseUrl+"'")||
-     !appSource.includes("payments: false")||!appSource.includes("commerce: true"))
+     (!identity.snapshot_binding&&!appSource.includes("baseUrl: '"+target.baseUrl+"'"))||
+     (!identity.snapshot_binding&&(!appSource.includes("payments: false")||!appSource.includes("commerce: true"))))
    throw Error('CONNECTED_PREVIEW_SOURCE_REQUIRED');
   const proof=process.env.COMMUNITY_PREVIEW_READINESS_RECEIPT;
   if(!proof)throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
   readiness=JSON.parse(fs.readFileSync(proof,'utf8'));
-  verifyReadiness(readiness,target,identity.product_source_sha,Math.floor(Date.now()/1000),identity.fixed_product?identity.control_source_sha:null);
+  verifyReadiness(readiness,target,identity.product_source_sha,Math.floor(Date.now()/1000),identity.fixed_product?identity.control_source_sha:null,identity.snapshot_binding||null);
   verifySource(projectPath,prepared.prepared_files);
   if(identity.fixed_product)verifySource(projectPath,identity.prepared_files);
  }
  const appid=process.env.WECHAT_MINIPROGRAM_APPID||config.appid;
  const receipt={head:identity.product_source_sha,control_source_sha:identity.control_source_sha,appid,operation:operation==='upload'?'DEVELOPMENT_UPLOAD_ONLY':'DEVELOPMENT_PREVIEW_ONLY',
    developer_version:operation==='upload'?version:null,description,
-   public_release:false,payment_enabled:false,connected_preview:Boolean(connected),
+   snapshot_manifest_sha256:identity.snapshot_binding?identity.snapshot_binding.manifest_sha256:null,public_release:false,payment_enabled:false,connected_preview:Boolean(connected),
    backend_origin:target?target.origin:null,backend_base_url:target?target.baseUrl:null,
    entry_page:'pages/home/index',scene:null,search_query:'',entry_mode:'EXISTING_SCENELESS_GUIDANCE',
    frontend_source_sha:identity.product_source_sha,
@@ -104,3 +104,4 @@ async function main(){
 }
 if(require.main===module)main().catch(()=>{console.error('MINI_PREVIEW_STATUS=LOCAL_PREVIEW_SETUP_FAILED');process.exitCode=4;});
 module.exports={main};
+

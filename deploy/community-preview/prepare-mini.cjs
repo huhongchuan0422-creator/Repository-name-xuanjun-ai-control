@@ -31,9 +31,9 @@ for(const page of pages){
 for(const name of required)if(!fs.lstatSync(path.join(SOURCE,name)).isFile())throw Error('REQUIRED_MINI_FILE_MISSING');
 const original=fs.readFileSync(path.join(SOURCE,'app.js'),'utf8');
 const needle="App({\n  globalData: {baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false},";
-if(!original.includes(needle))throw Error('EXPECTED_APP_BASELINE_REQUIRED');
+if(!identity.snapshot_binding&&!original.includes(needle))throw Error('EXPECTED_APP_BASELINE_REQUIRED');
 const replacement="App({\n  globalData: {baseUrl: '"+HOST+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true},";
-const updated=original.replace(needle,replacement);
+const updated=identity.snapshot_binding?original:original.replace(needle,replacement);
 const receipt={
  status:'CONNECTED_PREVIEW_SOURCE_PREPARED_NOT_UPLOADED',
  ...target,commerce:true,payments:false,scene:null,entry_page:'pages/home/index',search_query:'',
@@ -48,7 +48,7 @@ const receipt={
 // OUT is published only after all preparation succeeds. The parent must already exist.
 const temp=fs.mkdtempSync(path.join(path.dirname(path.resolve(OUT)),'.connected-mini-'));
 try{
- for(const name of fs.readdirSync(SOURCE))fs.cpSync(path.join(SOURCE,name),path.join(temp,name),{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});
+ for(const name of fs.readdirSync(SOURCE))fs.cpSync(path.join(SOURCE,name),path.join(temp,name),{recursive:true,errorOnExist:true,force:false,filter:p=>Boolean(identity.snapshot_binding)||!p.endsWith('.test.cjs')});
  fs.writeFileSync(path.join(temp,'app.js'),updated);
  receipt.prepared_files=sourceManifest(temp);
  if(identity.fixed_product)verifySource(temp,identity.prepared_files);
@@ -57,3 +57,4 @@ try{
  fs.renameSync(temp,OUT);
 }finally{fs.rmSync(temp,{recursive:true,force:true});}
 console.log(JSON.stringify(receipt));
+

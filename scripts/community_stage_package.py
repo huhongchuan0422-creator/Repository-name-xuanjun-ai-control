@@ -67,6 +67,8 @@ def build(root):
                 'deploy/community-preview/nginx-ui-preview-candidate.inc',
                 'deploy/community-preview/prepare-mini.cjs',
                 'deploy/community-preview/endpoint.cjs',
+                'deploy/community-preview/snapshot-identity.cjs',
+                'deploy/community-preview/snapshot_readiness.cjs',
                 'deploy/community-preview/endpoint-profiles.json',
                 'deploy/community-preview/native-backend-compatibility.json',
                 'deploy/community-preview/inspect-version-readonly.sh',
@@ -261,3 +263,4 @@ if __name__=='__main__':
     # Never replace an existing review artifact silently.
     with open(args.output,'xb') as out:out.write(data)
     print('OFFLINE_PACKAGE_SHA256='+digest)
+

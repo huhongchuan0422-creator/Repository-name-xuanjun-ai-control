@@ -57,11 +57,15 @@ def check(open_url=None, profile=None, product_identity=None):
                        and product_identity.get('backend_source_sha') == CURRENT_BACKEND
                        and product_identity.get('compatibility') == CURRENT_COMPATIBILITY
                        and 'compatibility_sha256' not in product_identity)
-            if not (legacy or exact_source or current):return report
+            snapshot = product_identity.get('snapshot_binding')
+            if snapshot:
+                if head!=snapshot['manifest_sha256'] or product_identity['control_source_sha']!=snapshot['control_source_sha']:return report
+                report.update(frontend_manifest_sha256=head,frontend_archive_sha256=snapshot['archive_sha256'],compatibility_evidence_sha256=snapshot['compatibility_evidence_sha256'])
+            if not (legacy or exact_source or current or snapshot):return report
             expected_backend=product_identity['backend_source_sha']
-            compatibility=CURRENT_COMPATIBILITY if current else 'EXACT_SOURCE_MATCH'
+            compatibility='EXACT_REVIEWED_SNAPSHOT_BACKEND_PAIR' if snapshot else CURRENT_COMPATIBILITY if current else 'EXACT_SOURCE_MATCH'
             if legacy:report['compatibility_sha256']=FIXED_PROOF_SHA256
-        if not re.fullmatch('[0-9a-f]{40}',head or ''):return report
+        if not re.fullmatch('[0-9a-f]{64}' if product_identity and product_identity.get('snapshot_binding') else '[0-9a-f]{40}',head or ''):return report
         url=target['health_url']
         with opener(Request(url,headers={'Accept':'application/json'}),timeout=10) as response:
             report['http_status']=response.status
@@ -96,8 +100,8 @@ if __name__=='__main__':
     # -I keeps imports isolated; load only our checked-out adjacent control helper.
     import importlib.util
     kind=os.environ.get('COMMUNITY_FIXED_PRODUCT_KIND','legacy-4f')
-    if kind not in ('legacy-4f','r1-7ca1ac2a','current-48df'):raise SystemExit('FIXED_PRODUCT_KIND_REQUIRED')
-    helper=('community_mini_r1_input.py' if kind=='r1-7ca1ac2a' else
+    if kind not in ('legacy-4f','r1-7ca1ac2a','current-48df','hangzhou-snapshot'):raise SystemExit('FIXED_PRODUCT_KIND_REQUIRED')
+    helper=('community_mini_snapshot_input.py' if kind=='hangzhou-snapshot' else 'community_mini_r1_input.py' if kind=='r1-7ca1ac2a' else
             'community_mini_current_input.py' if kind=='current-48df' else
             'community_preview_fixed_product.py')
     spec=importlib.util.spec_from_file_location('fixed_product',Path(__file__).with_name(helper))
@@ -107,3 +111,4 @@ if __name__=='__main__':
     output.write_text(json.dumps(report,sort_keys=True)+'\n');output.chmod(0o600)
     print('PREVIEW_BACKEND_STATUS='+report['status'])
     raise SystemExit(0 if report['status']=='BACKEND_HEALTH_VERIFIED' else 2)
+

@@ -53,6 +53,7 @@ function sourceIdentity(){
   return {product_source_sha:env.GITHUB_SHA||null,control_source_sha:env.GITHUB_SHA||null,source_root:null,fixed_product:false};
  }
  const kind=env.COMMUNITY_FIXED_PRODUCT_KIND||'legacy-4f';
+ if(kind==='hangzhou-snapshot')return require('./snapshot-identity.cjs').identity(env,{verifySource});
  if(!['legacy-4f','r1-7ca1ac2a','current-48df'].includes(kind))throw Error('FIXED_PRODUCT_KIND_REQUIRED');
  const helper=kind==='r1-7ca1ac2a'?'community_mini_r1_input.py':kind==='current-48df'?'community_mini_current_input.py':'community_preview_fixed_product.py';
  const keys=['PATH','GITHUB_SHA','GITHUB_EVENT_NAME','GITHUB_REPOSITORY','GITHUB_REF','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT',
@@ -85,7 +86,8 @@ function endpoint(profile=process.env.COMMUNITY_PREVIEW_PROFILE??'legacy'){
  const origin=new URL(baseUrl).origin;
  return {profile,baseUrl,origin,health_url:baseUrl+'/community/health'};
 }
-function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),controlSha=null){
+function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),controlSha=null,snapshotBinding=null){
+ if(snapshotBinding){if(target.profile!=='uk-path-candidate'||head!==snapshotBinding.manifest_sha256||controlSha!==snapshotBinding.control_source_sha)throw Error('SNAPSHOT_READINESS_BINDING_MISMATCH');return require('./snapshot_readiness.cjs').verifySnapshotReadiness(report,snapshotBinding,now);}
  if(controlSha!==null&&report?.control_source_sha!==controlSha)throw Error('MATCHING_CONTROL_READINESS_REQUIRED');
  const fixedPair=head===FIXED_FRONTEND && /^[a-f0-9]{40}$/.test(controlSha||'');
  const currentPair=head===CURRENT_FRONTEND && /^[a-f0-9]{40}$/.test(controlSha||'');
@@ -104,3 +106,4 @@ function verifyReadiness(report,target,head,now=Math.floor(Date.now()/1000),cont
   throw Error('MATCHING_FRESH_BACKEND_READINESS_REQUIRED');
 }
 module.exports={endpoint,verifyReadiness,sourceManifest,verifySource,sourceIdentity};
+
