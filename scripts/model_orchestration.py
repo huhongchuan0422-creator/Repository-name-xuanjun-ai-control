@@ -555,6 +555,9 @@ class ModelControl(object):
             if 'credential_generation' not in binding_columns:
                 self.db.execute('''ALTER TABLE model_request_bindings ADD COLUMN
                   credential_generation INTEGER''')
+            for name in ('source_metadata_json','source_metadata_mac'):
+                if name not in binding_columns:
+                    self.db.execute('ALTER TABLE model_request_bindings ADD COLUMN %s TEXT'%name)
             evaluation_columns={x['name'] for x in self.db.execute(
               'PRAGMA table_info(model_evaluations)')}
             for name in ('input_usage_state','output_usage_state'):
@@ -1160,6 +1163,27 @@ class ModelControl(object):
           chosen['effective_price']=='KNOWN_FREE' else
           'AUTHORIZED_QUALIFIED_FINAL_COST')
 
+    def request_source_mac(self,metadata,row):
+        identity={k:row[k] for k in ('tenant_id','request_id','task_id','attempt_id','role_id','provider_id','model_id','payload_sha256')}
+        body=canonical({'domain':'model-request-source-v1','request':identity,'source':metadata})
+        return hmac.new(self.master_key,body.encode('utf-8'),hashlib.sha256).hexdigest()
+
+    def validate_registered_provenance(self,row,expected,principal):
+        """Compare protected source and original audit to current host facts."""
+        try:
+            metadata=json.loads(row['source_metadata_json'])
+            if hashlib.sha256(row['payload_json'].encode('utf-8')).hexdigest()!=row['payload_sha256']:
+                raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+            if not isinstance(metadata,dict) or metadata!={'kind':'MCP_REGISTERED_V1','principal_id':principal,'detail':expected}:
+                raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+            if not isinstance(row['source_metadata_mac'],str) or not hmac.compare_digest(row['source_metadata_mac'],self.request_source_mac(metadata,row)):
+                raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+            audits=self.db.execute("SELECT principal_id,detail_json FROM model_audit WHERE tenant_id=? AND action='MCP_REGISTERED_QUEUE' AND target_id=?",(row['tenant_id'],row['request_id'])).fetchall()
+            if len(audits)!=1 or audits[0]['principal_id']!=principal or json.loads(audits[0]['detail_json'])!=expected:
+                raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+        except (TypeError,KeyError,ValueError):
+            raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+
     def queue_request(self, task_id, role_id, messages, idempotency_key,
                       max_output_tokens=None,connection_id=None,now=None,
                       expected_attempt_id=None,expected_assignment_binding=None,
@@ -1264,6 +1288,27 @@ class ModelControl(object):
                 if (old_binding is None or old_binding['max_output_tokens'] != max_output_tokens
                         or old_binding['connection_id'] != connection_id):
                     raise ValueError('IDEMPOTENCY_BINDING_CONFLICT')
+            if registered_mcp_audit is not None:
+                self.db.execute('BEGIN IMMEDIATE')
+                try:
+                    if expected_intake_guard is None:raise ValueError('MCP_REGISTERED_GUARD_REQUIRED')
+                    expected_intake_guard(self.db)
+                    self._assert_expected_project(task_id,expected_project_id)
+                    current=self.gateway.supervisor._task(task_id)
+                    if (current['attempt_id']!=expected_attempt_id or current['state']!='STARTED' or
+                        current['authority_state']!='VALID' or current['authority_valid_until'] is None or
+                        self.clock()>=current['authority_valid_until'] or
+                        any(current[k]!=task_state[k] for k in ('authority_caller_id','fence','epoch'))):
+                        raise ValueError('WRITER_CHANGED_BEFORE_QUEUE_COMMIT')
+                    locked=self.db.execute('''SELECT r.*,b.source_metadata_json,b.source_metadata_mac
+                      FROM model_requests r JOIN model_request_bindings b ON b.tenant_id=r.tenant_id
+                      AND b.request_id=r.request_id WHERE r.tenant_id=? AND r.request_id=?''',
+                      (self.tenant_id,existing['request_id'])).fetchone()
+                    if locked is None:raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+                    self.validate_registered_provenance(locked,registered_mcp_audit,self._principal())
+                    existing=locked
+                    self.db.commit()
+                except Exception:self.db.rollback();raise
             return {'request_id':existing['request_id'],'state':existing['state'],
                     'duplicate':True}
         checkpoint=canonical({'goal':'execute assigned role','input_version':
@@ -1331,6 +1376,12 @@ class ModelControl(object):
               task_state['authority_caller_id'],task_state['fence'],task_state['epoch'],
               task_state['authority_valid_until'],skill_sha,spec_sha,
               module['version'] if module else 'legacy-test-only'))
+            source={'kind':'MCP_REGISTERED_V1','principal_id':self._principal(),'detail':registered_mcp_audit} if registered_mcp_audit is not None else {'kind':'MODEL_DIRECT_V1'}
+            source_row={'tenant_id':self.tenant_id,'request_id':request_id,'task_id':task_id,
+              'attempt_id':task['attempt_id'],'role_id':role_id,'provider_id':assignment['provider_id'],
+              'model_id':assignment['model_id'],'payload_sha256':digest}
+            self.db.execute('UPDATE model_request_bindings SET source_metadata_json=?,source_metadata_mac=? WHERE tenant_id=? AND request_id=?',
+              (canonical(source),self.request_source_mac(source,source_row),self.tenant_id,request_id))
             if registered_mcp_audit is not None:
                 if expected_intake_guard is None or expected_attempt_id is None:
                     raise ValueError('MCP_REGISTERED_GUARD_REQUIRED')
@@ -2523,6 +2574,7 @@ class ModelScheduler(object):
         self.control=control;self.db=control.db;self.clock=clock or time.time
         self.worker_id=_text(worker_id,'worker_id')
         self.admission=admission
+        if admission is not None:admission.control=control
         self.adapters=adapters or {'siliconflow':SiliconFlowAdapter(),
           'openai-compatible':OpenAICompatibleAdapter()}
 
@@ -2621,7 +2673,9 @@ class ModelScheduler(object):
               LEFT JOIN role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id AND rt.version=a.role_version
               WHERE r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND r.next_attempt_at<=?
                 AND (EXISTS(SELECT 1 FROM mcp_task_bindings mb WHERE mb.tenant_id=r.tenant_id AND mb.request_id=r.request_id AND mb.task_id=r.task_id)
-                  OR EXISTS(SELECT 1 FROM model_audit au WHERE au.tenant_id=r.tenant_id AND au.target_id=r.request_id AND au.action='MCP_REGISTERED_QUEUE'))
+                  OR EXISTS(SELECT 1 FROM model_audit au WHERE au.tenant_id=r.tenant_id AND au.target_id=r.request_id AND au.action='MCP_REGISTERED_QUEUE')
+                  OR b.source_metadata_json LIKE '%"MCP_REGISTERED_V1"%'
+                  OR (b.source_metadata_json IS NULL AND b.connection_id IS NOT NULL))
                 AND (g.task_id IS NULL OR b.request_id IS NULL OR p.provider_id IS NULL OR m.model_id IS NULL OR a.role_id IS NULL OR rt.role_id IS NULL)
               ORDER BY r.created_at,r.request_id LIMIT 64''',(self.control.tenant_id,now)))
             for incomplete in missing:self._hold_mcp_request(incomplete,'MCP_WORKER_CONTEXT_MISSING',now)
@@ -2634,7 +2688,7 @@ class ModelScheduler(object):
           b.credential_generation,b.expected_input_tokens,
           b.max_output_tokens,b.allow_paid,b.writer_fence,b.writer_epoch,
           b.writer_principal,b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
-          b.module_version,p.adapter_type,p.base_url,p.timeout_seconds,
+          b.module_version,b.source_metadata_json,b.source_metadata_mac,p.adapter_type,p.base_url,p.timeout_seconds,
           p.retry_limit,p.config_version,p.price_state AS provider_price,
           m.price_state AS model_price,m.input_unit_cost,m.output_unit_cost,
           a.principal_id AS instance_id,rt.phase AS role_phase,
@@ -2655,9 +2709,25 @@ class ModelScheduler(object):
         row=None;reservation=None;reserved_secret=None;last_limit=None
         for candidate in candidates:
             mcp_table=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_task_bindings'").fetchone()
-            is_mcp=bool(self.admission is not None or candidate['role_id']=='mcp-text-executor' or (mcp_table and self.db.execute("SELECT 1 FROM mcp_task_bindings WHERE tenant_id=? AND request_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone()) or self.db.execute("SELECT 1 FROM model_audit WHERE tenant_id=? AND action='MCP_REGISTERED_QUEUE' AND target_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone())
+            source_bad=False;source_kind=None
+            if candidate['source_metadata_json'] is not None or candidate['source_metadata_mac'] is not None:
+                try:
+                    source=json.loads(candidate['source_metadata_json'])
+                    source_kind=source['kind']
+                    source_bad=(source_kind not in ('MODEL_DIRECT_V1','MCP_REGISTERED_V1') or
+                      hashlib.sha256(candidate['payload_json'].encode('utf-8')).hexdigest()!=candidate['payload_sha256'] or
+                      not isinstance(candidate['source_metadata_mac'],str) or not hmac.compare_digest(
+                        candidate['source_metadata_mac'],self.control.request_source_mac(source,candidate)))
+                except (TypeError,ValueError,KeyError):source_bad=True
+            # Pre-marker rows are ambiguous unless the original binding has
+            # no connection: registered MCP dispatch always required one.
+            # Never infer a direct origin merely from a missing audit row.
+            legacy_ambiguous=(candidate['source_metadata_json'] is None and
+              (candidate['connection_id'] is not None or candidate['role_id']=='mcp-text-executor' or
+               bool(self.db.execute("SELECT 1 FROM model_audit WHERE tenant_id=? AND ((action='MCP_REGISTERED_QUEUE' AND target_id=?) OR (action='ROLE_CONTRACT_PLANNED' AND target_id=?))",(candidate['tenant_id'],candidate['request_id'],candidate['task_id'])).fetchone())))
+            is_mcp=bool(self.admission is not None or source_bad or legacy_ambiguous or source_kind=='MCP_REGISTERED_V1' or candidate['role_id']=='mcp-text-executor' or (mcp_table and self.db.execute("SELECT 1 FROM mcp_task_bindings WHERE tenant_id=? AND request_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone()) or self.db.execute("SELECT 1 FROM model_audit WHERE tenant_id=? AND action='MCP_REGISTERED_QUEUE' AND target_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone())
             task=self.control.gateway.supervisor._task(candidate['task_id'])
-            fatal=None
+            fatal='MCP_REQUEST_SOURCE_INTEGRITY_HOLD' if source_bad or legacy_ambiguous else None
             if (candidate['cancel_requested'] or task['attempt_id']!=candidate['attempt_id'] or
                 task['authority_state']!='VALID' or
                 task['authority_valid_until'] is None or now>=task['authority_valid_until'] or

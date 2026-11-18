@@ -446,22 +446,24 @@ class RegisteredTaskDispatchMCP(object):
         if prior is not None and (prior['max_output_tokens'] != args['max_output_tokens']
                 or prior['connection_id'] != binding['connection_id']):
             raise ValueError('IDEMPOTENCY_BINDING_CONFLICT')
+        audit_detail={'task_id':args['task_id'],'attempt_id':args['attempt_id'],
+          'role_id':args['role_id'],'role_version':binding['role_version'],
+          'role_principal':binding['principal_id'],'provider_id':binding['provider_id'],
+          'model_id':binding['model_id'],'connection_id':binding['connection_id'],
+          'project_id':self.project_id,'contract_id':resolved['contract_id'],
+          'contract_version':resolved['contract_version'],'contract_sha256':resolved['contract_sha256']}
         if prior is not None:
-            audit=self.control.db.execute('''SELECT a.principal_id FROM model_requests r JOIN model_audit a
-              ON a.tenant_id=r.tenant_id AND a.target_id=r.request_id AND a.action='MCP_REGISTERED_QUEUE'
-              WHERE r.tenant_id=? AND r.idempotency_key=?''',(self.control.tenant_id,args['idempotency_key'])).fetchall()
-            if len(audit)!=1 or audit[0]['principal_id']!=self.host_identity['principal_id']:
-                raise ValueError('MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED')
+            existing=self.control.db.execute('''SELECT r.*,b.source_metadata_json,b.source_metadata_mac
+              FROM model_requests r JOIN model_request_bindings b ON b.tenant_id=r.tenant_id AND b.request_id=r.request_id
+              WHERE r.tenant_id=? AND r.idempotency_key=?''',(self.control.tenant_id,args['idempotency_key'])).fetchone()
+            self.control.validate_registered_provenance(existing,audit_detail,self.host_identity['principal_id'])
         try:
             result = self.control.queue_request(args['task_id'],args['role_id'],
                 [{'role':'user','content':args['input_text']}],args['idempotency_key'],
                 args['max_output_tokens'],binding['connection_id'],
                 expected_attempt_id=args['attempt_id'],
                 expected_assignment_binding=binding,expected_project_id=self.project_id,
-                expected_intake_guard=check,registered_mcp_audit={'task_id':args['task_id'],
-                  'attempt_id':args['attempt_id'],'role_id':args['role_id'],'project_id':self.project_id,
-                  'contract_id':resolved['contract_id'],'contract_version':resolved['contract_version'],
-                  'contract_sha256':resolved['contract_sha256']})
+                expected_intake_guard=check,registered_mcp_audit=audit_detail)
         except ValueError as exc:
             if str(exc) in ('TASK_CONTRACT_UNKNOWN','MCP_DISPATCH_PERMISSION_REVOKED',
               'MCP_DISPATCH_CONNECTION_REQUIRED','STALE_TASK_ATTEMPT',

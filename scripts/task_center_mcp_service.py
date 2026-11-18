@@ -569,7 +569,7 @@ class MCPTaskService(object):
 class MCPWorkerAdmission(object):
     """Host-injected plan, checked on the scheduler's locked DB connection."""
     def __init__(self,role_contract,config):
-        self.role_contract=role_contract;self.config=config
+        self.role_contract=role_contract;self.config=config;self.control=None
 
     def check(self,db,candidate,now):
         from task_center_role_contract import RoleContractResolver
@@ -647,10 +647,19 @@ class MCPWorkerAdmission(object):
             raise ValueError('MCP_WORKER_ROLE_NOT_SUPPORTED')
         try:detail=json.loads(audits[0]['detail_json'])
         except (ValueError,TypeError):raise ValueError('MCP_WORKER_BINDING_REQUIRED')
-        if detail!={'task_id':candidate['task_id'],'attempt_id':candidate['attempt_id'],
-            'role_id':role,'project_id':task['project_id'],'contract_id':contract['contract_id'],
-            'contract_version':contract['contract_version'],'contract_sha256':contract['contract_sha256']}:
-            raise ValueError('MCP_WORKER_BINDING_CHANGED')
+        expected_detail={'task_id':candidate['task_id'],'attempt_id':candidate['attempt_id'],
+            'role_id':role,'role_version':assignment['role_version'],'role_principal':assignment['principal_id'],
+            'provider_id':candidate['provider_id'],'model_id':candidate['model_id'],
+            'connection_id':candidate['connection_id'],'project_id':task['project_id'],
+            'contract_id':contract['contract_id'],'contract_version':contract['contract_version'],
+            'contract_sha256':contract['contract_sha256']}
+        # Same exact validator used at duplicate dispatch, not a second rule.
+        source_row=db.execute('''SELECT r.*,b.source_metadata_json,b.source_metadata_mac FROM model_requests r
+          JOIN model_request_bindings b ON b.tenant_id=r.tenant_id AND b.request_id=r.request_id
+          WHERE r.tenant_id=? AND r.request_id=?''',(tenant,candidate['request_id'])).fetchone()
+        from model_orchestration import ModelControl
+        # Use the already authenticated worker's control, bound below by check().
+        self.control.validate_registered_provenance(source_row,expected_detail,principal)
         connection=db.execute("SELECT status,purpose,provider_id,config_version,secret_cipher IS NOT NULL FROM service_connections WHERE tenant_id=? AND connection_id=?",(tenant,candidate['connection_id'])).fetchone()
         if connection is None or tuple(connection)!=('ACTIVE','MODEL_INFERENCE',candidate['provider_id'],candidate['connection_config_version'],1):
             raise ValueError('MCP_WORKER_AUTHORITY_CHANGED')

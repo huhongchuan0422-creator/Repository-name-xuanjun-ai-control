@@ -67,6 +67,53 @@ class RegisteredDispatch(unittest.TestCase):
         adapter=Adapter();self.assertEqual(self.scheduler(adapter).run_once()['state'],'HOLD');self.assertEqual(adapter.calls,0)
         self.assertEqual(self.db.execute('SELECT state FROM model_requests WHERE request_id=?',(first['request_id'],)).fetchone()[0],'HOLD')
         self.assertEqual(self.db.execute("SELECT count(*) FROM outbox WHERE task_id='demo-b' AND delivered_at IS NULL").fetchone()[0],1)
+    def test_missing_source_audit_default_scheduler_must_hold(self):
+        first=self.rpc('task_dispatch',self.args)
+        self.db.execute("DELETE FROM model_audit WHERE action='MCP_REGISTERED_QUEUE' AND target_id=?",(first['request_id'],));self.db.commit()
+        adapter=Adapter();self.assertEqual(self.scheduler(adapter,False).run_once()['state'],'HOLD')
+        self.assertEqual(adapter.calls,0)
+        self.assertEqual(self.db.execute('SELECT state FROM model_requests WHERE request_id=?',(first['request_id'],)).fetchone()[0],'HOLD')
+        self.assertEqual(self.db.execute("SELECT count(*) FROM outbox WHERE task_id='demo-b' AND delivered_at IS NULL").fetchone()[0],1)
+    def test_missing_audit_and_assignment_still_supervised(self):
+        first=self.rpc('task_dispatch',self.args)
+        self.db.execute("DELETE FROM model_audit WHERE action='MCP_REGISTERED_QUEUE' AND target_id=?",(first['request_id'],))
+        self.db.execute("DELETE FROM model_assignments WHERE task_id='demo-b'");self.db.commit()
+        adapter=Adapter();self.assertEqual(self.scheduler(adapter,False).run_once()['state'],'HOLD');self.assertEqual(adapter.calls,0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM outbox WHERE task_id='demo-b' AND delivered_at IS NULL").fetchone()[0],1)
+    def test_duplicate_rejects_missing_partial_multiple_and_tampered_audit(self):
+        first=self.rpc('task_dispatch',self.args)
+        audit=self.db.execute("SELECT * FROM model_audit WHERE action='MCP_REGISTERED_QUEUE' AND target_id=?",(first['request_id'],)).fetchone()
+        original=tuple(audit); detail=json.loads(audit['detail_json'])
+        variants=[None,{},dict(detail,contract_sha256='a'*64),dict(detail,provider_id='other')]
+        for value in variants:
+            self.db.execute("DELETE FROM model_audit WHERE action='MCP_REGISTERED_QUEUE' AND target_id=?",(first['request_id'],))
+            if value is not None:
+                row=list(original);row[5]=json.dumps(value);self.db.execute('INSERT INTO model_audit VALUES (?,?,?,?,?,?,?)',row)
+            self.db.commit()
+            with self.subTest(value=value),self.assertRaisesRegex(ValueError,'MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED'):
+                self.rpc('task_dispatch',self.args)
+        self.db.execute("DELETE FROM model_audit WHERE action='MCP_REGISTERED_QUEUE' AND target_id=?",(first['request_id'],))
+        self.db.execute('INSERT INTO model_audit VALUES (?,?,?,?,?,?,?)',original)
+        second=list(original);second[0]='duplicate-fixture';self.db.execute('INSERT INTO model_audit VALUES (?,?,?,?,?,?,?)',second);self.db.commit()
+        with self.assertRaisesRegex(ValueError,'MCP_REGISTERED_REQUEST_PROVENANCE_REQUIRED'):self.rpc('task_dispatch',self.args)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM model_requests').fetchone()[0],1)
+    def test_erased_or_forged_source_marker_is_held(self):
+        first=self.rpc('task_dispatch',self.args)
+        self.db.execute('UPDATE model_request_bindings SET source_metadata_json=NULL,source_metadata_mac=NULL WHERE request_id=?',(first['request_id'],))
+        self.db.execute("DELETE FROM model_audit WHERE action IN ('MCP_REGISTERED_QUEUE','ROLE_CONTRACT_PLANNED')");self.db.commit()
+        adapter=Adapter();self.assertEqual(self.scheduler(adapter,False).run_once()['state'],'HOLD');self.assertEqual(adapter.calls,0)
+        self.assertEqual(self.db.execute("SELECT error_kind FROM model_requests WHERE request_id=?",(first['request_id'],)).fetchone()[0],'MCP_REQUEST_SOURCE_INTEGRITY_HOLD')
+    def test_worker_rejects_tampered_audit_detail(self):
+        first=self.rpc('task_dispatch',self.args)
+        row=self.db.execute("SELECT detail_json FROM model_audit WHERE action='MCP_REGISTERED_QUEUE' AND target_id=?",(first['request_id'],)).fetchone()
+        detail=json.loads(row[0]);detail['contract_sha256']='a'*64
+        self.db.execute("UPDATE model_audit SET detail_json=? WHERE action='MCP_REGISTERED_QUEUE' AND target_id=?",(json.dumps(detail),first['request_id']));self.db.commit()
+        adapter=Adapter();self.assertEqual(self.scheduler(adapter).run_once()['state'],'HOLD');self.assertEqual(adapter.calls,0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM outbox WHERE task_id='demo-b' AND delivered_at IS NULL").fetchone()[0],1)
+    def test_modified_source_marker_is_held(self):
+        first=self.rpc('task_dispatch',self.args)
+        self.db.execute("UPDATE model_request_bindings SET source_metadata_json=? WHERE request_id=?",('{"kind":"MODEL_DIRECT_V1"}',first['request_id']));self.db.commit()
+        adapter=Adapter();self.assertEqual(self.scheduler(adapter,False).run_once()['state'],'HOLD');self.assertEqual(adapter.calls,0)
     def test_unknown_retry_is_fact_only(self):
         first=self.rpc('task_dispatch',self.args);adapter=Adapter();adapter.failure='TIMEOUT_UNKNOWN'
         self.assertEqual(self.scheduler(adapter).run_once()['state'],'UNKNOWN');self.assertEqual(adapter.calls,1)
@@ -74,3 +121,22 @@ class RegisteredDispatch(unittest.TestCase):
         self.assertEqual(again['request_id'],first['request_id']);self.assertEqual(self.scheduler(adapter).run_once()['state'],'IDLE');self.assertEqual(adapter.calls,1)
 
 if __name__=='__main__':unittest.main()
+
+class LegacyDirectProvenance(unittest.TestCase):
+    def setUp(self):
+        import test_model_orchestration as old
+        self.f=old.ModelOrchestrationTests();self.f.setUp()
+    def tearDown(self):self.f.tearDown()
+    def test_legacy_no_connection_direct_request_remains_executable(self):
+        self.f.assigned()
+        queued=self.f.control.queue_request('demo-b','developer',[{'role':'user','content':'x'}],'legacy-direct')
+        db=self.f.supervisor.db
+        db.execute('UPDATE model_request_bindings SET source_metadata_json=NULL,source_metadata_mac=NULL WHERE request_id=?',(queued['request_id'],));db.commit()
+        self.assertEqual(ModelScheduler(self.f.control).run_once()['state'],'SUCCEEDED')
+    def test_legacy_no_connection_unknown_remains_no_replay(self):
+        self.f.assigned(model='slow')
+        queued=self.f.control.queue_request('demo-b','developer',[],'legacy-slow')
+        db=self.f.supervisor.db
+        db.execute('UPDATE model_request_bindings SET source_metadata_json=NULL,source_metadata_mac=NULL WHERE request_id=?',(queued['request_id'],));db.commit()
+        self.assertEqual(ModelScheduler(self.f.control).run_once()['state'],'UNKNOWN')
+        self.assertEqual(ModelScheduler(self.f.control).run_once()['state'],'IDLE')
