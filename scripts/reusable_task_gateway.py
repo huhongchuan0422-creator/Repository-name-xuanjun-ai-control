@@ -376,16 +376,29 @@ class GatewayKernel(object):
     def _handoff_attempt_id(prefix,outbox_id,attempt):
         return prefix+outbox_id+(':'+str(attempt) if attempt>1 else '')
 
-    def due_handoff_alerts(self,context,now=None,limit=100):
-        """Original outbox, explicitly routed to the trusted alert owner only."""
+    def due_handoff_alerts(self,context,now=None,limit=100,host_adapter=None):
+        """List only alerts whose task/attempt has an existing host destination."""
         tenant=self.tenants.verify(context);now=self.clock() if now is None else _finite(now,'time')
+        if host_adapter is None or limit==0:return []
         rows=self.db.execute("""SELECT o.* FROM outbox o JOIN gateway_task_metadata m ON m.task_id=o.task_id
           JOIN events e ON e.task_id=o.task_id AND e.attempt_id=o.attempt_id AND e.event_id=o.event_id
           WHERE m.tenant_id=? AND e.kind='SUPERVISION_ACTION' AND e.evidence_ref='HANDOFF_CONTEXT_INCOMPLETE'
             AND o.delivered_at IS NULL AND o.dead_lettered_at IS NULL AND o.next_attempt_at<=?
             AND ((o.attempts=0 AND o.last_error='') OR o.last_error='HANDOFF_ALERT_RETRY_READY')
-          ORDER BY o.next_attempt_at,o.outbox_id LIMIT ?""",(tenant,now,limit))
-        return [dict(row) for row in rows]
+          ORDER BY o.next_attempt_at,o.outbox_id""",(tenant,now))
+        result=[]
+        for row in rows:
+            try:
+                _,packet=self._handoff_alert_packet(context,row['outbox_id'])
+                packet['delivery_attempt']=row['attempts']+1
+                # Same trusted host-only task/attempt resolver as delivery;
+                # unavailable/unknown authority never returns the outbox row.
+                destination=host_adapter.resolve_destination(dict(packet))
+                if destination is None:continue
+            except Exception:continue
+            result.append(dict(row))
+            if limit>0 and len(result)>=limit:break
+        return result
 
     def deliver_handoff_alert(self, context, outbox_id, host_adapter=None):
         """Trusted host sends only the original alert; unknown effects never replay."""

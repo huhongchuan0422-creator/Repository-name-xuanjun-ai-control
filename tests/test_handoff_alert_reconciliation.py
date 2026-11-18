@@ -17,7 +17,7 @@ class Reconciliation(OriginalAlertDelivery):
         self.assertFalse(any(x['outbox_id']==self.oid for x in self.s.due_outbox(now=9999)))
         self.assertEqual(self.g.reconcile_handoff_alert(self.context,self.oid,a)['state'],'RETRY_READY')
         self.assertEqual(self.g.reconcile_handoff_alert(self.context,self.oid,a)['state'],'RETRY_READY');self.assertEqual(a.lookups,1)
-        self.assertEqual([x['outbox_id'] for x in self.g.due_handoff_alerts(self.context,now=1000)],[self.oid])
+        self.assertEqual([x['outbox_id'] for x in self.g.due_handoff_alerts(self.context,now=1000,host_adapter=PlatformFixture())],[self.oid])
         a.state='SENT';a.send=FixtureTransport.send.__get__(a,PlatformFixture)
         self.assertEqual(self.g.deliver_handoff_alert(self.context,self.oid,a)['state'],'SENT_ACK_UNKNOWN')
         self.assertEqual(self.g.deliver_handoff_alert(self.context,self.oid,a)['state'],'SENT_ACK_UNKNOWN');self.assertEqual(a.calls,1)
@@ -38,10 +38,10 @@ class Reconciliation(OriginalAlertDelivery):
         self.assertEqual(self.g.reconcile_handoff_alert(self.context,self.oid,a)['state'],'UNKNOWN_NO_RETRY')
         self.assertEqual(self.g.deliver_handoff_alert(self.context,self.oid,a)['state'],'UNKNOWN_NO_RETRY');self.assertEqual(a.calls,1)
         with self.assertRaises(ValueError):self.g.reconcile_handoff_alert(self.authority.issue('other','seed'),self.oid,a)
-        self.assertFalse(self.g.due_handoff_alerts(self.context,now=9999))
+        self.assertFalse(self.g.due_handoff_alerts(self.context,now=9999,host_adapter=PlatformFixture()))
     def test_unattempted_not_visible_to_generic_consumer(self):
         self.assertFalse(any(x['outbox_id']==self.oid for x in self.s.due_outbox(now=9999)))
-        self.assertEqual([x['outbox_id'] for x in self.g.due_handoff_alerts(self.context,now=1000)],[self.oid])
+        self.assertEqual([x['outbox_id'] for x in self.g.due_handoff_alerts(self.context,now=1000,host_adapter=PlatformFixture())],[self.oid])
     def test_unsettled_and_wrong_task_never_authorize_retry(self):
         a=PlatformFixture();self.g.deliver_handoff_alert(self.context,self.oid,a)
         a.reconcile=lambda packet:{'state':'NOT_SENT','receipt_ref':'fixture-proof','dispatch_settled':False}
