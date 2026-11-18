@@ -359,6 +359,74 @@ class GatewayKernel(object):
                 now))
         return result
 
+    def deliver_handoff_alert(self, context, outbox_id, host_adapter=None):
+        """Explicit trusted-host transport seam, not an HTTP/body entry.
+
+        Host locally resolves an authorized destination for the exact task,
+        sends with outbox_id as idempotency key using its existing tool, and
+        interprets the actual returned platform result. No adapter is installed
+        by default. A committed intent prevents blind repeat after any crash.
+        """
+        row=self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',(outbox_id,)).fetchone()
+        if row is None:raise KeyError(outbox_id)
+        tenant=self.assert_task_context(context,row['task_id'])
+        intent_id='handoff-alert-intent:'+outbox_id
+        result_id='handoff-alert-result:'+outbox_id
+        prior=self.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='HANDOFF_ALERT_RESULT'",(row['task_id'],row['attempt_id'],result_id)).fetchone()
+        if prior is not None:return dict(json.loads(prior['payload_json']),dispatch_performed=False)
+        if self.db.execute("SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='HANDOFF_ALERT_INTENT'",(row['task_id'],row['attempt_id'],intent_id)).fetchone():
+            return {'state':'UNKNOWN_NO_RETRY','outbox_id':outbox_id,'dispatch_performed':False}
+        if host_adapter is None:return {'state':'HOST_TRANSPORT_UNAVAILABLE','outbox_id':outbox_id,'dispatch_performed':False}
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',(outbox_id,)).fetchone()
+            self.assert_task_context(context,row['task_id'])
+            event=self.db.execute('SELECT kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(row['task_id'],row['attempt_id'],row['event_id'])).fetchone()
+            payload=json.loads(row['payload_json'])
+            if (event is None or event['kind']!='SUPERVISION_ACTION' or event['evidence_ref']!='HANDOFF_CONTEXT_INCOMPLETE'
+                or event['payload_json']!=row['payload_json'] or payload.get('action')!='HANDOFF_CONTEXT_INCOMPLETE'
+                or payload.get('tenant_id')!=tenant or payload.get('task_id')!=row['task_id'] or payload.get('attempt_id')!=row['attempt_id']):
+                raise ValueError('ORIGINAL_HANDOFF_ALERT_REQUIRED')
+            if self.db.execute("SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND event_id=?",(row['task_id'],row['attempt_id'],intent_id)).fetchone() or row['attempts'] or row['delivered_at'] is not None or row['dead_lettered_at'] is not None:
+                self.db.rollback();return {'state':'UNKNOWN_NO_RETRY','outbox_id':outbox_id,'dispatch_performed':False}
+            packet={'tenant_id':tenant,'task_id':row['task_id'],'attempt_id':row['attempt_id'],
+                    'event_id':row['event_id'],'outbox_id':outbox_id,'alert':payload}
+            # Trusted host-only local lookup, never an HTTP-supplied destination.
+            destination=host_adapter.resolve_destination(dict(packet))
+            if destination is None:
+                self.db.rollback();return {'state':'DESTINATION_UNAVAILABLE','outbox_id':outbox_id,'dispatch_performed':False}
+            now=_finite(self.clock(),'time')
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],intent_id,'HANDOFF_ALERT_INTENT',now,'PHASE_EXECUTION','HOST_SELECTED_DESTINATION',canonical({'outbox_id':outbox_id,'state':'DISPATCHING_NO_RETRY'})))
+            self.db.execute("UPDATE outbox SET attempts=attempts+1,last_error='HANDOFF_ALERT_DISPATCHING_NO_RETRY' WHERE outbox_id=?",(outbox_id,))
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
+        try:
+            # The adapter calls the already-approved host tool. It must derive
+            # verdict from its actual result, not request body or model prose.
+            raw=host_adapter.send(destination,dict(packet))
+            receipt=host_adapter.interpret_result(destination,dict(packet),raw)
+            state=receipt.get('state') if isinstance(receipt,dict) else None
+            ref=receipt.get('receipt_ref') if isinstance(receipt,dict) else None
+            if state not in ('SENT','FAILED') or not isinstance(ref,str) or not ref.strip() or ref!=ref.strip() or len(ref)>256:
+                state='UNKNOWN';ref=None
+        except Exception:
+            state='UNKNOWN';ref=None
+        now=_finite(self.clock(),'time')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            result={'state':('SENT_ACK_UNKNOWN' if state=='SENT' else 'FAILED_NO_RETRY' if state=='FAILED' else 'UNKNOWN_NO_RETRY'),'outbox_id':outbox_id}
+            if state=='SENT':
+                self.db.execute('INSERT INTO gateway_delivery_receipts VALUES (?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],row['event_id'],'SENT',ref,now))
+                self.db.execute("UPDATE outbox SET delivered_at=?,last_error='HANDOFF_ALERT_SENT_ACK_UNKNOWN' WHERE outbox_id=?",(now,outbox_id))
+            else:
+                self.db.execute('UPDATE outbox SET last_error=? WHERE outbox_id=?',('HANDOFF_ALERT_'+state+'_NO_RETRY',outbox_id))
+            self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(row['task_id'],row['attempt_id'],result_id,'HANDOFF_ALERT_RESULT',now,'PHASE_EXECUTION',ref or 'UNKNOWN',canonical(result)))
+            self.db.commit()
+            return dict(result,dispatch_performed=True)
+        except Exception:
+            self.db.rollback();raise
+
     def receive_outbox(self, context, outbox_id, now=None):
         tenant_id = self.tenants.verify(context)
         row = self.db.execute('SELECT * FROM outbox WHERE outbox_id=?',

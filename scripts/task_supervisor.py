@@ -2444,9 +2444,10 @@ class Supervisor(object):
         return [dict(r) for r in self.db.execute('''SELECT * FROM outbox
           WHERE delivered_at IS NULL AND dead_lettered_at IS NULL
             AND next_attempt_at<=? AND last_error NOT LIKE 'CORRECTION_%'
+            AND last_error NOT LIKE 'HANDOFF_ALERT_%'
             AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task_id=outbox.task_id
               AND e.attempt_id=outbox.attempt_id AND ((e.event_id=outbox.event_id
-              AND e.kind='CORRECTION_PROPOSAL') OR (e.event_id='correction-intent-'||outbox.outbox_id AND e.kind='CORRECTION_INTENT')))
+              AND e.kind='CORRECTION_PROPOSAL') OR (e.event_id='correction-intent-'||outbox.outbox_id AND e.kind='CORRECTION_INTENT') OR (e.event_id='handoff-alert-intent:'||outbox.outbox_id AND e.kind='HANDOFF_ALERT_INTENT')))
           ORDER BY next_attempt_at,outbox_id LIMIT ?''', (now, limit))]
 
     def outbox_result(self, outbox_id, delivered, now=None, error=''):
@@ -2460,9 +2461,13 @@ class Supervisor(object):
                                   (outbox_id,)).fetchone()
             if row is None:
                 raise KeyError(outbox_id)
+            handoff=self.db.execute("SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='SUPERVISION_ACTION' AND evidence_ref='HANDOFF_CONTEXT_INCOMPLETE'",(row['task_id'],row['attempt_id'],row['event_id'])).fetchone()
+            if handoff is not None:
+                raise ValueError('HANDOFF_ALERT_REQUIRES_TRUSTED_TRANSPORT_RECEIPT')
             protected=self.db.execute('''SELECT 1 FROM events WHERE task_id=? AND attempt_id=?
-              AND ((event_id=? AND kind='CORRECTION_PROPOSAL') OR (event_id=? AND kind='CORRECTION_INTENT')) LIMIT 1''',
-              (row['task_id'],row['attempt_id'],row['event_id'],'correction-intent-'+outbox_id)).fetchone()
+              AND ((event_id=? AND kind='CORRECTION_PROPOSAL') OR (event_id=? AND kind='CORRECTION_INTENT')
+                   OR (event_id=? AND kind='HANDOFF_ALERT_INTENT')) LIMIT 1''',
+              (row['task_id'],row['attempt_id'],row['event_id'],'correction-intent-'+outbox_id,'handoff-alert-intent:'+outbox_id)).fetchone()
             if protected is not None:
                 raise ValueError('CORRECTION_OUTBOX_REQUIRES_ORIGINAL_RECEIPT_PATH')
             if row['delivered_at'] is not None:
