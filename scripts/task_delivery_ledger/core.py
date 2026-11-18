@@ -20,10 +20,15 @@ TEXT_FIELDS={'goal','acceptance','blocker','next_action','reason'}
 LIST_FIELDS={'dependencies','code_refs','deploy_refs','source_refs','pending_operations',
              'scope_included','scope_excluded','actual_checks','unknown_items'}
 DICT_FIELDS={'data','snapshot_data'}
-FIELDS.update({'installed_version_ref','permission_request_ref','install_channel_ref',
-               'protected_config_ref','credential_ref','effects_receipt_ref','backup_ref',
-               'restore_ref','acceptance_entry_ref','acceptance_identity_ref',
-               'acceptance_actions_ref'})
+CONTINUATION_REFERENCES={
+    'installed_version_ref':frozenset(),
+    'permission_request_ref':frozenset(('openclaw-github-identity-status',)),
+    'install_channel_ref':frozenset(), 'protected_config_ref':frozenset(),
+    'credential_ref':frozenset(), 'effects_receipt_ref':frozenset(),
+    'backup_ref':frozenset(('source-backup-1889-coverage-20261118',)),
+    'restore_ref':frozenset(), 'acceptance_entry_ref':frozenset(),
+    'acceptance_identity_ref':frozenset(), 'acceptance_actions_ref':frozenset()}
+FIELDS.update(CONTINUATION_REFERENCES)
 HASH_FIELDS={'snapshot_digest','artifact_sha256','commit','tree'}
 TIME_FIELDS={'occurred_at','observed_at','expires_at','permission_expires_at'}
 TEXT_RE=re.compile(r'^[\w\s\u3400-\u9fff，。；：、（）(),.：:;!?！？，/\-]{1,256}$')
@@ -40,6 +45,9 @@ def safe(value, key=None):
             safe(v,'list_item')
     elif isinstance(value, str):
         if key in DICT_FIELDS or key in LIST_FIELDS: raise LedgerError('invalid field type')
+        if key in CONTINUATION_REFERENCES:
+            if value != 'UNKNOWN' and value not in CONTINUATION_REFERENCES[key]: raise LedgerError('unregistered continuation reference')
+            return
         if len(value)>256 or BAD.search(value) or any(ord(c)<32 for c in value): raise LedgerError('unsafe value')
         if key in TEXT_FIELDS:
             if not TEXT_RE.fullmatch(value) or OPAQUE.search(value): raise LedgerError('unsafe business text')

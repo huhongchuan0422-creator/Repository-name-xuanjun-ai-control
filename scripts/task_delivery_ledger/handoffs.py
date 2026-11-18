@@ -4,8 +4,9 @@ Identity and permission validation must be supplied by a trusted existing system
 Without a verifier even complete-looking receipts remain incomplete.
 """
 from datetime import datetime, timezone
+import copy
 import re
-from .core import LedgerError, ident, canonical, digest, parse_time
+from .core import LedgerError, ident, canonical, digest, parse_time, CONTINUATION_REFERENCES
 
 SNAPSHOT_FIELDS=('goal_acceptance_ref','instruction_ref','repo_ref','branch','commit','tree','dirty_ref',
                  'manifest_ref','artifact_sha256','build_ref','deploy_refs','running_ref','runtime_source_ref','entry_ref',
@@ -63,6 +64,12 @@ def project_handoffs(events, verifier=None, now=None):
     groups={}
     for e in events:
         if e['type'].startswith('handoff_'):
+            e=copy.deepcopy(e)
+            snap=e.get('data',{}).get('snapshot_data')
+            if isinstance(snap,dict):
+                for key in CONTINUATION_FIELDS:
+                    if key in snap and (not isinstance(snap[key],str) or snap[key] not in CONTINUATION_REFERENCES[key]):
+                        snap[key]='UNKNOWN'
             d=e['data']; groups.setdefault((e['task_id'],d['handoff_id']),[]).append(e)
     result={}
     for (task_id,hid), es in groups.items():
