@@ -5,7 +5,7 @@ from task_center_handoff_host import HandoffHost, HostAuthAdapter, FormalHandoff
 from task_center_app import build_handler
 
 CONFIG={'schema_version':1,'enabled':True,'bindings':[{'tenant_id':'tenant-1','principal_id':'dispatch-user','project_id':'demo-project',
-        'roles':{'role-agent':{'role_version':'v1','principal_id':'agent','provider_id':'fixture-only','model_id':'fixture-model','connection_id':'fixture-connection'}}}]}
+        'roles':{'role-agent':{'role_version':'v1','principal_id':'agent','provider_id':'fixture-only','model_id':'fixture-model','connection_id':'fixture-connection'},'role-carol':{'role_version':'v1','principal_id':'carol','provider_id':'fixture-only','model_id':'fixture-model','connection_id':'fixture-connection'}}}]}
 
 class SimulatedHost(HostAuthAdapter):
     def __init__(self):self.enabled=True;self.override={};self.backup={'state':'COMPLETE','missing':[],'cycle_at':990}
@@ -33,25 +33,32 @@ class HostDelta(unittest.TestCase):
           INSERT INTO model_assignments VALUES('tenant-1','task-1','attempt-1','role-agent','v1','agent','fixture-only','fixture-model','ASSIGNED');''')
         scope=hashlib.sha256(b'["repo"]').hexdigest()
         self.db.execute('INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?)',('task-1','attempt-1','VALID',2000,1,1,'["repo"]',scope,900))
-        self.db.commit();self.auth=SimulatedHost();self.host=HandoffHost(self.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG)
+        self.db.commit();self.auth=SimulatedHost();self.host=HandoffHost(self.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG);self.refs={};self.root_ref=None
     def tearDown(self):self.db.close();self.tmp.cleanup()
     def req(self,action='PROPOSE',eid='event-1',cause='NONE'):
-        return {'task_id':'task-1','attempt_id':'attempt-1','handoff_id':'handoff-1','handoff_version':1,'event_id':eid,'action':action,'causation':cause,'snapshot_digest':'a'*64,'backup_cycle_id':'cycle-1','backup_manifest_sha256':'b'*64,'checked':sorted(REQUIRED_CONTEXT),'provider_ref':'fixture-only'}
+        actor={'PROPOSE':'alice','NOMINATE':'alice','RECEIVE':'bob','ALIGNED':'bob','SUPERVISE':'carol','SUPERVISION_START':'carol','VERIFIED':'carol'}[action]
+        if eid not in self.refs:
+            parent=self.root_ref
+            ref=self.host.issue_reference(actor,'task-1','attempt-1',1,parent)
+            self.refs[eid]=ref
+            if self.root_ref is None:self.root_ref=ref['event_id']
+        ref=self.refs[eid]
+        return dict(ref,task_id='task-1',attempt_id='attempt-1',action=action,causation=self.refs[cause]['event_id'] if cause in self.refs else cause,snapshot_digest='a'*64,backup_manifest_sha256='b'*64,checked=sorted(REQUIRED_CONTEXT),provider_ref='fixture-only')
     def test_actual_transaction_chain_and_historical_verification(self):
         self.assertEqual(self.host.record('alice',self.req())['state'],'RECORDED')
         self.assertEqual(self.host.record('alice',self.req())['state'],'ALREADY_RECORDED')
         self.host.record('bob',self.req('RECEIVE','event-2','event-1'))
         self.host.record('carol',self.req('SUPERVISE','event-3','event-2'))
         with self.assertRaises(ValueError):self.host.record('bob',self.req('RECEIVE','other-event','event-1'))
-        row=self.db.execute("SELECT payload_json FROM events WHERE event_id='handoff-host:event-2'").fetchone();payload=json.loads(row[0])
+        row=self.db.execute("SELECT payload_json FROM events WHERE event_id=?",('handoff-host:'+self.refs['event-2']['event_id'],)).fetchone();payload=json.loads(row[0])
         self.assertEqual(payload['principal_id'],'bob')
-        self.assertTrue(self.host.verify_recorded('tenant-1','task-1','attempt-1','event-2',payload))
+        self.assertTrue(self.host.verify_recorded('tenant-1','task-1','attempt-1',self.refs['event-2']['event_id'],payload))
         self.db.execute("UPDATE tasks SET authority_state='REVOKED'");self.db.commit()
-        self.assertTrue(self.host.verify_recorded('tenant-1','task-1','attempt-1','event-2',payload))
+        self.assertTrue(self.host.verify_recorded('tenant-1','task-1','attempt-1',self.refs['event-2']['event_id'],payload))
         with self.assertRaises(ValueError):self.host.record('carol',self.req('SUPERVISE','event-4','event-2'))
         payload['handoff_version']=2
-        self.assertFalse(self.host.verify_recorded('tenant-1','task-1','attempt-1','event-2',payload))
-        self.assertFalse(self.host.verify_recorded('other','task-1','attempt-1','event-2',payload))
+        self.assertFalse(self.host.verify_recorded('tenant-1','task-1','attempt-1',self.refs['event-2']['event_id'],payload))
+        self.assertFalse(self.host.verify_recorded('other','task-1','attempt-1',self.refs['event-2']['event_id'],payload))
     def test_six_phases_are_separate_authenticated_records(self):
         self.host.record('alice',self.req('PROPOSE','p1','NONE'))
         nomination=self.req('NOMINATE','n1','p1');nomination['target_ref']='role-carol'
@@ -62,7 +69,7 @@ class HostDelta(unittest.TestCase):
         self.host.record('carol',self.req('SUPERVISION_START','s1','n1'))
         verified=self.req('VERIFIED','v1','s1');verified['alignment_ref']='missing'
         with self.assertRaises(ValueError):self.host.record('carol',verified)
-        verified['alignment_ref']='a1';self.host.record('carol',verified)
+        verified['alignment_ref']=self.refs['a1']['event_id'];self.host.record('carol',verified)
         rows=self.db.execute("SELECT kind FROM events WHERE kind LIKE 'AUTHENTICATED_HANDOFF_%'").fetchall()
         self.assertEqual(len(rows),6)
     def test_reject_untrusted_or_mismatched(self):
@@ -87,16 +94,16 @@ class HostDelta(unittest.TestCase):
         with self.assertRaises(ValueError):self.host.record('alice',self.req('RECEIVE','event-2','event-1'))
         self.db.execute("INSERT INTO writer_operations VALUES('task-1','UNKNOWN')");self.db.commit()
         self.assertEqual(self.host.record('bob',self.req('RECEIVE','event-2','event-1'))['reason'],'UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED')
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],2)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind!='HANDOFF_REFERENCE_ISSUED'").fetchone()[0],2)
         self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],1)
     def test_incomplete_checklist_unknown_backup_and_revoked_claims(self):
         self.auth.backup=None
         result=self.host.record('alice',self.req());self.assertEqual(result['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED')
-        self.assertEqual(self.host.read_receipt('bob','task-1','attempt-1','event-1')['backup_state'],'UNKNOWN')
+        self.assertEqual(self.host.read_receipt('bob','task-1','attempt-1',self.refs['event-1']['event_id'])['backup_state'],'UNKNOWN')
         self.auth.backup={'state':'COMPLETE','missing':[],'cycle_at':990}
         unchecked=self.req(eid='event-2');unchecked['checked'].remove('RESTORE')
         result=self.host.record('alice',unchecked);self.assertEqual(result['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED')
-        self.assertIn('RESTORE',self.host.read_receipt('bob','task-1','attempt-1','event-2')['missing'])
+        self.assertIn('RESTORE',self.host.read_receipt('bob','task-1','attempt-1',self.refs['event-2']['event_id'])['missing'])
         self.db.execute("UPDATE resource_claims SET state='REVOKED'");self.db.commit()
         with self.assertRaises(ValueError):self.host.record('alice',self.req(eid='event-3'))
         self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind='AUTHENTICATED_HANDOFF_PROPOSE'").fetchone()[0],0)
@@ -104,7 +111,7 @@ class HostDelta(unittest.TestCase):
         self.auth.backup={'state':'INCOMPLETE','missing':['INSTALL_ENTRY','CREDENTIAL_REFERENCE'],'cycle_at':990}
         result=self.host.record('alice',self.req())
         self.assertEqual(result['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED');self.assertEqual(result['alert_delivery'],'UNKNOWN')
-        observed=self.host.read_receipt('bob','task-1','attempt-1','event-1')
+        observed=self.host.read_receipt('bob','task-1','attempt-1',self.refs['event-1']['event_id'])
         self.assertEqual(observed['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED');self.assertEqual(observed['alert_delivery'],'UNKNOWN')
         self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind='AUTHENTICATED_HANDOFF_PROPOSE'").fetchone()[0],0)
         self.assertIsNone(self.db.execute('SELECT delivered_at FROM outbox').fetchone()[0])
@@ -120,14 +127,14 @@ class HostDelta(unittest.TestCase):
         self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],3)
         self.auth.backup={'state':'COMPLETE','missing':[],'cycle_at':990}
         self.assertEqual(self.host.record('alice',self.req())['state'],'RECORDED')
-        receipt=self.host.read_receipt('bob','task-1','attempt-1','event-1')
+        receipt=self.host.read_receipt('bob','task-1','attempt-1',self.refs['event-1']['event_id'])
         self.assertEqual(receipt['state'],'HISTORICAL_RECORDED')
         self.assertEqual([h['missing'] for h in receipt['history']],
                          [['INSTALL_ENTRY','RESTORE'],['INSTALL_ENTRY'],['INSTALL_ENTRY','RESTORE']])
         self.assertTrue(all(h['alert_delivery']=='UNKNOWN' for h in receipt['history']))
         self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
         self.host.record('alice',self.req())
-        self.assertEqual(self.host.read_receipt('bob','task-1','attempt-1','event-1')['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED')
+        self.assertEqual(self.host.read_receipt('bob','task-1','attempt-1',self.refs['event-1']['event_id'])['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED')
 
     def test_blocked_alert_requires_authenticated_fenced_writer(self):
         self.db.execute("INSERT INTO writer_operations VALUES('task-1','UNKNOWN')");self.db.commit()
@@ -136,7 +143,7 @@ class HostDelta(unittest.TestCase):
         self.auth.enabled=True
         self.db.execute("UPDATE resource_claims SET state='REVOKED'");self.db.commit()
         with self.assertRaises(ValueError):self.host.record('alice',self.req())
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind!='HANDOFF_REFERENCE_ISSUED'").fetchone()[0],0)
         self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],0)
 
     def test_alert_outbox_error_rolls_back_event(self):
@@ -144,7 +151,7 @@ class HostDelta(unittest.TestCase):
         self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
         with patch('task_supervisor.Supervisor._enqueue',side_effect=RuntimeError('unavailable')):
             with self.assertRaises(RuntimeError):self.host.record('alice',self.req())
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind!='HANDOFF_REFERENCE_ISSUED'").fetchone()[0],0)
         self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],0)
 
     def test_stale_or_future_cycle_is_not_complete(self):
@@ -154,12 +161,12 @@ class HostDelta(unittest.TestCase):
             self.assertEqual(self.host.record('alice',event)['state'],'HANDOFF_INCOMPLETE_ALERT_QUEUED')
             self.assertEqual(self.host.read_receipt('bob','task-1','attempt-1',event['event_id'])['backup_state'],'UNKNOWN')
     def test_unconnected_provider_never_produces_receipt(self):
-        value=self.req();value['provider_ref']='dots'
+        value=self.req();self.auth.assess_provider=lambda binding:None
         self.assertEqual(self.host.record('alice',value)['reason'],'NOT_CONNECTED')
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],1)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind!='HANDOFF_REFERENCE_ISSUED'").fetchone()[0],1)
         self.db.execute("UPDATE model_assignments SET role_version='wrong'");self.db.commit()
         self.assertEqual(self.host.record('alice',self.req(eid='event-2'))['reason'],'NOT_CONNECTED')
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],2)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind!='HANDOFF_REFERENCE_ISSUED'").fetchone()[0],2)
     def test_real_supervisor_schema_transaction_and_outbox(self):
         from task_supervisor import Supervisor
         from reusable_task_gateway import GatewayKernel, TestTenantAuthority
@@ -174,20 +181,20 @@ class HostDelta(unittest.TestCase):
                 s.db.execute('CREATE TABLE model_assignments(tenant_id TEXT,task_id TEXT,attempt_id TEXT,role_id TEXT,role_version TEXT,principal_id TEXT,provider_id TEXT,model_id TEXT,state TEXT)')
                 s.db.execute("INSERT INTO model_assignments VALUES('tenant-1','demo-b','attempt-1','role-agent','v1','agent','fixture-only','fixture-model','ASSIGNED')");s.db.commit()
                 host=HandoffHost(s.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG)
-                req=self.req();req['task_id']='demo-b'
+                req=self.req();req.update(host.issue_reference('alice','demo-b','attempt-1',1));req['task_id']='demo-b'
                 self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
                 self.assertEqual(host.record('alice',req)['alert_delivery'],'UNKNOWN')
                 self.assertIsNone(s.db.execute('SELECT delivered_at FROM outbox').fetchone()[0])
                 self.auth.backup={'state':'COMPLETE','missing':[],'cycle_at':990}
                 self.assertEqual(host.record('alice',req)['state'],'RECORDED')
-                self.assertEqual(host.read_receipt('bob','demo-b','attempt-1','event-1')['state'],'HISTORICAL_RECORDED')
+                self.assertEqual(host.read_receipt('bob','demo-b','attempt-1',req['event_id'])['state'],'HISTORICAL_RECORDED')
             finally:s.close()
     def test_expired_writer_and_wrong_resource_scope_are_denied(self):
         self.db.execute("UPDATE tasks SET authority_valid_until=999");self.db.commit()
         with self.assertRaises(ValueError):self.host.record('alice',self.req())
         self.db.execute("UPDATE tasks SET authority_valid_until=2000,resource_scope_digest='wrong'");self.db.commit()
         with self.assertRaises(ValueError):self.host.record('alice',self.req())
-        self.assertEqual(self.db.execute('SELECT count(*) FROM events').fetchone()[0],0)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM events WHERE kind!='HANDOFF_REFERENCE_ISSUED'").fetchone()[0],0)
     def test_handler_requires_provider_session_csrf_and_hides_claims(self):
         class Sessions:
             tenant_id='tenant-1';COOKIE='session'
@@ -204,12 +211,12 @@ class HostDelta(unittest.TestCase):
         self.assertEqual(post('good','bad',self.req())[0],403)
         self.auth.backup={'state':'INCOMPLETE','missing':['RESTORE'],'cycle_at':990}
         self.assertIn(b'HANDOFF_INCOMPLETE_ALERT_QUEUED',post('good','good-csrf',self.req(eid='alert-1'))[1])
-        h=handler.__new__(handler);h.command='GET';h.path='/api/admin/handoff-event?task_id=task-1&attempt_id=attempt-1&event_id=alert-1';h.server=SimpleNamespace(server_port=8765);h.headers={'Host':'localhost:8765','Cookie':'session=good'}
+        h=handler.__new__(handler);h.command='GET';h.path='/api/admin/handoff-event?task_id=task-1&attempt_id=attempt-1&event_id='+self.refs['alert-1']['event_id'];h.server=SimpleNamespace(server_port=8765);h.headers={'Host':'localhost:8765','Cookie':'session=good'}
         out=[];h._send=lambda status,data,kind,extra_headers=None:out.append((status,data));h.do_GET()
         self.assertEqual(out[0][0],200);self.assertIn(b'RESTORE',out[0][1]);self.assertIn(b'UNKNOWN',out[0][1])
         self.auth.backup={'state':'COMPLETE','missing':[],'cycle_at':990}
         status,body=post('good','good-csrf',self.req());self.assertEqual(status,200);self.assertNotIn(b'alice',body)
-        h=handler.__new__(handler);h.command='GET';h.path='/api/admin/handoff-event?task_id=task-1&attempt_id=attempt-1&event_id=event-1';h.server=SimpleNamespace(server_port=8765);h.headers={'Host':'localhost:8765','Cookie':'session=good'}
+        h=handler.__new__(handler);h.command='GET';h.path='/api/admin/handoff-event?task_id=task-1&attempt_id=attempt-1&event_id='+self.refs['event-1']['event_id'];h.server=SimpleNamespace(server_port=8765);h.headers={'Host':'localhost:8765','Cookie':'session=good'}
         out=[];h._send=lambda status,data,kind,extra_headers=None:out.append((status,data));h.do_GET()
         self.assertEqual(out[0][0],200);self.assertNotIn(b'alice',out[0][1]);self.assertIn(b'HISTORICAL_RECORDED',out[0][1])
         self.auth.enabled=False;out[:]=[];h.do_GET();self.assertEqual(out[0][0],404)

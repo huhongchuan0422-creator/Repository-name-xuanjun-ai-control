@@ -3,7 +3,7 @@
 Not a production identity provider. A trusted host adapter must validate the
 session and current role/permission, including revocation, on every call.
 """
-import hashlib, json, math, re, sqlite3, time
+import hashlib, json, math, re, secrets, sqlite3, time
 from task_supervisor import canonical, Supervisor
 
 ID=re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,100}$')
@@ -72,6 +72,81 @@ class HandoffHost(object):
                     for k in ('role_version','principal_id','provider_id','model_id'))):return True
         return False
 
+    def _current_task(self, task_id, attempt_id, now):
+        db=self.db
+        meta=db.execute('SELECT tenant_id FROM gateway_task_metadata WHERE task_id=?',(task_id,)).fetchone()
+        task=db.execute('SELECT attempt_id,authority_state,authority_valid_until,fence,epoch,resource_scope_json,resource_scope_digest,last_trusted_time FROM tasks WHERE task_id=?',(task_id,)).fetchone()
+        if meta is None or meta['tenant_id']!=self.tenant_id or task is None or task['attempt_id']!=attempt_id:raise ValueError('TASK_TENANT_ATTEMPT_MISMATCH')
+        if task['authority_state']!='VALID' or type(task['authority_valid_until']) not in (int,float) or not math.isfinite(task['authority_valid_until']) or task['authority_valid_until']<=now or task['fence'] is None or task['epoch'] is None or type(task['last_trusted_time']) not in (int,float) or not math.isfinite(task['last_trusted_time']) or task['last_trusted_time']>now:raise ValueError('CURRENT_FENCED_WRITER_REQUIRED')
+        resources=json.loads(task['resource_scope_json'])
+        claims_rows=db.execute('SELECT resource_key,attempt_id,fence,epoch,state FROM resource_claims WHERE task_id=? ORDER BY resource_key',(task_id,)).fetchall()
+        if (not isinstance(resources,list) or not resources or any(not isinstance(x,str) or not x for x in resources) or resources!=sorted(set(resources)) or
+            hashlib.sha256(canonical(resources).encode('utf-8')).hexdigest()!=task['resource_scope_digest'] or
+            [r['resource_key'] for r in claims_rows]!=resources or any(r['attempt_id']!=task['attempt_id'] or r['fence']!=task['fence'] or r['epoch']!=task['epoch'] or r['state']!='VALID' for r in claims_rows)):
+            raise ValueError('WRITER_RESOURCE_SCOPE_INVALID')
+        return task
+
+    def _reference(self, task_id, attempt_id, event_id):
+        row=self.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind='HANDOFF_REFERENCE_ISSUED'",(task_id,attempt_id,'handoff-reference:'+event_id)).fetchone()
+        if row is None:raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        try: value=json.loads(row['payload_json'])
+        except (ValueError,TypeError):raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        if (not isinstance(value,dict) or value.get('tenant_id')!=self.tenant_id or value.get('task_id')!=task_id or value.get('attempt_id')!=attempt_id or value.get('event_id')!=event_id or value.get('issuer')!=self.issuer):
+            raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        return value
+
+    def issue_reference(self, session, task_id, attempt_id, handoff_version, parent_event_id=None):
+        """Allocate a scoped opaque reference; a reservation is not backup evidence."""
+        if (any(not isinstance(x,str) or not ID.fullmatch(x) for x in (task_id,attempt_id)) or
+            type(handoff_version) is not int or handoff_version<1 or
+            (parent_event_id is not None and (not isinstance(parent_event_id,str) or not ID.fullmatch(parent_event_id)))):
+            raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        db=self.db;db.execute('BEGIN IMMEDIATE')
+        try:
+            now=self.clock()
+            if type(now) not in (int,float) or not math.isfinite(now):raise ValueError('TRUSTED_TIME_REQUIRED')
+            task=self._current_task(task_id,attempt_id,now)
+            parent=self._reference(task_id,attempt_id,parent_event_id) if parent_event_id is not None else None
+            if parent is not None and (parent.get('handoff_version')!=handoff_version or parent.get('fence')!=task['fence'] or parent.get('epoch')!=task['epoch']):raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+            binding={'task_id':task_id,'attempt_id':attempt_id,'handoff_version':handoff_version}
+            if parent is not None:binding.update({'handoff_id':parent['handoff_id'],'backup_cycle_id':parent['backup_cycle_id']})
+            claims=self.adapter.authenticate_and_authorize(session,'ISSUE',binding)
+            fields={'issuer','tenant_id','principal_id','session_id','role_id','expires_at','scope'}
+            if (not isinstance(claims,dict) or set(claims)!=fields or
+                any(not isinstance(claims[k],str) or not ID.fullmatch(claims[k]) for k in fields-{'expires_at'}) or
+                claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or claims['scope']!='handoff:ISSUE' or
+                type(claims['expires_at']) not in (int,float) or not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
+            event_id='ev-'+secrets.token_hex(16)
+            handoff_id=parent['handoff_id'] if parent else 'ho-'+secrets.token_hex(16)
+            cycle_id=parent['backup_cycle_id'] if parent else 'cy-'+secrets.token_hex(16)
+            value={'tenant_id':self.tenant_id,'task_id':task_id,'attempt_id':attempt_id,'handoff_version':handoff_version,
+                   'handoff_id':handoff_id,'event_id':event_id,'backup_cycle_id':cycle_id,'issuer':self.issuer,
+                   'principal_id':claims['principal_id'],'session_id':claims['session_id'],'role_id':claims['role_id'],
+                   'fence':task['fence'],'epoch':task['epoch']}
+            db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(task_id,attempt_id,'handoff-reference:'+event_id,'HANDOFF_REFERENCE_ISSUED',now,'PHASE_EXECUTION','HOST_GENERATED',canonical(value)))
+            db.commit()
+            return {'event_id':event_id,'handoff_id':handoff_id,'backup_cycle_id':cycle_id,'handoff_version':handoff_version}
+        except Exception:
+            db.rollback();raise
+
+    def _require_reference(self, value, task, claims):
+        ref=self._reference(value['task_id'],value['attempt_id'],value['event_id'])
+        if any(ref.get(k)!=value[k] for k in ('handoff_id','handoff_version','backup_cycle_id')) or any(ref.get(k)!=claims[k] for k in ('issuer','principal_id','session_id','role_id')) or ref.get('fence')!=task['fence'] or ref.get('epoch')!=task['epoch']:
+            raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        for key in ('causation','alignment_ref'):
+            if key in value and value[key]!='NONE':
+                other=self._reference(value['task_id'],value['attempt_id'],value[key])
+                if any(other.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id','fence','epoch')):raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        # Only identifiers registered for this existing task project are eligible.
+        meta=self.db.execute('SELECT project_id FROM gateway_task_metadata WHERE task_id=? AND tenant_id=?',(value['task_id'],self.tenant_id)).fetchone()
+        if meta is None:raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        hosts=[host for host in self.mcp_config['bindings'] if host['tenant_id']==self.tenant_id and host['project_id']==meta['project_id']]
+        if not any(role['provider_id']==value['provider_ref'] for host in hosts for role in host['roles'].values()):
+            raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        if 'target_ref' in value and not any(value['target_ref'] in host['roles'] for host in hosts):
+            raise ValueError('HANDOFF_REFERENCE_UNAVAILABLE')
+        return ref
+
     def _alerts(self, task_id, attempt_id, event_id):
         prefix='handoff-alert:'+hashlib.sha256(event_id.encode('utf-8')).hexdigest()+':'
         rows=self.db.execute("SELECT rowid AS recorded_order,event_id,payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='SUPERVISION_ACTION' AND (substr(event_id,1,?)=? OR event_id=?) ORDER BY rowid", (task_id,attempt_id,len(prefix),prefix,'handoff-missing:'+event_id)).fetchall()
@@ -133,16 +208,8 @@ class HandoffHost(object):
                 claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or
                 claims['scope']!='handoff:'+value['action'] or type(claims['expires_at']) not in (int,float) or
                 not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
-            meta=db.execute('SELECT tenant_id FROM gateway_task_metadata WHERE task_id=?',(value['task_id'],)).fetchone()
-            task=db.execute('SELECT attempt_id,authority_state,authority_valid_until,fence,epoch,resource_scope_json,resource_scope_digest,last_trusted_time FROM tasks WHERE task_id=?',(value['task_id'],)).fetchone()
-            if meta is None or meta['tenant_id']!=self.tenant_id or task is None or task['attempt_id']!=value['attempt_id']:raise ValueError('TASK_TENANT_ATTEMPT_MISMATCH')
-            if task['authority_state']!='VALID' or type(task['authority_valid_until']) not in (int,float) or not math.isfinite(task['authority_valid_until']) or task['authority_valid_until']<=now or task['fence'] is None or task['epoch'] is None or type(task['last_trusted_time']) not in (int,float) or not math.isfinite(task['last_trusted_time']) or task['last_trusted_time']>now:raise ValueError('CURRENT_FENCED_WRITER_REQUIRED')
-            resources=json.loads(task['resource_scope_json'])
-            claims_rows=db.execute('SELECT resource_key,attempt_id,fence,epoch,state FROM resource_claims WHERE task_id=? ORDER BY resource_key',(value['task_id'],)).fetchall()
-            if (not isinstance(resources,list) or not resources or any(not isinstance(x,str) or not x for x in resources) or resources!=sorted(set(resources)) or
-                hashlib.sha256(canonical(resources).encode('utf-8')).hexdigest()!=task['resource_scope_digest'] or
-                [r['resource_key'] for r in claims_rows]!=resources or any(r['attempt_id']!=task['attempt_id'] or r['fence']!=task['fence'] or r['epoch']!=task['epoch'] or r['state']!='VALID' for r in claims_rows)):
-                raise ValueError('WRITER_RESOURCE_SCOPE_INVALID')
+            task=self._current_task(value['task_id'],value['attempt_id'],now)
+            self._require_reference(value,task,claims)
             if db.execute("SELECT 1 FROM writer_operations WHERE task_id=? AND state IN ('PREPARED','DISPATCHING','UNKNOWN') LIMIT 1",(value['task_id'],)).fetchone():
                 return self._queue_alert(value,now,'UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED',{'state':'UNKNOWN','missing':[]})
             try:connected=self._mcp_registered(binding) and self.adapter.assess_provider(binding)=='CONNECTED'
@@ -224,6 +291,7 @@ class HandoffHost(object):
         now=self.clock()
         meta=self.db.execute('SELECT tenant_id FROM gateway_task_metadata WHERE task_id=?',(task_id,)).fetchone()
         if meta is None or meta['tenant_id']!=self.tenant_id:raise ValueError('TASK_TENANT_ATTEMPT_MISMATCH')
+        ref=self._reference(task_id,attempt_id,event_id)
         row=self.db.execute('SELECT rowid AS recorded_order,kind,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(task_id,attempt_id,'handoff-host:'+event_id)).fetchone()
         _,alert_rows=self._alerts(task_id,attempt_id,event_id)
         alert=bool(alert_rows) and (row is None or alert_rows[-1]['recorded_order']>row['recorded_order'])
@@ -233,6 +301,9 @@ class HandoffHost(object):
         if alert:
             if (payload.get('action')!='HANDOFF_CONTEXT_INCOMPLETE' or payload.get('tenant_id')!=self.tenant_id or payload.get('task_id')!=task_id or payload.get('attempt_id')!=attempt_id):raise ValueError('RECEIPT_UNAVAILABLE')
         elif not self.verify_recorded(self.tenant_id,task_id,attempt_id,event_id,payload):raise ValueError('RECEIPT_UNAVAILABLE')
+        if (any(payload.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id')) or
+            not any(role['provider_id']==payload.get('provider_ref') for host in self.mcp_config['bindings'] if host['tenant_id']==self.tenant_id for role in host['roles'].values()) or
+            any(not isinstance(payload.get(k),str) or not re.fullmatch(r'[0-9a-f]{64}',payload[k]) for k in ('snapshot_digest','backup_manifest_sha256'))):raise ValueError('RECEIPT_UNAVAILABLE')
         binding={k:payload[k] for k in ('task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','provider_ref')}
         binding['checked']=payload.get('checked',[])
         claims=self.adapter.authenticate_and_authorize(session,'READ',binding)
@@ -242,7 +313,14 @@ class HandoffHost(object):
             claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or claims['scope']!='handoff:READ' or
             type(now) not in (int,float) or not math.isfinite(now) or type(claims['expires_at']) not in (int,float) or
             not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
-        history=[{'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'} for a in (json.loads(r['payload_json']) for r in alert_rows)]
+        history=[]
+        for entry in alert_rows:
+            a=json.loads(entry['payload_json'])
+            if (a.get('reason','HANDOFF_CONTEXT_INCOMPLETE') not in ('HANDOFF_CONTEXT_INCOMPLETE','NOT_CONNECTED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED') or
+                a.get('state') not in ('UNKNOWN','INCOMPLETE') or not isinstance(a.get('missing'),list) or
+                any(x not in REQUIRED_CONTEXT for x in a['missing']) or
+                any(a.get(k)!=ref[k] for k in ('handoff_id','handoff_version','backup_cycle_id'))):raise ValueError('RECEIPT_UNAVAILABLE')
+            history.append({'reason':a.get('reason','HANDOFF_CONTEXT_INCOMPLETE'),'backup_state':a['state'],'missing':a['missing'],'alert_delivery':'UNKNOWN'})
         if alert:
             return {'history':history,'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','alert_delivery':'UNKNOWN',
                     'task_id':task_id,'attempt_id':attempt_id,'event_id':event_id,

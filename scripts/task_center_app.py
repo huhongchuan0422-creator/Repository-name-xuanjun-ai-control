@@ -942,6 +942,26 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store.COOKIE+'=; Path='+base_path+'; HttpOnly; SameSite=Strict; '+self._secure_cookie()+'Max-Age=0'),
                   ('Set-Cookie',session_store.CSRF_COOKIE+
                    '=; Path='+base_path+'; SameSite=Strict; '+self._secure_cookie()+'Max-Age=0')]);return
+            if path == '/api/admin/handoff-reference':
+                from task_center_handoff_host import FormalHandoffIdentityProvider
+                if handoff_host is None or session_store is None or not isinstance(identity_provider,FormalHandoffIdentityProvider) or isinstance(identity_provider,FileTestIdentityProvider):
+                    self._send(503,_json_bytes({'error':'HANDOFF_HOST_UNAVAILABLE'}),'application/json; charset=utf-8');return
+                session=self._session()
+                if session is None:
+                    self._send(401,_json_bytes({'error':'LOGIN_REQUIRED'}),'application/json; charset=utf-8');return
+                if not session_store.verify_csrf(session,self.headers.get('X-CSRF-Token')):
+                    self._send(403,_json_bytes({'error':'CSRF_REQUIRED'}),'application/json; charset=utf-8');return
+                try:
+                    if identity_provider.is_formal_session(session) is not True:raise ValueError('FORMAL_SESSION_REQUIRED')
+                    length=int(self.headers.get('Content-Length','0'))
+                    if length<2 or length>8192:raise ValueError('BODY_LIMIT')
+                    value=json.loads(self.rfile.read(length).decode('utf-8'))
+                    if not isinstance(value,dict) or set(value) not in ({'task_id','attempt_id','handoff_version'}, {'task_id','attempt_id','handoff_version','parent_event_id'}):raise ValueError('EXACT_REFERENCE_REQUEST_REQUIRED')
+                    result=handoff_host.issue_reference(session,value['task_id'],value['attempt_id'],value['handoff_version'],value.get('parent_event_id'))
+                    self._send(200,_json_bytes(result),'application/json; charset=utf-8')
+                except Exception:
+                    self._send(409,_json_bytes({'error':'HANDOFF_REFERENCE_UNAVAILABLE'}),'application/json; charset=utf-8')
+                return
             if path == '/api/admin/handoff-event':
                 from task_center_handoff_host import FormalHandoffIdentityProvider
                 if handoff_host is None or session_store is None or not isinstance(identity_provider,FormalHandoffIdentityProvider) or isinstance(identity_provider,FileTestIdentityProvider):
