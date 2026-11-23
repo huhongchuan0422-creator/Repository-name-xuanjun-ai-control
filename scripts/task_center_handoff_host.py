@@ -15,6 +15,9 @@ REQUIRED_CONTEXT=frozenset(('ORIGIN_SCOPE','SOURCE','DIRTY_SCOPE','INSTALLED_VER
                            'ACCEPTANCE','EFFECTS','WRITER_CUSTODY','ARTIFACT'))
 LEGACY_CONTEXT=REQUIRED_CONTEXT-{'ARTIFACT'}
 
+class _BackupConfigChangedBeforeCommit(Exception):
+    pass
+
 class FormalHandoffIdentityProvider(object):
     """Host session provenance seam; no concrete production provider ships here."""
     def is_formal_session(self, session):
@@ -216,7 +219,7 @@ class HandoffHost(object):
             (reason=='HANDOFF_CONTEXT_INCOMPLETE' and ((state=='UNKNOWN' and missing) or (state=='INCOMPLETE' and not missing)))):
             raise ValueError('HANDOFF_ALERT_INVALID')
 
-    def _queue_alert(self, value, now, reason, assessment, contract=None):
+    def _queue_alert(self, value, now, reason, assessment, contract=None, precommit_check=None):
         # Only called inside the authenticated, fenced writer transaction.
         prefix,rows=self._alerts(value['task_id'],value['attempt_id'],value['event_id'])
         alert={'action':'HANDOFF_CONTEXT_INCOMPLETE','reason':reason,'tenant_id':self.tenant_id,
@@ -245,6 +248,7 @@ class HandoffHost(object):
             self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],alert_id,'SUPERVISION_ACTION',now,'PHASE_EXECUTION','HANDOFF_CONTEXT_INCOMPLETE',encoded))
             supervisor=Supervisor.__new__(Supervisor);supervisor.db=self.db
             supervisor._enqueue(value['task_id'],value['attempt_id'],alert_id,alert,now)
+        if precommit_check is not None:precommit_check()
         self.db.commit()
         return {'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','reason':reason,'alert_delivery':'UNKNOWN','event_id':value['event_id']}
 
@@ -275,7 +279,13 @@ class HandoffHost(object):
         # was started by this invocation. Do not catch/retry execute() errors:
         # even the same error text could follow an unknown commit outcome.
         if prepared._guard.locked():return self._record_authenticated(session,value,None)
-        return prepared.execute(_PreparedRecordHost(self,prepared),session,value,binding)
+        try:
+            return prepared.execute(_PreparedRecordHost(self,prepared),session,value,binding)
+        except _BackupConfigChangedBeforeCommit:
+            # The dedicated signal is emitted only before DB commit and the
+            # original transaction has rolled back. Never rerun the producer.
+            if self.db.in_transaction:raise RuntimeError('BACKUP_CONFIG_ROLLBACK_UNKNOWN')
+            return self._record_authenticated(session,value,None)
 
     def _backup_preflight_binding(self,session,value):
         # Only authenticated, currently fenced and registered requests may
@@ -355,8 +365,20 @@ class HandoffHost(object):
                 return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',{'state':'UNKNOWN','missing':[]})
             binding.update({k:contract[k] for k in ('contract_id','contract_version','contract_sha256')})
             binding['applicability']={k:contract[k] for k in ('role_id','role_version','role_scope','required_categories','not_applicable','required_checks')}
-            try:assessment=backup_assessor(binding) if backup_assessor is not None else None
-            except Exception:assessment=None
+            config_check=None
+            try:
+                assessment=backup_assessor(binding) if backup_assessor is not None else None
+                if backup_assessor is not None:
+                    resolver=getattr(getattr(backup_assessor,'component',None),'host',None)
+                    if resolver is not None:
+                        from task_center_backup_v1_migration import _ConfigRecheckedContract
+                        if type(resolver) is _ConfigRecheckedContract:
+                            def config_check():
+                                try:resolver.assert_current()
+                                except Exception:raise _BackupConfigChangedBeforeCommit() from None
+                            config_check()
+            except _BackupConfigChangedBeforeCommit:raise
+            except Exception:assessment=None;config_check=None
             if (not isinstance(assessment,dict) or set(assessment)!={'state','missing','cycle_at'} or
                 assessment['state'] not in ('COMPLETE','INCOMPLETE','UNKNOWN') or
                 not isinstance(assessment['missing'],list) or
@@ -373,7 +395,7 @@ class HandoffHost(object):
             if unchecked:
                 assessment={'state':'INCOMPLETE','missing':sorted(set(assessment['missing'])|unchecked),'cycle_at':assessment['cycle_at']}
             if assessment['state']!='COMPLETE':
-                return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',assessment,contract)
+                return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',assessment,contract,precommit_check=config_check)
             key='handoff-host:'+value['event_id'];kind='AUTHENTICATED_HANDOFF_'+value['action']
             payload=dict(value,tenant_id=self.tenant_id,issuer=claims['issuer'],principal_id=claims['principal_id'],session_id=claims['session_id'],role_id=claims['role_id'],scope=claims['scope'],expires_at=claims['expires_at'],fence=task['fence'],epoch=task['epoch'],backup_cycle_at=assessment['cycle_at'],backup_state='COMPLETE',contract_id=contract['contract_id'],contract_version=contract['contract_version'],contract_sha256=contract['contract_sha256'])
             if ledger_event is not None:
@@ -385,6 +407,7 @@ class HandoffHost(object):
                 ledger_row=db.execute('SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=? AND kind=?',(value['task_id'],value['attempt_id'],'handoff-ledger:'+value['event_id'],'HANDOFF_LEDGER_BOUND')).fetchone()
                 from task_delivery_ledger.core import canonical as ledger_canonical
                 if (ledger_row is None)!=(ledger_event is None) or (ledger_row is not None and ledger_row['payload_json']!=ledger_canonical(ledger_event).decode('utf-8')):raise ValueError('HANDOFF_LEDGER_CONFLICT')
+                if config_check is not None:config_check()
                 db.rollback();return {'state':'ALREADY_RECORDED','event_id':value['event_id']}
             existing=db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind=? LIMIT 2049",(value['task_id'],value['attempt_id'],kind)).fetchall()
             if len(existing)>2048:raise ValueError('HANDOFF_HISTORY_LIMIT')
@@ -421,6 +444,7 @@ class HandoffHost(object):
             if ledger_event is not None:
                 from task_delivery_ledger.core import canonical as ledger_canonical
                 db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)',(value['task_id'],value['attempt_id'],'handoff-ledger:'+value['event_id'],'HANDOFF_LEDGER_BOUND',now,'PHASE_EXECUTION','HOST_AUTHENTICATED',ledger_canonical(ledger_event).decode('utf-8')))
+            if config_check is not None:config_check()
             db.commit();return {'state':'RECORDED','event_id':value['event_id']}
         except Exception:
             db.rollback();raise

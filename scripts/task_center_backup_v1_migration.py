@@ -12,14 +12,14 @@ from backup_component_hostcycle import BackupComponent
 
 class V1PreparedHostAdapter(HostAuthAdapter):
     """Keep existing authentication/ledger adapter; rebind v1 producer per DB."""
-    def __init__(self,delegate,legacy,policies):
+    def __init__(self,delegate,legacy,policies,config_path=None,config_digest=None):
         if not isinstance(delegate,HostAuthAdapter) or type(delegate) is HostAuthAdapter:
             raise ValueError('TRUSTED_HOST_ADAPTER_REQUIRED')
         if type(legacy) is not BackupAssessment or type(legacy.component) is not BackupComponent:
             raise ValueError('EXACT_EXISTING_BACKUP_ASSESSMENT_REQUIRED')
         if legacy.required_context!=REQUIRED_CONTEXT or not isinstance(policies,(list,tuple)):
             raise ValueError('TRUSTED_INVENTORY_REQUIRED')
-        self.delegate=delegate;self.legacy=legacy;self.policies=copy.deepcopy(tuple(policies))
+        self.delegate=delegate;self.legacy=legacy;self.policies=copy.deepcopy(tuple(policies));self.config_path=config_path;self.config_digest=config_digest
     def authenticate_and_authorize(self,session,action,binding):
         return self.delegate.authenticate_and_authorize(session,action,binding)
     def assess_provider(self,binding):return self.delegate.assess_provider(binding)
@@ -27,11 +27,16 @@ class V1PreparedHostAdapter(HostAuthAdapter):
     def verify_ledger_event_current(self,event,host_record):return self.delegate.verify_ledger_event_current(event,host_record)
     def assess_candidate_bundle(self,binding):return self.delegate.assess_candidate_bundle(binding)
     def prepare_backup_assessment(self,host):
-        if host.tenant_id!=self.legacy.tenant_id:raise ValueError('BACKUP_TENANT_MISMATCH')
+        if host.tenant_id!=self.legacy.tenant_id or self.delegate.assess_backup is not self.legacy:raise ValueError('BACKUP_TENANT_MISMATCH')
         # Share only original producer paths/lock, not its mutable resolver or
         # creator-thread DB connection. No directories, job or config changed.
         component=copy.copy(self.legacy.component)
-        component.host=LocalHostContract(host,self.policies)
+        if self.config_path is not None:
+            policies,version=_read_inventory_config(self.delegate,self.config_path)
+            if policies is None or version[-1]!=self.config_digest:raise ValueError('BACKUP_CONFIG_CHANGED')
+            component.host=_ConfigRecheckedContract(host,policies,self.delegate,self.legacy,self.config_path,version)
+        else:
+            component.host=LocalHostContract(host,self.policies)
         return PreparedBackupAssessment(component,host.tenant_id,REQUIRED_CONTEXT,host.db,clock=self.legacy.clock)
 
 def migrate_v1_consumer(delegate,policies):
@@ -43,15 +48,45 @@ def migrate_v1_consumer(delegate,policies):
     if not isinstance(delegate,HostAuthAdapter):raise ValueError('TRUSTED_HOST_ADAPTER_REQUIRED')
     return V1PreparedHostAdapter(delegate,delegate.assess_backup,policies)
 
-def load_v1_consumer(delegate, config_path):
-    """Load original host's owner-only inventory; never create or amend config.
+def _read_stable_owned_config(path):
+    """Bounded, no-follow owner file read with before/after version checks."""
+    import hashlib, os, stat
+    flags=os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)
+    before=os.lstat(path)
+    def valid(info):
+        return stat.S_ISREG(info.st_mode) and info.st_nlink==1 and info.st_uid==os.geteuid() and stat.S_IMODE(info.st_mode)==0o600 and info.st_size<=65536
+    def stamp(info):return (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns)
+    if not valid(before):raise ValueError('BACKUP_CONFIG_INVALID')
+    fd=os.open(path,flags)
+    try:
+        first=os.fstat(fd)
+        if not valid(first) or stamp(first)!=stamp(before):raise ValueError('BACKUP_CONFIG_INVALID')
+        chunks=[];remaining=65537
+        while remaining:
+            piece=os.read(fd,remaining)
+            if not piece:break
+            chunks.append(piece);remaining-=len(piece)
+        content=b''.join(chunks);last=os.fstat(fd);current=os.lstat(path)
+        if len(content)>65536 or len(content)!=last.st_size or not valid(last) or not valid(current) or stamp(first)!=stamp(last) or stamp(last)!=stamp(current):
+            raise ValueError('BACKUP_CONFIG_INVALID')
+        return content,stamp(current)+(hashlib.sha256(content).hexdigest(),)
+    finally:os.close(fd)
 
-    Return the unmodified delegate if no config is supplied or it is explicitly
-    disabled. Such a host remains UNKNOWN; this function grants no authority.
-    """
-    if config_path is None:return delegate
+class _ConfigRecheckedContract(LocalHostContract):
+    """Recheck the same protected config version before each DB/local plan."""
+    def __init__(self,host,policies,delegate,legacy,path,version):
+        super().__init__(host,policies);self.delegate=delegate;self.legacy=legacy;self.path=path;self.version=version
+    def assert_current(self):
+        if self.delegate.assess_backup is not self.legacy:raise ValueError('BACKUP_CONFIG_CHANGED')
+        policies,version=_read_inventory_config(self.delegate,self.path)
+        if policies is None or version!=self.version:raise ValueError('BACKUP_CONFIG_CHANGED')
+    def resolve(self,request):
+        self.assert_current()
+        return super().resolve(request)
+
+def _read_inventory_config(delegate, config_path):
+    """Read and validate one protected inventory version without mutation."""
     import json, pathlib, re
-    from secure_file_input import read_owned_secret_file
     def unique(pairs):
         result={}
         for k,v in pairs:
@@ -60,13 +95,14 @@ def load_v1_consumer(delegate, config_path):
         return result
     try:
         if not isinstance(config_path,str) or not pathlib.Path(config_path).is_absolute():raise ValueError('BACKUP_CONFIG_UNAVAILABLE')
-        raw=json.loads(read_owned_secret_file(config_path,'BACKUP_INVENTORY_CONFIG'),object_pairs_hook=unique)
+        content,version=_read_stable_owned_config(config_path)
+        raw=json.loads(content.decode('utf-8'),object_pairs_hook=unique)
         if (not isinstance(raw,dict) or set(raw)!={'schema_version','enabled','policies'} or
             type(raw['schema_version']) is not int or raw['schema_version']!=1 or type(raw['enabled']) is not bool or
             not isinstance(raw['policies'],list) or len(raw['policies'])>128):raise ValueError('BACKUP_CONFIG_INVALID')
         if not raw['enabled']:
             if raw['policies']:raise ValueError('BACKUP_CONFIG_INVALID')
-            return delegate
+            return None,version
         if not raw['policies']:raise ValueError('BACKUP_CONFIG_INVALID')
         if not isinstance(delegate,HostAuthAdapter) or type(delegate.assess_backup) is not BackupAssessment:raise ValueError('BACKUP_CONFIG_INVALID')
         atom=re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,100}$')
@@ -90,9 +126,16 @@ def load_v1_consumer(delegate, config_path):
                     parsed.append((spec['category'],pathlib.Path(spec['root']),spec['relative_path']))
                 resources[resource]=parsed
             policies.append(dict((k,row[k]) for k in fields-{'resources'}));policies[-1]['resources']=resources
-        return migrate_v1_consumer(delegate,policies)
+        return policies,version
     except (OSError,ValueError,TypeError,KeyError):
         raise ValueError('BACKUP_INVENTORY_CONFIG_UNAVAILABLE_OR_INVALID') from None
+
+def load_v1_consumer(delegate, config_path):
+    """Load protected inventory; configured hosts revalidate every request."""
+    if config_path is None:return delegate
+    policies,version=_read_inventory_config(delegate,config_path)
+    if policies is None:return delegate
+    return V1PreparedHostAdapter(delegate,delegate.assess_backup,policies,config_path=config_path,config_digest=version[-1])
 
 def build_v1_host(host,config_path):
     """Build the original HandoffHost with the protected configured adapter.
