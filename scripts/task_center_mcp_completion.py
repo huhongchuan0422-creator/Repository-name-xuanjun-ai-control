@@ -360,7 +360,11 @@ class CandidateLifecycleMCP:
                     c.gateway.save_checkpoint(c.context,args['task_id'],args['attempt_id'],checkpoint_id,
                         {'terminal_state':'SUCCESS'},[],'RECONCILED',resources)
                 controller={'role':'REVOCATION_CONTROLLER','caller_id':'test-executor-finalizer'}
-                fence.begin_revocation(args['task_id'],controller,admission_check=recovery_admission)
+                def revocation_admission():
+                    result=recovery_admission()
+                    if result[3] is None:raise ValueError('TERMINAL_RECOVERY_CHECKPOINT_MISSING')
+                    return result
+                fence.begin_revocation(args['task_id'],controller,admission_check=revocation_admission)
                 fence.drain(args['task_id'],controller,timeout=1)
                 fence.invalidate_source_resources(args['task_id'],'terminal-release')
                 self.supervisor.complete_revocation(args['task_id'])
