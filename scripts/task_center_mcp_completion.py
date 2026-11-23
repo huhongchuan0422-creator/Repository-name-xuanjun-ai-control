@@ -32,14 +32,15 @@ def tools():
 
 class CandidateAcceptanceEvidence:
     """Recheck original host-produced handoff, backup and bundle evidence."""
-    def __init__(self,control,host):
-        self.control=control;self.host=host
+    def __init__(self,control,host,backup_assessor=None):
+        self.control=control;self.host=host;self.backup_assessor=backup_assessor
 
-    def check(self,binding):
+    def check(self,binding,prepare_only=False):
         from task_center_handoff_host import HandoffHost, ID
         from task_center_role_contract import RoleContractResolver
         c=self.control;db=c.db;host=self.host
-        if not db.in_transaction:raise ValueError('CANDIDATE_EVIDENCE_TRANSACTION_REQUIRED')
+        if not prepare_only and not db.in_transaction:raise ValueError('CANDIDATE_EVIDENCE_TRANSACTION_REQUIRED')
+        if prepare_only and db.in_transaction:raise ValueError('CANDIDATE_PREFLIGHT_TRANSACTION_FORBIDDEN')
         if type(host) is not HandoffHost or host.tenant_id!=c.tenant_id or type(host.role_contract) is not RoleContractResolver:
             raise ValueError('CANDIDATE_TRUSTED_HOST_REQUIRED')
         databases=[r[2] for r in db.execute('PRAGMA database_list') if r[1]=='main']
@@ -54,6 +55,8 @@ class CandidateAcceptanceEvidence:
             raise ValueError('CANDIDATE_SNAPSHOT_DIGEST_REQUIRED')
         c._require_candidate_review_receipts(row)
         task=c.gateway.supervisor._task(row['task_id'])
+        if db.execute("SELECT 1 FROM writer_operations WHERE task_id=? AND state IN ('PREPARED','DISPATCHING','UNKNOWN') LIMIT 1",(row['task_id'],)).fetchone():
+            raise ValueError('UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED')
         actors=db.execute('''SELECT a.role_id,a.role_version,a.provider_id FROM model_assignments a
           JOIN role_templates r ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id AND r.version=a.role_version
           WHERE a.tenant_id=? AND a.task_id=? AND a.attempt_id=? AND a.principal_id=?
@@ -130,7 +133,14 @@ class CandidateAcceptanceEvidence:
                 raise ValueError('CANDIDATE_HANDOFF_RECEIPTS_REQUIRED')
             backup_binding={k:verified.get(k) for k in ('task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','provider_ref','checked','contract_id','contract_version','contract_sha256')}
             backup_binding['applicability']={k:contract[k] for k in ('role_id','role_version','role_scope','required_categories','not_applicable','required_checks')}
-            try:backup=host.adapter.assess_backup(backup_binding)
+            if prepare_only:return {'verified':verified,'backup_binding':backup_binding}
+            try:
+                backup=self.backup_assessor(backup_binding) if self.backup_assessor is not None else None
+                if self.backup_assessor is not None:
+                    resolver=getattr(getattr(self.backup_assessor,'component',None),'host',None)
+                    if resolver is not None:
+                        from task_center_backup_v1_migration import _ConfigRecheckedContract
+                        if type(resolver) is _ConfigRecheckedContract:resolver.assert_current()
             except Exception:backup=None
             now=c.clock()
             if (not isinstance(backup,dict) or set(backup)!={'state','missing','cycle_at'} or backup['state']!='COMPLETE' or
@@ -143,12 +153,13 @@ class CandidateAcceptanceEvidence:
         error=None
         for event_id in sorted(set(event_ids)):
             try:
-                check_cycle(event_id)
+                prepared=check_cycle(event_id)
                 break
             except ValueError as exc:
                 error=exc
         else:
             raise error
+        if prepare_only:return prepared
         return {'task_id':row['task_id'],'attempt_id':row['attempt_id'],'candidate_id':row['candidate_id'],
           'artifact_sha256':row['artifact_sha256'],'snapshot_sha256':snapshot,
           'read_location_ref_sha256':hashlib.sha256(bundle['read_location_ref'].encode()).hexdigest(),
@@ -160,6 +171,7 @@ class CandidateLifecycleMCP:
         self.control=control;self.binding=dict(binding);self.lock_dir=lock_dir
         self.acceptance_host=acceptance_host;self.enforce_acceptance=enforce_acceptance
         self.supervisor=control.gateway.supervisor
+        self._backup_attempted=False;self._backup_assessor=None
     def _evidence_bound(self,row,actor):
         c=self.control
         audits=c.db.execute("SELECT detail_json FROM model_audit WHERE tenant_id=? AND principal_id=? AND action='CANDIDATE_EVIDENCE_BOUND' AND target_id=?",(c.tenant_id,actor,row['candidate_id'])).fetchall()
@@ -216,6 +228,8 @@ class CandidateLifecycleMCP:
         if 'candidate_id' in args:b['candidate_id']=args['candidate_id']
         if ACTIONS[name] and ACTIONS[name]!=b['phase']:raise ValueError('HOST_LIFECYCLE_PHASE_REQUIRED')
         c=self.control;actor=b['principal_id']
+        if name=='task_accept_candidate' and self.enforce_acceptance and not self._backup_attempted:
+            return self._accept_with_prepared_backup(name,args,b)
         if name=='task_submit_candidate':
             return c.submit_candidate(args['task_id'],args['artifact_sha256'],args['checklist_sha256'],actor,_host_binding=b)
         if name=='task_review_candidate':
@@ -252,7 +266,7 @@ class CandidateLifecycleMCP:
             if provider_id[0] is not None and current['authority_lock_provider_id']!=provider_id[0]:
                 raise ValueError('EXISTING_WRITER_LOCK_PROVIDER_REQUIRED')
             candidate=c.validate_accept_candidate(args['candidate_id'],actor)
-            if self.enforce_acceptance:CandidateAcceptanceEvidence(c,self.acceptance_host).check(b)
+            if self.enforce_acceptance:CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)
             return candidate
         c.db.execute('BEGIN IMMEDIATE')
         try:
@@ -285,10 +299,61 @@ class CandidateLifecycleMCP:
                     args['task_id'],args['attempt_id'],candidate['artifact_sha256'],
                     json.loads(task['completion_json']),terminal_admission_check=admission)
             finally:fence.close()
-        accept_check=(lambda:CandidateAcceptanceEvidence(c,self.acceptance_host).check(b)) if self.enforce_acceptance else None
+        accept_check=(lambda:CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)) if self.enforce_acceptance else None
         result=c.accept_candidate(args['candidate_id'],actor,_host_binding=b,_host_acceptance_check=accept_check)
         result.update(canonical_task_state='SUCCESS',model_invoked=False)
         return result
+    def _accept_with_prepared_backup(self,name,args,binding):
+        """Run the original producer outside the terminal DB transaction."""
+        from task_center_handoff_host import HandoffHost
+        from task_center_role_contract import RoleContractResolver
+        c=self.control;host=self.acceptance_host
+        # Authenticate and check candidate before any remote readback.
+        c.db.execute('BEGIN')
+        try:
+            c.assert_host_lifecycle(binding)
+            row=c.db.execute('SELECT state FROM delivery_candidates WHERE tenant_id=? AND candidate_id=?',(c.tenant_id,args['candidate_id'])).fetchone()
+            if row is None:raise ValueError('EXACT_HOST_CANDIDATE_REQUIRED')
+            duplicate=row['state']=='ACCEPTED'
+            if not duplicate:c.validate_accept_candidate(args['candidate_id'],binding['principal_id'])
+        finally:c.db.rollback()
+        if duplicate:
+            self._backup_attempted=True
+            try:return self.call(name,args)
+            finally:self._backup_attempted=False
+        databases=[r[2] for r in c.db.execute('PRAGMA database_list') if r[1]=='main']
+        if (type(host) is not HandoffHost or type(host.role_contract) is not RoleContractResolver or
+            host.tenant_id!=c.tenant_id or host.db_path is None or len(databases)!=1 or not databases[0] or os.path.realpath(databases[0])!=host.db_path):
+            raise ValueError('CANDIDATE_TRUSTED_HOST_REQUIRED')
+        roles=RoleContractResolver(c.db,host.role_contract.contracts,host.role_contract.intake_plans)
+        readback=host._lifecycle_candidate_readback
+        root=os.path.dirname(readback.artifacts) if readback is not None else None
+        local=HandoffHost(c.db,host.tenant_id,host.issuer,host.adapter,clock=host.clock,mcp_config=host.mcp_config,role_contract=roles,candidate_lifecycle_root=root)
+        plan=CandidateAcceptanceEvidence(c,local).check(binding,prepare_only=True)
+        try:prepared=local.adapter.prepare_backup_assessment(local)
+        except Exception:prepared=None
+        if prepared is None:
+            self._backup_attempted=True
+            try:return self.call(name,args)
+            finally:self._backup_attempted=False
+        try:
+            from task_center_backup_bridge_v2 import PreparedBackupAssessment
+            if type(prepared) is not PreparedBackupAssessment or prepared.db is not c.db:raise ValueError('CANDIDATE_BACKUP_COMPLETE_REQUIRED')
+        except ImportError:raise ValueError('CANDIDATE_BACKUP_COMPLETE_REQUIRED')
+        # A known-busy bridge has not started this call; record a hold rather
+        # than retrying an invocation with potentially unknown effects.
+        if prepared._guard.locked():raise ValueError('CANDIDATE_BACKUP_COMPLETE_REQUIRED')
+        owner=self
+        class AcceptanceHost:
+            def __init__(self):self.db=c.db
+            def _reference(self,*a):return local._reference(*a)
+            def _current_task(self,*a):return local._current_task(*a)
+            def record(self,_session,_value):
+                owner._backup_attempted=True;owner._backup_assessor=prepared
+                try:return owner.call(name,args)
+                finally:owner._backup_assessor=None;owner._backup_attempted=False
+        return prepared.execute(AcceptanceHost(),binding['principal_id'],plan['verified'],plan['backup_binding'])
+
     def rpc(self,value):
         if not isinstance(value,dict) or value.get('jsonrpc')!='2.0' or value.get('method')!='tools/call':
             raise ValueError('EXACT_LIFECYCLE_RPC_REQUIRED')
@@ -307,7 +372,7 @@ class CandidateLifecycleMCP:
           'CANDIDATE_HANDOFF_RECEIPTS_REQUIRED','CANDIDATE_BACKUP_COMPLETE_REQUIRED',
           'CANDIDATE_EXECUTOR_CONTRACT_REQUIRED','CANDIDATE_ACCEPTOR_CONTRACT_REQUIRED',
           'CANDIDATE_SNAPSHOT_DIGEST_REQUIRED','TASK_CONTRACT_UNKNOWN',
-          'INDEPENDENT_REVIEW_RECEIPTS_REQUIRED','REVIEW_PASS_REQUIRED'}
+          'INDEPENDENT_REVIEW_RECEIPTS_REQUIRED','REVIEW_PASS_REQUIRED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED'}
         if reason not in allowed or not isinstance(args,dict):return
         if any(not isinstance(args.get(k),str) for k in ('task_id','attempt_id','candidate_id')):return
         c=self.control;b={k:self.binding[k] for k in ('project_id','principal_id','role_id','role_version','phase','review_kind')}
