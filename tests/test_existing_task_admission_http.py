@@ -68,6 +68,35 @@ class ExistingAdmissionTests(unittest.TestCase):
             args=copy.deepcopy(self.args);args['query_ids']=[suffix]
             self.rejected(dict(args,action='RECORD_EXISTING_TASK_ADMISSION'))
         self.assertEqual(self.status()['work_specs'],[]);self.assertEqual(self.status()['units'],[])
+    def test_required_project_and_task_identifiers_reject_null_empty_and_omission(self):
+        for field in ('project_id','task_id'):
+            for bad in (None,'',[],{}):
+                args=copy.deepcopy(self.args);args[field]=bad
+                self.rejected(dict(args,action='RECORD_EXISTING_TASK_ADMISSION'))
+                status={'task_id':'demo-b','project_id':'demo-project'};status[field]=bad
+                self.rejected(dict(status,action='TASK_ADMISSION_STATUS'))
+            args=copy.deepcopy(self.args);del args[field]
+            self.rejected(dict(args,action='RECORD_EXISTING_TASK_ADMISSION'))
+        self.assertEqual(self.status()['work_specs'],[]);self.assertEqual(self.status()['units'],[])
+    def test_conflicting_latest_resource_preflight_is_rejected_without_rewriting_history(self):
+        first=self.post('RECORD_EXISTING_TASK_ADMISSION',self.args)
+        self.f.post(dict(self.query,query_id='other-resource',asset_key='fake:other'))
+        other=self.post('RECORD_DISPATCH_PREFLIGHT',{'task_id':'demo-b','asset_version':'input-v1','query_ids':['other-resource'],'outcome':'NOT_FOUND','reuse_reason':'conflicting pre-existing resource stage'})
+        self.assertNotEqual(first['admission']['preflight_id'],other['preflight_id'])
+        before=tuple(self.s.db.iterdump())
+        self.rejected(dict(self.args,action='RECORD_EXISTING_TASK_ADMISSION'))
+        self.assertEqual(before,tuple(self.s.db.iterdump()))
+    def test_old_conflicting_history_does_not_block_matching_current_preflight(self):
+        first=self.post('RECORD_EXISTING_TASK_ADMISSION',self.args)
+        self.f.post(dict(self.query,query_id='other-resource',asset_key='fake:other'))
+        other=self.post('RECORD_DISPATCH_PREFLIGHT',{'task_id':'demo-b','asset_version':'input-v1','query_ids':['other-resource'],'outcome':'NOT_FOUND','reuse_reason':'older history'})
+        # Fixture history ordering only; product code never updates a preflight.
+        observed=self.s.db.execute('SELECT observed_at FROM dispatch_preflights WHERE preflight_id=?',(first['admission']['preflight_id'],)).fetchone()[0]
+        self.s.db.execute('UPDATE dispatch_preflights SET observed_at=? WHERE preflight_id=?',(observed-1,other['preflight_id']));self.s.db.commit()
+        before=tuple(self.s.db.iterdump())
+        result=self.post('RECORD_EXISTING_TASK_ADMISSION',self.args)
+        self.assertEqual(result['admission']['preflight_id'],first['admission']['preflight_id'])
+        self.assertEqual(before,tuple(self.s.db.iterdump()))
     def test_scope_cannot_supply_deploy_publish_or_authority(self):
         for change in ({'scope':['DEPLOY']},{'principal_id':'admin:fake'}):
             args=copy.deepcopy(self.args);args.update(change)

@@ -11,8 +11,13 @@ from task_supervisor import canonical
 
 def _scope(control, task_id, project_id):
     control._admin()
+    if any(not isinstance(v,str) or not v.strip() for v in (task_id,project_id)):
+        raise ValueError('REQUIRED_ADMISSION_TASK_PROJECT')
     control.gateway.assert_task_context(control.context, task_id)
     control._assert_expected_project(task_id, project_id)
+    meta=control.db.execute('SELECT tenant_id,project_id FROM gateway_task_metadata WHERE task_id=?',(task_id,)).fetchone()
+    if meta is None or meta['tenant_id']!=control.tenant_id or meta['project_id']!=project_id:
+        raise ValueError('EXACT_ADMISSION_PROJECT_BINDING_REQUIRED')
     return control.gateway.supervisor._task(task_id)
 
 
@@ -31,6 +36,15 @@ def admission_status(control, value):
                         (control.tenant_id, task_id))] if exists else []
     result['asset_queries']=[{k:r[k] for k in ('query_id','source_kind','source_version','result_digest','observed_at')} for r in result['asset_queries']]
     return result
+
+
+def _latest_preflight(control, task_id, expected):
+    # Same selection/order as original require_dispatch_ready, not any history.
+    row=control.db.execute('''SELECT * FROM dispatch_preflights WHERE tenant_id=? AND task_id=?
+        ORDER BY observed_at DESC,preflight_id DESC LIMIT 1''',(control.tenant_id,task_id)).fetchone()
+    if row is not None and any(row[k]!=v for k,v in expected.items()):
+        raise ValueError('EXISTING_ADMISSION_METADATA_CONFLICT:latest_dispatch_preflight')
+    return row
 
 
 def record_existing_admission(control, value):
@@ -65,6 +79,7 @@ def record_existing_admission(control, value):
             'dependencies': json.loads(task['dependencies_json']) or ['NONE'],
             'asset_version': meta['input_version'], 'responsible_party': task['owner']}
     policy.validate_unit_input(unit)
+    resources=control.gateway.canonical_resources(task_id)
     queries = []
     for query_id in value['query_ids']:
         row = control.db.execute('SELECT * FROM asset_query_receipts WHERE tenant_id=? AND task_id=? AND query_id=?',
@@ -72,7 +87,7 @@ def record_existing_admission(control, value):
         if row is None or row['source_kind'] != 'CANONICAL_DB' or row['source_version'] != meta['input_version']:
             raise ValueError('EXISTING_VERSIONED_RESOURCE_QUERY_REQUIRED')
         query = json.loads(row['query_json'])
-        if query['lookup']['asset_key'] not in control.gateway.canonical_resources(task_id):
+        if query['lookup']['asset_key'] not in resources:
             raise ValueError('CANONICAL_RESOURCE_QUERY_REQUIRED')
         observed = query['observed_result']
         if not isinstance(observed, dict) or not isinstance(observed.get('matches'), list):
@@ -91,14 +106,25 @@ def record_existing_admission(control, value):
     body = {'task_id': task_id, 'asset_version': unit['asset_version'], 'query_ids': sorted(value['query_ids']),
             'outcome': outcome, 'reuse_reason': value['reuse_reason']}
     preflight_id = hashlib.sha256(canonical(body).encode()).hexdigest()
-    if before['dispatch_preflights'] and not any(r['preflight_id'] == preflight_id for r in before['dispatch_preflights']):
-        raise ValueError('EXISTING_ADMISSION_METADATA_CONFLICT:dispatch_preflights')
+    expected_preflight={'preflight_id':preflight_id,'asset_version':unit['asset_version'],
+        'query_ids_json':canonical(sorted(value['query_ids'])),'outcome':outcome,'reuse_reason':value['reuse_reason']}
+    _latest_preflight(control,task_id,expected_preflight)
     if not before['work_specs']:
         control.record_task_spec(task_id, spec['goal'], spec['allowed_files'], spec['acceptance'])
     if not before['units']:
         policy.record_unit(unit)
     if not before['dispatch_preflights']:
         policy.record_dispatch_preflight(task_id, unit['asset_version'], value['query_ids'], outcome, value['reuse_reason'])
-    result = admission_status(control, {'task_id': task_id, 'project_id': value['project_id']})
-    result['admission'] = policy.require_dispatch_ready(task_id)
+    # One read snapshot binds returned admission to the actually selected latest
+    # preflight and to the request's validated canonical resource set.
+    control.db.execute('BEGIN')
+    with control.db:
+        if _latest_preflight(control,task_id,expected_preflight) is None:
+            raise ValueError('DISPATCH_PREFLIGHT_REQUIRED')
+        result=admission_status(control,{'task_id':task_id,'project_id':value['project_id']})
+        admission=policy.require_dispatch_ready(task_id)
+        if (admission['preflight_id']!=preflight_id or admission['asset_version']!=unit['asset_version']
+                or result['resources']!=resources):
+            raise ValueError('CURRENT_REQUEST_RESOURCE_PREFLIGHT_REQUIRED')
+        result['admission']=admission
     return result
