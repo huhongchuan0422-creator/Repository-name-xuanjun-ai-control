@@ -228,13 +228,13 @@ class CandidateLifecycleMCP:
         if 'candidate_id' in args:b['candidate_id']=args['candidate_id']
         if ACTIONS[name] and ACTIONS[name]!=b['phase']:raise ValueError('HOST_LIFECYCLE_PHASE_REQUIRED')
         c=self.control;actor=b['principal_id']
-        if name=='task_accept_candidate' and not self.enforce_acceptance:
+        if name=='task_accept_candidate' and (not self.enforce_acceptance or self._backup_attempted):
             task=self.supervisor._task(args['task_id'])
-            if task['state']=='SUCCESS' and task['authority_state']=='REVOKING':
+            if task['state']=='SUCCESS' and task['authority_state']=='REVOKING' and not self.enforce_acceptance:
                 self._resume_local_test_invalidation(args,b)
                 return self.call(name,args)
-            # The non-enforced TEST_ONLY entry can finish its original DB-only
-            # release after a crash; this must not bypass enforced backup.
+            # Resume the original TEST_ONLY DB-only release after a crash.
+            # An enforced call must recheck the prepared backup in its lock.
             task=self.supervisor._task(args['task_id'])
             release=c.db.execute('SELECT 1 FROM gateway_resource_releases WHERE task_id=? AND attempt_id=?',
                 (args['task_id'],args['attempt_id'])).fetchone()
@@ -281,6 +281,8 @@ class CandidateLifecycleMCP:
                         'receipts':[{'resource_key':r['resource_key'],'receipt_sha256':r['receipt_sha256']} for r in receipts]}
                     if hashlib.sha256(canonical(coverage).encode()).hexdigest()!=task['coverage_digest']:
                         raise ValueError('HOLD_RESOURCE_RELEASE_RECONCILIATION')
+                    if self.enforce_acceptance:
+                        CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)
                 c.gateway.release_revoked_resources(c.context,args['task_id'],args['attempt_id'],
                     'terminal-checkpoint-'+args['attempt_id'],'test-terminal-release',resume_ready=False,
                     admission_check=release_admission)
@@ -299,10 +301,11 @@ class CandidateLifecycleMCP:
                         raise ValueError('TERMINAL_RECOVERY_STATE_CHANGED')
                     c.validate_accept_candidate(args['candidate_id'],actor,_terminal_recovery=True)
                     CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)
-                    # A passing check is not authority to replay revocation or
-                    # infer release; that continuation is not yet connected.
-                    raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
                 finally:c.db.rollback()
+                def prepared_admission():
+                    CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)
+                self._resume_local_test_invalidation(args,b,prepared_admission)
+                return self.call(name,args)
         if name=='task_submit_candidate':
             return c.submit_candidate(args['task_id'],args['artifact_sha256'],args['checklist_sha256'],actor,_host_binding=b)
         if name=='task_review_candidate':
@@ -427,7 +430,7 @@ class CandidateLifecycleMCP:
         result=c.accept_candidate(args['candidate_id'],actor,_host_binding=b,_host_acceptance_check=accept_check)
         result.update(canonical_task_state='SUCCESS',model_invoked=False)
         return result
-    def _resume_local_test_invalidation(self,args,b):
+    def _resume_local_test_invalidation(self,args,b,prepared_admission=None):
         """Continue only pure LOCAL_ONLY fake-resource receipt persistence."""
         from task_writer_fence import SourceResourceAdapter
         from task_supervisor import canonical
@@ -493,6 +496,7 @@ class CandidateLifecycleMCP:
                         row['receipt_sha256']!=hashlib.sha256(row['receipt_json'].encode()).hexdigest()):
                         raise ValueError('TERMINAL_RECOVERY_RECEIPT_CONFLICT')
                     present.add(key)
+                if prepared_admission is not None:prepared_admission()
                 return resources,present
             c.db.execute('BEGIN IMMEDIATE')
             try:resources,present=admission()
@@ -609,8 +613,46 @@ class CandidateLifecycleMCP:
                 raise ValueError('CANDIDATE_RELEASED_RESERVATION_REQUIRED')
             c.assert_host_lifecycle(binding)
             candidate=c.validate_accept_candidate(binding['candidate_id'],binding['principal_id'])
-            c.require_host_resource_release(candidate)
             c._require_terminal_artifact(candidate)
+            release=c.db.execute('SELECT 1 FROM gateway_resource_releases WHERE task_id=? AND attempt_id=?',(task_id,attempt_id)).fetchone()
+            if release is None:
+                # Read-only historical reservation: the original completed
+                # revocation, checkpoint and still-held claims must agree.
+                # This grants no writer authority and does not release claims.
+                from task_supervisor import canonical
+                if c.gateway.supervisor.unresolved_operations(task_id):
+                    raise ValueError('CANDIDATE_RELEASED_RESERVATION_REQUIRED')
+                event=c.db.execute('SELECT kind,evidence_kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',(task_id,attempt_id,'terminal-'+attempt_id)).fetchone()
+                expected={'state':'SUCCESS','artifact_sha256':candidate['artifact_sha256'],
+                    'writer_stopped':True,'effects_reconciled':True,'next_action':'DEPENDENCIES_RECHECK',
+                    'completion_evidence':json.loads(task['completion_json'])}
+                resources=json.loads(task['resource_scope_json'])
+                checkpoint=c.db.execute('SELECT * FROM gateway_checkpoints WHERE task_id=? AND attempt_id=? AND checkpoint_id=?',(task_id,attempt_id,'terminal-checkpoint-'+attempt_id)).fetchone()
+                drain=c.db.execute('SELECT * FROM revocation_drains WHERE task_id=? AND attempt_id=?',(task_id,attempt_id)).fetchone()
+                receipts=c.db.execute('SELECT * FROM resource_invalidation_receipts WHERE task_id=? AND old_attempt_id=? ORDER BY resource_key',(task_id,attempt_id)).fetchall()
+                claims=c.db.execute('SELECT resource_key,attempt_id,fence,epoch,state FROM resource_claims WHERE task_id=? ORDER BY resource_key',(task_id,)).fetchall()
+                if (event is None or event['kind']!='TERMINAL' or event['evidence_kind']!='TEST_RUN' or
+                    event['evidence_ref']!='test-terminal-'+attempt_id or json.loads(event['payload_json'])!=expected or
+                    not isinstance(resources,list) or not resources or resources!=sorted(set(resources)) or
+                    hashlib.sha256(canonical(resources).encode()).hexdigest()!=task['resource_scope_digest'] or
+                    checkpoint is None or json.loads(checkpoint['payload_json'])!={'terminal_state':'SUCCESS'} or
+                    checkpoint['effects_state']!='RECONCILED' or json.loads(checkpoint['inflight_json']) or
+                    json.loads(checkpoint['resources_json'])!=resources or drain is None or
+                    drain['provider_id']!=task['authority_lock_provider_id'] or
+                    hashlib.sha256(drain['receipt_json'].encode()).hexdigest()!=drain['receipt_sha256'] or
+                    [r['resource_key'] for r in receipts]!=resources or [r['resource_key'] for r in claims]!=resources or
+                    any((r['attempt_id'],r['fence'],r['epoch'],r['state'])!=(attempt_id,task['fence'],task['epoch'],'REVOKED') for r in claims) or
+                    any(hashlib.sha256(r['receipt_json'].encode()).hexdigest()!=r['receipt_sha256'] for r in receipts)):
+                    raise ValueError('CANDIDATE_RELEASED_RESERVATION_REQUIRED')
+                coverage={'task_id':task_id,'old_attempt_id':attempt_id,'old_lease_id':task['lease_id'],
+                    'old_fence':task['fence'],'old_epoch':task['epoch'],'spec_sha256':task['spec_sha256'],
+                    'resource_scope_digest':task['resource_scope_digest'],'drain_provider_id':drain['provider_id'],
+                    'drain_receipt_sha256':drain['receipt_sha256'],
+                    'receipts':[{'resource_key':r['resource_key'],'receipt_sha256':r['receipt_sha256']} for r in receipts]}
+                if hashlib.sha256(canonical(coverage).encode()).hexdigest()!=task['coverage_digest']:
+                    raise ValueError('CANDIDATE_RELEASED_RESERVATION_REQUIRED')
+                return task
+            c.require_host_resource_release(candidate)
             resources=json.loads(task['resource_scope_json'])
             if (not isinstance(resources,list) or not resources or resources!=sorted(set(resources)) or
                 hashlib.sha256(json.dumps(resources,sort_keys=True,separators=(',',':')).encode()).hexdigest()!=task['resource_scope_digest']):
