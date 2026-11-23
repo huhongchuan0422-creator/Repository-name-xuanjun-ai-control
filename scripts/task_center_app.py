@@ -1753,6 +1753,7 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
     parser.add_argument('--delivery-observation-collector')
     parser.add_argument('--delivery-backup-observation-file')
     parser.add_argument('--delivery-backup-receipt-file')
+    parser.add_argument('--handoff-backup-inventory-file')
     args = parser.parse_args(argv)
     ledger_config=(args.delivery_ledger_root,args.delivery_ledger_namespace,args.delivery_ledger_writer)
     observation_config=(args.delivery_observation_file,args.delivery_observation_collector)
@@ -1828,6 +1829,19 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
         raise ValueError('ADMIN_TOKEN_OR_IDENTITY_REQUIRED')
     if identity_provider is not None and (admin_token is not None or actor_tokens):
         raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
+    if args.handoff_backup_inventory_file is not None:
+        if handoff_host is None:raise ValueError('HANDOFF_HOST_REQUIRED_FOR_BACKUP_CONFIG')
+        if ledger_bridge is not None:
+            from task_center_handoff_ledger import HandoffLedgerBridge
+            if type(ledger_bridge) is not HandoffLedgerBridge or ledger_bridge.host is not handoff_host:
+                raise ValueError('HANDOFF_LEDGER_HOST_BINDING_REQUIRED')
+        from task_center_backup_v1_migration import build_v1_host
+        configured_host=build_v1_host(handoff_host,args.handoff_backup_inventory_file)
+        if ledger_bridge is not None and configured_host is not handoff_host:
+            # The original bridge must use the exact configured host instance.
+            # Reconstruct only its existing immutable selectors, before serving.
+            ledger_bridge=HandoffLedgerBridge(configured_host,ledger_bridge.root,ledger_bridge.namespace,ledger_bridge.writer)
+        handoff_host=configured_host
     from task_center_mcp_development import load_host as load_development_host
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
