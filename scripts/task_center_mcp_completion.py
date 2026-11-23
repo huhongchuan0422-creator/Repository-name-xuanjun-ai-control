@@ -286,6 +286,23 @@ class CandidateLifecycleMCP:
                     admission_check=release_admission)
         if name=='task_accept_candidate' and self.enforce_acceptance and not self._backup_attempted:
             return self._accept_with_prepared_backup(name,args,b)
+        if name=='task_accept_candidate' and self.enforce_acceptance and self._backup_attempted:
+            task=self.supervisor._task(args['task_id'])
+            if task['state']=='SUCCESS' and task['authority_state']=='REVOKING':
+                # Producer readback has finished outside the DB transaction.
+                # Recheck the original authenticated candidate and prepared
+                # backup under the same serialized evidence transaction.
+                c.db.execute('BEGIN IMMEDIATE')
+                try:
+                    current=c.assert_host_lifecycle(b)
+                    if current['state']!='SUCCESS' or current['authority_state']!='REVOKING':
+                        raise ValueError('TERMINAL_RECOVERY_STATE_CHANGED')
+                    c.validate_accept_candidate(args['candidate_id'],actor,_terminal_recovery=True)
+                    CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)
+                    # A passing check is not authority to replay revocation or
+                    # infer release; that continuation is not yet connected.
+                    raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+                finally:c.db.rollback()
         if name=='task_submit_candidate':
             return c.submit_candidate(args['task_id'],args['artifact_sha256'],args['checklist_sha256'],actor,_host_binding=b)
         if name=='task_review_candidate':

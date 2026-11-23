@@ -20,7 +20,7 @@ class RevokingBackupReadback(unittest.TestCase):
         def readback(obj,*args):
             self.assertFalse(self.f.db.in_transaction);seen.append(True);return original(obj,*args)
         with patch.object(component.BackupComponent,'_readback',new=readback):
-            with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE_ATTEMPT_REQUIRED'):self.f.f.call(self.f.candidate)
+            with self.assertRaisesRegex(ValueError,'CANDIDATE_BACKUP_COMPLETE_REQUIRED'):self.f.f.call(self.f.candidate)
         self.assertEqual(seen,[True]);self.assertEqual(self.h.supervisor._task('demo-b')['authority_state'],'REVOKING')
         self.assertEqual(self.f.db.execute('SELECT state FROM delivery_candidates WHERE candidate_id=?',(self.f.candidate,)).fetchone()[0],'REVIEW_PASSED')
     def assert_no_readback(self):
@@ -57,7 +57,7 @@ class RevokingBackupReadback(unittest.TestCase):
         original=component.BackupComponent._readback;seen=[]
         def readback(obj,*args):seen.append(True);return original(obj,*args)
         with patch.object(component.BackupComponent,'_readback',new=readback):
-            with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE_ATTEMPT_REQUIRED'):self.f.f.call(self.f.candidate)
+            with self.assertRaisesRegex(ValueError,'CANDIDATE_BACKUP_COMPLETE_REQUIRED'):self.f.f.call(self.f.candidate)
         after=self.f.db.execute("SELECT receipt_json,receipt_sha256 FROM resource_invalidation_receipts WHERE task_id='demo-b'").fetchone()
         self.assertEqual(seen,[True]);self.assertEqual(tuple(before),tuple(after))
         self.assertEqual(self.h.supervisor._task('demo-b')['authority_state'],'REVOKING')

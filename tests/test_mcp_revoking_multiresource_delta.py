@@ -85,7 +85,7 @@ class EnforcedRecoveryBoundary(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'stop'):
                 TestOnlyExecutor(h.gateway,h.fence,h.context).complete_success('demo-b','attempt-b',artifact,json.loads(task['completion_json']))
         with patch.object(SourceResourceAdapter,'invalidation_receipt',side_effect=AssertionError('no recovery')):
-            with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE_ATTEMPT_REQUIRED'):f.f.call(f.candidate)
+            with self.assertRaisesRegex(ValueError,'CANDIDATE_BACKUP_COMPLETE_REQUIRED'):f.f.call(f.candidate)
         self.assertEqual(h.supervisor._task('demo-b')['authority_state'],'REVOKING')
         self.assertEqual(f.db.execute("SELECT count(*) FROM resource_invalidation_receipts WHERE task_id='demo-b'").fetchone()[0],0)
         self.assertEqual(f.db.execute('SELECT state FROM delivery_candidates WHERE candidate_id=?',(f.candidate,)).fetchone()[0],'REVIEW_PASSED')
