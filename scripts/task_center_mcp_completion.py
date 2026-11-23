@@ -329,6 +329,33 @@ class CandidateLifecycleMCP:
         readback=host._lifecycle_candidate_readback
         root=os.path.dirname(readback.artifacts) if readback is not None else None
         local=HandoffHost(c.db,host.tenant_id,host.issuer,host.adapter,clock=host.clock,mcp_config=host.mcp_config,role_contract=roles,candidate_lifecycle_root=root)
+        # This host is private to backup assessment, not an authority for any
+        # handoff write. After the original fence has released the task, resolve
+        # its historical reservation only against the original terminal,
+        # reconciled checkpoint and complete resource-release receipt.
+        live_current=local._current_task
+        def assessment_task(task_id,attempt_id,now):
+            task=c.gateway.supervisor._task(task_id)
+            if task['authority_state']!='REVOKED':
+                return live_current(task_id,attempt_id,now)
+            if (task_id!=binding['task_id'] or attempt_id!=binding['attempt_id'] or
+                task['attempt_id']!=attempt_id or task['state']!='SUCCESS' or
+                task['fence'] is None or task['epoch'] is None or
+                type(now) not in (int,float) or not math.isfinite(now)):
+                raise ValueError('CANDIDATE_RELEASED_RESERVATION_REQUIRED')
+            c.assert_host_lifecycle(binding)
+            candidate=c.validate_accept_candidate(binding['candidate_id'],binding['principal_id'])
+            c.require_host_resource_release(candidate)
+            c._require_terminal_artifact(candidate)
+            resources=json.loads(task['resource_scope_json'])
+            if (not isinstance(resources,list) or not resources or resources!=sorted(set(resources)) or
+                hashlib.sha256(json.dumps(resources,sort_keys=True,separators=(',',':')).encode()).hexdigest()!=task['resource_scope_digest']):
+                raise ValueError('CANDIDATE_RELEASED_RESERVATION_REQUIRED')
+            placeholders=','.join('?' for _ in resources)
+            if c.db.execute('SELECT 1 FROM resource_claims WHERE resource_key IN (%s) LIMIT 1'%placeholders,resources).fetchone():
+                raise ValueError('CANDIDATE_RELEASED_RESERVATION_REQUIRED')
+            return task
+        local._current_task=assessment_task
         plan=CandidateAcceptanceEvidence(c,local).check(binding,prepare_only=True)
         try:prepared=local.adapter.prepare_backup_assessment(local)
         except Exception:prepared=None
