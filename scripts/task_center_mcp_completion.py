@@ -523,6 +523,66 @@ class CandidateLifecycleMCP:
         live_current=local._current_task
         def assessment_task(task_id,attempt_id,now):
             task=c.gateway.supervisor._task(task_id)
+            if task['authority_state']=='REVOKING':
+                # This private host is only used to read the existing producer.
+                # It never issues a writer lease, completes revocation or accepts.
+                from task_supervisor import canonical
+                if (task_id!=binding['task_id'] or attempt_id!=binding['attempt_id'] or
+                    task['attempt_id']!=attempt_id or task['state']!='SUCCESS' or
+                    task['fence'] is None or task['epoch'] is None or
+                    type(now) not in (int,float) or not math.isfinite(now) or
+                    type(task['last_trusted_time']) not in (int,float) or
+                    not math.isfinite(task['last_trusted_time']) or task['last_trusted_time']>now):
+                    raise ValueError('CANDIDATE_REVOKING_RESERVATION_REQUIRED')
+                c.assert_host_lifecycle(binding)
+                candidate=c.validate_accept_candidate(binding['candidate_id'],binding['principal_id'],_terminal_recovery=True)
+                if c.gateway.supervisor.unresolved_operations(task_id):
+                    raise ValueError('CANDIDATE_REVOKING_RESERVATION_REQUIRED')
+                c._require_terminal_artifact(candidate)
+                event=c.db.execute('SELECT kind,evidence_kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                    (task_id,attempt_id,'terminal-'+attempt_id)).fetchone()
+                expected={'state':'SUCCESS','artifact_sha256':candidate['artifact_sha256'],
+                    'writer_stopped':True,'effects_reconciled':True,'next_action':'DEPENDENCIES_RECHECK',
+                    'completion_evidence':json.loads(task['completion_json'])}
+                if (event is None or event['kind']!='TERMINAL' or event['evidence_kind']!='TEST_RUN' or
+                    event['evidence_ref']!='test-terminal-'+attempt_id or json.loads(event['payload_json'])!=expected):
+                    raise ValueError('CANDIDATE_REVOKING_RESERVATION_REQUIRED')
+                resources=json.loads(task['resource_scope_json'])
+                checkpoint=c.db.execute('SELECT * FROM gateway_checkpoints WHERE task_id=? AND attempt_id=? AND checkpoint_id=?',
+                    (task_id,attempt_id,'terminal-checkpoint-'+attempt_id)).fetchone()
+                claims=c.db.execute('SELECT resource_key,attempt_id,fence,epoch,state FROM resource_claims WHERE task_id=? ORDER BY resource_key',(task_id,)).fetchall()
+                if (not isinstance(resources,list) or not resources or resources!=sorted(set(resources)) or
+                    hashlib.sha256(canonical(resources).encode()).hexdigest()!=task['resource_scope_digest'] or
+                    checkpoint is None or json.loads(checkpoint['payload_json'])!={'terminal_state':'SUCCESS'} or
+                    checkpoint['effects_state']!='RECONCILED' or json.loads(checkpoint['inflight_json']) or
+                    json.loads(checkpoint['resources_json'])!=resources or [r['resource_key'] for r in claims]!=resources or
+                    any((r['attempt_id'],r['fence'],r['epoch'],r['state'])!=(attempt_id,task['fence'],task['epoch'],'REVOKING') for r in claims)):
+                    raise ValueError('CANDIDATE_REVOKING_RESERVATION_REQUIRED')
+                drain=c.db.execute('SELECT * FROM revocation_drains WHERE task_id=? AND attempt_id=?',(task_id,attempt_id)).fetchone()
+                ticket_sha=c.gateway.supervisor._ticket_sha(c.gateway.supervisor._authority_ticket(task))
+                expected_drain={'schema':1,'kind':'LOCAL_DRAIN','capability':'LOCAL_ONLY','task_id':task_id,
+                    'old_attempt_id':attempt_id,'old_lease_id':task['lease_id'],'old_fence':task['fence'],
+                    'old_epoch':task['epoch'],'ticket_sha256':ticket_sha,'spec_sha256':task['spec_sha256'],
+                    'provider_id':task['authority_lock_provider_id'],'resource_scope_digest':task['resource_scope_digest'],'outcome':'DRAINED'}
+                if (drain is None or drain['provider_id']!=task['authority_lock_provider_id'] or
+                    drain['receipt_json']!=canonical(expected_drain) or
+                    hashlib.sha256(drain['receipt_json'].encode()).hexdigest()!=drain['receipt_sha256']):
+                    raise ValueError('CANDIDATE_REVOKING_RESERVATION_REQUIRED')
+                receipts=c.db.execute('SELECT * FROM resource_invalidation_receipts WHERE task_id=? AND old_attempt_id=? ORDER BY resource_key',
+                    (task_id,attempt_id)).fetchall()
+                for row in receipts:
+                    key=row['resource_key']
+                    if key not in resources:raise ValueError('CANDIDATE_REVOKING_RESERVATION_REQUIRED')
+                    expected_receipt={'schema':1,'kind':'RESOURCE_INVALIDATION','capability':'LOCAL_ONLY',
+                        'adapter_id':'source-resource-adapter-v1','provider_id':task['authority_lock_provider_id'],
+                        'task_id':task_id,'old_attempt_id':attempt_id,'old_lease_id':task['lease_id'],
+                        'old_fence':task['fence'],'old_epoch':task['epoch'],'ticket_sha256':ticket_sha,
+                        'spec_sha256':task['spec_sha256'],'resource_scope_digest':task['resource_scope_digest'],
+                        'resource_key':key,'outcome':'INVALIDATED','evidence_id':'terminal-release-%d'%resources.index(key)}
+                    if (row['receipt_json']!=canonical(expected_receipt) or
+                        hashlib.sha256(row['receipt_json'].encode()).hexdigest()!=row['receipt_sha256']):
+                        raise ValueError('CANDIDATE_REVOKING_RESERVATION_REQUIRED')
+                return task
             if task['authority_state']!='REVOKED':
                 return live_current(task_id,attempt_id,now)
             if (task_id!=binding['task_id'] or attempt_id!=binding['attempt_id'] or
