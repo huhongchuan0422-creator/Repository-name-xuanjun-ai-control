@@ -52,7 +52,7 @@ class DevelopmentBridgeTests(unittest.TestCase):
         import base64
         f=self.f.control.fernet
         return base64.urlsafe_b64encode(f._signing_key+f._encryption_key)
-    def native_candidate(self):
+    def native_candidate(self,executed=True):
         f=self.f;checkout=f.root/'checkout'
         subprocess.check_call(['git','clone','-q','--branch','main',str(f.repo),str(checkout)],stderr=subprocess.DEVNULL)
         subprocess.check_call(['git','-C',str(checkout),'remote','set-url','origin','https://github.com/owner/repo.git'])
@@ -64,6 +64,17 @@ class DevelopmentBridgeTests(unittest.TestCase):
             source_comment_id=1,status='RECEIPT_VALIDATED_NOT_ADMITTED',native_identity='TEST_FIXTURE_NOT_REAL_GITHUB',
             quota_attribution='TEST_ONLY',authority_effect='NONE',required_gate='CANONICAL_TASK_SPEC_CHECKPOINT_TARGET_LEASE_FENCE',**f.caller)
         candidate=f.s.bind_development_candidate(receipt,{'module.py':hashlib.sha256(f.before_raw).hexdigest()})
+        if executed:
+            # Synthetic executor only; never a real host/runtime acceptance.
+            from native_development_executor import NativeDevelopmentExecutor
+            class FixtureRunner:
+                def execute(self,request,files):
+                    result={k:request[k] for k in ('schema','execution_id','candidate_sha256','code_commit','test_plan_sha256')}
+                    result.update(state='PASSED',isolation='ISOLATED',tests_executed=1,result_sha256='1'*64)
+                    return result
+                def lookup(self,execution_id):return None
+            NativeDevelopmentExecutor(FixtureRunner(),'2'*64).run(f.s,candidate['candidate'],
+                {'module.py':f.before_raw},lambda:None)
         contract=dict(f.contract,code_commit=f.base);bundle=gate.review_bundle(contract,{'module.py':f.before_raw},[])['bundle_sha256']
         reviews=[]
         for r in f.contract['trusted_reviewers']:
@@ -74,7 +85,7 @@ class DevelopmentBridgeTests(unittest.TestCase):
     def native_apply_host(self):
         # Real dispatch -> DevelopmentHost -> checked git object -> canonical DB.
         # All identity, GitHub event and authority values here are test fixtures.
-        self.native_candidate()
+        self.native_candidate(executed=False)
         f=self.f
         payload=dict(schema=1,entry='CHATGPT',execution_path='CHATGPT_NATIVE',
             task_id='demo-b',spec_sha256='b'*64,checkpoint_sha256='a'*64,
@@ -153,6 +164,26 @@ class DevelopmentBridgeTests(unittest.TestCase):
         result=self.call('acceptor','task_development_finalize',reviewed_event_id='review-native',completion_event_id='complete-native')
         self.assertEqual(self.f.s._task('demo-b')['state'],'SUCCESS')
         self.assertGreater(self.f.s.db.execute("SELECT count(*) FROM model_audit WHERE action='AUTHENTICATED_MCP_DEVELOPMENT'").fetchone()[0],0)
+    def test_historical_native_without_execution_cannot_review(self):
+        candidate,reviews=self.native_candidate(executed=False)
+        with self.assertRaisesRegex(ValueError,'TRUSTED_NATIVE_EXECUTION_REQUIRED'):
+            self.call('qa','task_development_review',candidate_event_id=candidate,
+                reviewed_event_id='historical-review',reviews=reviews)
+        self.assertNotEqual(self.f.s._task('demo-b')['state'],'SUCCESS')
+
+    def test_historical_review_cannot_finalize_without_execution(self):
+        candidate,reviews=self.native_candidate()
+        self.call('qa','task_development_review',candidate_event_id=candidate,
+            reviewed_event_id='historical-reviewed',reviews=reviews)
+        self.f.s.db.execute("DELETE FROM events WHERE kind='DEVELOPMENT_EXECUTION'");self.f.s.db.commit()
+        controller={'role':'REVOCATION_CONTROLLER','caller_id':'original-test-owner'}
+        self.f.fence.begin_revocation('demo-b',controller);self.f.fence.drain('demo-b',controller,timeout=1)
+        self.f.fence.invalidate_source_resources('demo-b','original-test-revocation');self.f.s.complete_revocation('demo-b')
+        with self.assertRaisesRegex(ValueError,'TRUSTED_NATIVE_EXECUTION_REQUIRED'):
+            self.call('acceptor','task_development_finalize',reviewed_event_id='historical-reviewed',
+                completion_event_id='must-not-complete')
+        self.assertNotEqual(self.f.s._task('demo-b')['state'],'SUCCESS')
+
     def test_missing_host_key_and_writer_providers_reject(self):
         self.host=DevelopmentHost(self.bindings)
         with self.assertRaisesRegex(ValueError,'WRITER_CONTEXT'):self.call('developer-1','task_development_apply',request_id='none')

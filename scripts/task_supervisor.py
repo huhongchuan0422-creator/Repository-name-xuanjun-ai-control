@@ -747,6 +747,8 @@ class Supervisor(object):
                 'files': {path: file_manifest[path]
                           for path in sorted(file_manifest)},
             }
+            if receipt.get('execution_required') is True:
+                candidate['execution_required']=True
             if local:
                 candidate['source_operation_id']=receipt['source_operation_id']
                 candidate['source_kind']='LOCAL_ONLY_CONFIRMED_OPERATION'
@@ -785,14 +787,16 @@ class Supervisor(object):
             raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
         return json.loads(row['payload_json'])
 
-    @staticmethod
-    def _require_development_execution_ready(candidate):
+    def _require_development_execution_ready(self,candidate):
         # Local source-write receipts and Writer revocation are not runtime proof.
-        # No trusted sandbox execution evidence format is implemented yet: fail
-        # closed in canonical APIs, including historical reviewed-event replay.
+        # Enforce in canonical APIs too, including historical candidate/review
+        # replay: native source imports predate the explicit required marker.
         if (candidate.get('source_kind') == 'LOCAL_ONLY_CONFIRMED_OPERATION'
                 or 'source_operation_id' in candidate):
             raise ValueError('HOLD_SANDBOX_UNAVAILABLE')
+        if candidate.get('execution_required') is True or 'source_comment_id' in candidate:
+            from native_development_executor import require_execution
+            require_execution(self,candidate)
 
     def record_development_review(self, task_id, candidate_event_id, files,
                                   bundle_sha256, review_record_ids,

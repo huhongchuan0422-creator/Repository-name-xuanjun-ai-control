@@ -37,7 +37,7 @@ class DevelopmentHost:
     {ticket,caller,lock_root}; review_keys_provider(task,key_ids) supplies existing keys.
     None is permitted and fails closed only the dependent operation.
     """
-    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None,native_source_provider=None):
+    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None,native_source_provider=None,native_executor=None):
         if not isinstance(bindings,list) or len(bindings)>128:raise ValueError('BOUNDED_DEVELOPMENT_BINDINGS_REQUIRED')
         required={'tenant_id','principal_id','project_id','task_id','spec_sha256','checkpoint_sha256','contract_sha256',
                   'role_id','role_version','phase','review_kind','authority_identity','actions','candidate_root','executor_profile'}
@@ -69,6 +69,10 @@ class DevelopmentHost:
             if fn is not None and not callable(fn):raise ValueError('TRUSTED_HOST_PROVIDER_REQUIRED')
         self.bindings=copy.deepcopy(bindings);self.review_keys_provider=review_keys_provider;self.writer_context_provider=writer_context_provider
         self.native_source_provider=native_source_provider
+        from native_development_executor import NativeDevelopmentExecutor
+        if native_executor is not None and not isinstance(native_executor,NativeDevelopmentExecutor):
+            raise ValueError('TRUSTED_NATIVE_EXECUTOR_REQUIRED')
+        self.native_executor=native_executor
     def visible(self,identity):
         allowed=set()
         for b in self.bindings:
@@ -124,6 +128,7 @@ class DevelopmentHost:
                                        source['trusted_owner'],source['destination'])
                 if receipt['event']!='CODE_READY':
                     raise ValueError('NATIVE_CODE_READY_REQUIRED')
+                receipt['execution_required']=True
                 files=_controlled_candidate_files(s,receipt,b['candidate_root'])
                 result=s._bind_development_candidate(receipt,
                     {path:hashlib.sha256(raw).hexdigest() for path,raw in files.items()},
@@ -131,6 +136,11 @@ class DevelopmentHost:
                 result.update(execution_state='HOLD_TRUSTED_NATIVE_EXECUTION_UNAVAILABLE',
                     generated_code_executed=False,source_kind='AUTHENTICATED_NATIVE_IMPORT',
                     next_action='RUN_SAME_COMMIT_WITH_ORIGINAL_TRUSTED_EXECUTOR')
+                if self.native_executor is not None:
+                    execution=self.native_executor.run(s,result['candidate'],files,lambda:check(True))
+                    result.update(execution_state='TRUSTED_NATIVE_TESTS_PASSED',
+                        execution_receipt=execution,generated_code_executed=True,
+                        next_action='INDEPENDENT_SIGNED_REVIEW')
             elif name=='task_development_apply':
                 if self.writer_context_provider is None:raise ValueError('HOLD_EXISTING_WRITER_CONTEXT_UNAVAILABLE')
                 profile=b['executor_profile']
@@ -173,7 +183,7 @@ def _read_host_json(path,code):
     except (OSError,ValueError,TypeError):raise ValueError(code+'_UNAVAILABLE_OR_INVALID') from None
 
 
-def load_host(path):
+def load_host(path,native_executor=None):
     """Read-only original-host custody references; never generates/saves keys.
 
     Files are owned0600 regular single-link and bounded by secure_file_input.
@@ -211,4 +221,4 @@ def load_host(path):
         return value
     return DevelopmentHost(cfg['bindings'],keys if cfg['review_keyring_file'] else None,
                             writer if cfg['writer_context_file'] else None,
-                            native_source if cfg.get('native_source_file') else None)
+                            native_source if cfg.get('native_source_file') else None,native_executor)
