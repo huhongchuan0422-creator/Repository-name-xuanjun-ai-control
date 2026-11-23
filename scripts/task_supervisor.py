@@ -1307,7 +1307,7 @@ class Supervisor(object):
         return hashlib.sha256(canonical(ticket).encode('utf-8')).hexdigest()
 
     def claim_writer(self, task_id, attempt_id, owner, entry, caller,
-                     lease_id, lock_provider_id, resource_keys, valid_until):
+                     lease_id, lock_provider_id, resource_keys, valid_until, admission_check=None):
         now = self.clock()
         caller = self._caller(caller)
         keys = self._exact_resource_keys(resource_keys)
@@ -1319,6 +1319,7 @@ class Supervisor(object):
         scope_digest = self._scope_digest(keys)
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             task = self._task(task_id)
             if (task['authority_state'] != 'NONE' or task['state'] != 'READY'
                     or not self._dependencies_done(task)):
@@ -1356,7 +1357,7 @@ class Supervisor(object):
 
     def claim_development_writer(self, task_id, entry, caller,
                                  lock_provider_id, resource_keys, valid_until,
-                                 owner_grant, developer_credential):
+                                 owner_grant, developer_credential, admission_check=None):
         """Allocate first-attempt and lease identities inside the writer CAS."""
         contract = self.development_contract(task_id)
         task = self._task(task_id)
@@ -1382,7 +1383,7 @@ class Supervisor(object):
         lease_id = 'lease-' + secrets.token_hex(16)
         return self.claim_writer(task_id, attempt_id, task['owner'], entry, caller,
                                  lease_id, lock_provider_id, resource_keys,
-                                 valid_until)
+                                 valid_until, admission_check=admission_check)
 
     def _validate_writer_locked(self, ticket, caller, lock_provider_id):
         now = self.clock()

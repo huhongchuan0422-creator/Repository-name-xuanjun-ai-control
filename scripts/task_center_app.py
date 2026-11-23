@@ -329,7 +329,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
                   mcp_model_worker_enabled=False,mcp_dispatch_config=None,
-                  mcp_development_host=None):
+                  mcp_development_host=None,mcp_claim_host=None):
     mcp_dispatch_config=validate_dispatch_config(mcp_dispatch_config)
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
@@ -1193,7 +1193,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   (value.get('params') or {}).get('name')=='task_submit'
                   else 'MCP_TOOL_CALL')
                 result=dispatch_rpc(service,identity,mcp_dispatch_config,value,
-                                    mcp_model_worker_enabled,mcp_development_host)
+                                    mcp_model_worker_enabled,mcp_development_host,mcp_claim_host)
                 if value.get('id') is None:
                     self._send(202,b'','application/json; charset=utf-8');return
                 self._send(200,_json_bytes(result),
@@ -1296,10 +1296,16 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,
+                mcp_dispatch_config=None,mcp_development_host=None,mcp_claim_host=None,
                 correction_observer_interval=None):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
+    if mcp_claim_host is not None:
+        from task_center_mcp_claim import ClaimHost
+        if not isinstance(mcp_claim_host,ClaimHost) or not mcp_enabled:
+            raise ValueError('TRUSTED_CLAIM_HOST_REQUIRES_MCP')
+        if any(row['tenant_id']!=tenant_id for row in mcp_claim_host.bindings):
+            raise ValueError('CLAIM_HOST_TENANT_MISMATCH')
     if mcp_development_host is not None:
         from task_center_mcp_development import DevelopmentHost
         if not isinstance(mcp_development_host,DevelopmentHost) or not mcp_enabled:
@@ -1360,7 +1366,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
                                 mcp_model_worker_enabled,mcp_dispatch_config,
-                                mcp_development_host)
+                                mcp_development_host,mcp_claim_host)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None
