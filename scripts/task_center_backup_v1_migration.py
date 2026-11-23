@@ -42,3 +42,72 @@ def migrate_v1_consumer(delegate,policies):
     """
     if not isinstance(delegate,HostAuthAdapter):raise ValueError('TRUSTED_HOST_ADAPTER_REQUIRED')
     return V1PreparedHostAdapter(delegate,delegate.assess_backup,policies)
+
+def load_v1_consumer(delegate, config_path):
+    """Load original host's owner-only inventory; never create or amend config.
+
+    Return the unmodified delegate if no config is supplied or it is explicitly
+    disabled. Such a host remains UNKNOWN; this function grants no authority.
+    """
+    if config_path is None:return delegate
+    import json, pathlib, re
+    from secure_file_input import read_owned_secret_file
+    def unique(pairs):
+        result={}
+        for k,v in pairs:
+            if k in result:raise ValueError('DUPLICATE_BACKUP_CONFIG_KEY')
+            result[k]=v
+        return result
+    try:
+        if not isinstance(config_path,str) or not pathlib.Path(config_path).is_absolute():raise ValueError('BACKUP_CONFIG_UNAVAILABLE')
+        raw=json.loads(read_owned_secret_file(config_path,'BACKUP_INVENTORY_CONFIG'),object_pairs_hook=unique)
+        if (not isinstance(raw,dict) or set(raw)!={'schema_version','enabled','policies'} or
+            type(raw['schema_version']) is not int or raw['schema_version']!=1 or type(raw['enabled']) is not bool or
+            not isinstance(raw['policies'],list) or len(raw['policies'])>128):raise ValueError('BACKUP_CONFIG_INVALID')
+        if not raw['enabled']:
+            if raw['policies']:raise ValueError('BACKUP_CONFIG_INVALID')
+            return delegate
+        if not raw['policies']:raise ValueError('BACKUP_CONFIG_INVALID')
+        if not isinstance(delegate,HostAuthAdapter) or type(delegate.assess_backup) is not BackupAssessment:raise ValueError('BACKUP_CONFIG_INVALID')
+        atom=re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,100}$')
+        seen=set();policies=[]
+        for row in raw['policies']:
+            fields={'tenant_id','task_id','attempt_id','provider_ref','contract_sha256','resources'}
+            if not isinstance(row,dict) or set(row)!=fields or any(not isinstance(row[k],str) or not atom.fullmatch(row[k]) for k in ('tenant_id','task_id','attempt_id','provider_ref')) or row['tenant_id']!=delegate.assess_backup.tenant_id or not isinstance(row['contract_sha256'],str) or not re.fullmatch(r'[0-9a-f]{64}',row['contract_sha256']):raise ValueError('BACKUP_CONFIG_INVALID')
+            key=tuple(row[k] for k in ('tenant_id','task_id','attempt_id','provider_ref','contract_sha256'))
+            if key in seen:raise ValueError('BACKUP_CONFIG_INVALID')
+            seen.add(key)
+            if not isinstance(row['resources'],dict) or not 1<=len(row['resources'])<=128:raise ValueError('BACKUP_CONFIG_INVALID')
+            resources={}
+            for resource,specs in row['resources'].items():
+                if not isinstance(resource,str) or not resource or len(resource)>256 or any(ord(c)<32 for c in resource) or not isinstance(specs,list) or not 1<=len(specs)<=256:raise ValueError('BACKUP_CONFIG_INVALID')
+                parsed=[]
+                for spec in specs:
+                    if (not isinstance(spec,dict) or set(spec)!={'category','root','relative_path'} or spec['category'] not in ('SOURCE','ARTIFACT','CONTEXT','INSTALL','CONFIG_REFERENCE','AUTH_ENTRY') or
+                        not isinstance(spec['root'],str) or len(spec['root'])>4096 or any(ord(c)<32 for c in spec['root']) or not pathlib.Path(spec['root']).is_absolute() or
+                        not isinstance(spec['relative_path'],str) or not spec['relative_path'] or len(spec['relative_path'])>4096 or any(ord(c)<32 for c in spec['relative_path']) or
+                        spec['relative_path'].startswith('/') or any(x in ('','.','..') for x in spec['relative_path'].split('/'))):raise ValueError('BACKUP_CONFIG_INVALID')
+                    parsed.append((spec['category'],pathlib.Path(spec['root']),spec['relative_path']))
+                resources[resource]=parsed
+            policies.append(dict((k,row[k]) for k in fields-{'resources'}));policies[-1]['resources']=resources
+        return migrate_v1_consumer(delegate,policies)
+    except (OSError,ValueError,TypeError,KeyError):
+        raise ValueError('BACKUP_INVENTORY_CONFIG_UNAVAILABLE_OR_INVALID') from None
+
+def build_v1_host(host,config_path):
+    """Build the original HandoffHost with the protected configured adapter.
+
+    Host assembly owns identity and DB; call before creating the existing
+    ledger bridge/server. The original host and its adapter are never mutated.
+    """
+    import os
+    from task_center_handoff_host import HandoffHost
+    if type(host) is not HandoffHost or host.db.in_transaction:
+        raise ValueError('EXACT_IDLE_HANDOFF_HOST_REQUIRED')
+    adapter=load_v1_consumer(host.adapter,config_path)
+    if adapter is host.adapter:return host
+    readback=host._lifecycle_candidate_readback
+    root=os.path.dirname(readback.artifacts) if readback is not None else None
+    return HandoffHost(host.db,host.tenant_id,host.issuer,adapter,clock=host.clock,
+                       mcp_config=host.mcp_config,role_contract=host.role_contract,
+                       candidate_lifecycle_root=root)
