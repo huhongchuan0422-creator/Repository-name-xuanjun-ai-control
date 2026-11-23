@@ -1393,7 +1393,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise
 
 
-def main(argv=None):
+def main(argv=None, mcp_claim_host=None, mcp_development_host=None):
+    # Original trusted in-process factory only; no executable CLI/env loader.
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
     authority = parser.add_mutually_exclusive_group(required=True)
@@ -1462,6 +1463,10 @@ def main(argv=None):
     if identity_provider is not None and (admin_token is not None or actor_tokens):
         raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
     from task_center_mcp_development import load_host as load_development_host
+    if mcp_development_host is None and args.mcp_development_config_file:
+        mcp_development_host=load_development_host(args.mcp_development_config_file)
+    if mcp_claim_host is None and mcp_development_host is not None:
+        mcp_claim_host=getattr(mcp_development_host,'claim_host',None)
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
                          actor_tokens,codex_transports,identity_provider,
@@ -1471,8 +1476,8 @@ def main(argv=None):
                          args.allow_mcp_model_outbound,
                          mcp_dispatch_config=(load_dispatch_config(args.mcp_dispatch_config_file)
                            if args.mcp_dispatch_config_file else None),
-                         mcp_development_host=(load_development_host(args.mcp_development_config_file)
-                           if args.mcp_development_config_file else None),
+                         mcp_development_host=mcp_development_host,
+                         mcp_claim_host=mcp_claim_host,
                          correction_observer_interval=args.correction_observer_interval)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)

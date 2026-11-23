@@ -192,14 +192,19 @@ def load_host(path,native_executor=None):
     """
     cfg=_read_host_json(path,'DEVELOPMENT_HOST_CONFIG')
     required={'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}
-    if (not isinstance(cfg,dict) or set(cfg) not in (required,required|{'native_source_file'})
+    if (not isinstance(cfg,dict) or not required.issubset(cfg) or set(cfg)-required-{'native_source_file','claim_registration'}
             or type(cfg['schema_version']) is not int or cfg['schema_version']!=1 or type(cfg['enabled']) is not bool):
         raise ValueError('EXACT_DEVELOPMENT_HOST_CONFIG_REQUIRED')
     for k in ('review_keyring_file','writer_context_file','native_source_file'):
         if cfg.get(k) is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
             raise ValueError('EXISTING_PROTECTED_HOST_REFERENCE_REQUIRED')
+    registration=cfg.get('claim_registration')
+    if registration is not None:
+        if (not isinstance(registration,dict) or set(registration)!={'owner_public_key_file','custody_file'}
+                or any(not isinstance(v,str) or not v.startswith('/') for v in registration.values())):
+            raise ValueError('EXISTING_CLAIM_REGISTRATION_REFERENCES_REQUIRED')
     if not cfg['enabled']:
-        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('native_source_file') is not None:
+        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('native_source_file') is not None or registration is not None:
             raise ValueError('DISABLED_DEVELOPMENT_CONFIG_MUST_BE_EMPTY')
         return None
     def keys(task,ids):
@@ -219,6 +224,10 @@ def load_host(path,native_executor=None):
         except (KeyError,TypeError):
             raise ValueError('HOLD_TRUSTED_NATIVE_SOURCE_UNAVAILABLE') from None
         return value
-    return DevelopmentHost(cfg['bindings'],keys if cfg['review_keyring_file'] else None,
+    host=DevelopmentHost(cfg['bindings'],keys if cfg['review_keyring_file'] else None,
                             writer if cfg['writer_context_file'] else None,
                             native_source if cfg.get('native_source_file') else None,native_executor)
+    if registration is not None:
+        from task_center_mcp_claim import load_claim_host
+        host.claim_host=load_claim_host(host,registration['owner_public_key_file'],registration['custody_file'])
+    return host
