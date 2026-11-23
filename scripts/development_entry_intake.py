@@ -29,12 +29,27 @@ def _unique(pairs):
     return result
 
 
-def validate_event(event, control_repository, trusted_owner):
+def _destination(destination=None):
+    # Original host scope, never a destination selected by the comment body.
+    if destination is None:
+        return {'task_id': TASK, 'pull_request_number': 17}
+    if (not isinstance(destination, dict)
+            or set(destination) != {'task_id', 'pull_request_number'}
+            or not isinstance(destination['task_id'], str)
+            or not re.fullmatch(r'[A-Za-z0-9_.:/-]{1,160}', destination['task_id'])
+            or type(destination['pull_request_number']) is not int
+            or destination['pull_request_number'] < 1):
+        raise ValueError('EXACT_HOST_ENTRY_DESTINATION_REQUIRED')
+    return dict(destination)
+
+
+def validate_event(event, control_repository, trusted_owner, destination=None):
+    destination = _destination(destination)
     # Actor and destination come from the GitHub event, never the message.
     issue = event.get('issue', {})
     comment = event.get('comment', {})
     if (event.get('repository', {}).get('full_name') != control_repository
-            or issue.get('number') != 17 or 'pull_request' not in issue
+            or issue.get('number') != destination['pull_request_number'] or 'pull_request' not in issue
             or event.get('sender', {}).get('login') != trusted_owner
             or comment.get('user', {}).get('login') != trusted_owner
             or event.get('action') != 'created'):
@@ -50,7 +65,7 @@ def validate_event(event, control_repository, trusted_owner):
         raise ValueError('EXACT_ENTRY_SCHEMA_REQUIRED')
     if value.get('entry') not in ENTRIES or value.get('execution_path') != ENTRIES[value['entry']]:
         raise ValueError('NATIVE_ENTRY_REQUIRED_NO_HIDDEN_CODEX')
-    if value.get('task_id') != TASK or value.get('event') not in EVENTS:
+    if value.get('task_id') != destination['task_id'] or value.get('event') not in EVENTS:
         raise ValueError('EXISTING_TASK_AND_EVENT_REQUIRED')
     # Receipt intake accepts explicit destinations, but never authorizes them.
     if not isinstance(value.get('target_repository'), str) or not re.fullmatch(
@@ -201,7 +216,8 @@ def bind_from_controlled_environment(receipt):
         supervisor.close()
 
 
-def main():
+def main(destination=None):
+    destination = _destination(destination)
     with open(os.environ['GITHUB_EVENT_PATH'], encoding='utf-8') as stream:
         event = json.load(stream)
     body = event.get('comment', {}).get('body', '')
@@ -211,11 +227,11 @@ def main():
     owner = repo.split('/')[0]
     if (event.get('sender', {}).get('login') != owner
             or event.get('comment', {}).get('user', {}).get('login') != owner
-            or event.get('issue', {}).get('number') != 17
+            or event.get('issue', {}).get('number') != destination['pull_request_number']
             or 'pull_request' not in event.get('issue', {})):
         return
     try:
-        receipt = validate_event(event, repo, owner)
+        receipt = validate_event(event, repo, owner, destination)
         if receipt['event'] == 'CODE_READY':
             try:
                 receipt['syntax_gate'] = syntax_receipt(
@@ -240,7 +256,7 @@ def main():
     marker = '<!-- XJ_DEV_ENTRY_RECEIPT %s -->' % json.dumps(
         receipt, sort_keys=True)
     request = urllib.request.Request(
-        'https://api.github.com/repos/' + repo + '/issues/17/comments',
+        'https://api.github.com/repos/' + repo + '/issues/' + str(destination['pull_request_number']) + '/comments',
         data=json.dumps({
             'body': marker + '\n::SKIP_COMPLETION::\n'
                     'Entry receipt with optional canonical source-evidence binding. '
