@@ -42,6 +42,10 @@ class HostAuthAdapter(object):
         """
         return None
 
+    def prepare_backup_assessment(self, host):
+        """Return the trusted two-phase backup bridge bound to this DB, or None."""
+        return None
+
     def assess_ledger_event(self, binding, event):
         """Trusted host verifies every supplied snapshot/check/source fact; default denies."""
         return False
@@ -245,6 +249,68 @@ class HandoffHost(object):
         return {'state':'HANDOFF_INCOMPLETE_ALERT_QUEUED','reason':reason,'alert_delivery':'UNKNOWN','event_id':value['event_id']}
 
     def record(self, session, value):
+        """Run trusted backup readback before the original DB transaction."""
+        try:binding=self._backup_preflight_binding(session,value)
+        except Exception:return self._record_authenticated(session,value,None)
+        try:prepared=self.adapter.prepare_backup_assessment(self)
+        except Exception:prepared=None
+        if prepared is None:
+            # A caller already inside the reviewed bridge's execute() can
+            # re-enter here under its held lock; never call an arbitrary legacy
+            # adapter from the SQLite write transaction.
+            try:
+                from task_center_backup_bridge_v2 import PreparedBackupAssessment
+                existing=self.adapter.assess_backup
+                if type(existing) is PreparedBackupAssessment and existing.db is self.db and existing._prepared is not None:
+                    return self._record_authenticated(session,value,existing)
+            except (ImportError,AttributeError):pass
+            return self._record_authenticated(session,value,None)
+        try:
+            from task_center_backup_bridge_v2 import PreparedBackupAssessment
+            if type(prepared) is not PreparedBackupAssessment or prepared.db is not self.db:
+                raise ValueError('TRUSTED_BACKUP_PREFLIGHT_REQUIRED')
+        except Exception:
+            return self._record_authenticated(session,value,None)
+        # A guard already busy before execute proves that no producer action
+        # was started by this invocation. Do not catch/retry execute() errors:
+        # even the same error text could follow an unknown commit outcome.
+        if prepared._guard.locked():return self._record_authenticated(session,value,None)
+        return prepared.execute(_PreparedRecordHost(self,prepared),session,value,binding)
+
+    def _backup_preflight_binding(self,session,value):
+        # Only authenticated, currently fenced and registered requests may
+        # cause producer readback. Every fact is rechecked inside the record.
+        if not isinstance(value,dict):raise ValueError('EXACT_HANDOFF_REQUEST_REQUIRED')
+        request=dict(value)
+        if request.get('ledger_event') is not None:del request['ledger_event']
+        required={'task_id','attempt_id','handoff_id','handoff_version','event_id','action','causation','snapshot_digest','backup_cycle_id','backup_manifest_sha256','checked','provider_ref'}
+        extra={'target_ref'} if request.get('action')=='NOMINATE' else {'alignment_ref'} if request.get('action')=='VERIFIED' else set()
+        if set(request)!=required|extra:raise ValueError('EXACT_HANDOFF_REQUEST_REQUIRED')
+        ids=(required-{'handoff_version','snapshot_digest','backup_manifest_sha256','checked'})|extra
+        if any(not isinstance(request[k],str) or not ID.fullmatch(request[k]) for k in ids):raise ValueError('HANDOFF_REFERENCE_REQUIRED')
+        if (type(request['handoff_version']) is not int or request['handoff_version']<1 or request['action'] not in ACTIONS or
+            any(not isinstance(request[k],str) or not re.fullmatch(r'[0-9a-f]{64}',request[k]) for k in ('snapshot_digest','backup_manifest_sha256')) or
+            not isinstance(request['checked'],list) or any(not isinstance(x,str) or x not in REQUIRED_CONTEXT for x in request['checked']) or
+            request['checked']!=sorted(set(request['checked']))):raise ValueError('HANDOFF_BINDING_REQUIRED')
+        keys=('task_id','attempt_id','handoff_id','handoff_version','snapshot_digest','backup_cycle_id','backup_manifest_sha256','checked','provider_ref')
+        binding={k:request[k] for k in keys};binding.update({k:request[k] for k in extra})
+        now=self.clock();claims=self.adapter.authenticate_and_authorize(session,value['action'],binding)
+        fields={'issuer','tenant_id','principal_id','session_id','role_id','expires_at','scope'}
+        if (type(now) not in (int,float) or not math.isfinite(now) or not isinstance(claims,dict) or set(claims)!=fields or
+            any(not isinstance(claims[k],str) or not ID.fullmatch(claims[k]) for k in fields-{'expires_at'}) or
+            claims['issuer']!=self.issuer or claims['tenant_id']!=self.tenant_id or claims['scope']!='handoff:'+value['action'] or
+            type(claims['expires_at']) not in (int,float) or not math.isfinite(claims['expires_at']) or claims['expires_at']<=now):raise ValueError('HANDOFF_AUTHORITY_REJECTED')
+        self._bind_session_claims(session,claims,now)
+        task=self._current_task(value['task_id'],value['attempt_id'],now);self._require_reference(value,task,claims)
+        if self.db.execute("SELECT 1 FROM writer_operations WHERE task_id=? AND state IN ('PREPARED','DISPATCHING','UNKNOWN') LIMIT 1",(value['task_id'],)).fetchone():raise ValueError('UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED')
+        if not self._mcp_registered(binding) or self.adapter.assess_provider(binding)!='CONNECTED':raise ValueError('NOT_CONNECTED')
+        if self.role_contract is None:raise ValueError('TASK_CONTRACT_UNKNOWN')
+        contract=self.role_contract.resolve(self.tenant_id,value['task_id'],value['attempt_id'],value['provider_ref'])
+        binding.update({k:contract[k] for k in ('contract_id','contract_version','contract_sha256')})
+        binding['applicability']={k:contract[k] for k in ('role_id','role_version','role_scope','required_categories','not_applicable','required_checks')}
+        return binding
+
+    def _record_authenticated(self, session, value, backup_assessor):
         ledger_event=value.get('ledger_event') if isinstance(value,dict) else None
         if ledger_event is not None:
             value=dict(value);del value['ledger_event']
@@ -289,7 +355,7 @@ class HandoffHost(object):
                 return self._queue_alert(value,now,'HANDOFF_CONTEXT_INCOMPLETE',{'state':'UNKNOWN','missing':[]})
             binding.update({k:contract[k] for k in ('contract_id','contract_version','contract_sha256')})
             binding['applicability']={k:contract[k] for k in ('role_id','role_version','role_scope','required_categories','not_applicable','required_checks')}
-            try:assessment=self.adapter.assess_backup(binding)
+            try:assessment=backup_assessor(binding) if backup_assessor is not None else None
             except Exception:assessment=None
             if (not isinstance(assessment,dict) or set(assessment)!={'state','missing','cycle_at'} or
                 assessment['state'] not in ('COMPLETE','INCOMPLETE','UNKNOWN') or
@@ -509,3 +575,11 @@ class HandoffHost(object):
                 'checked':payload['checked'],
                 'current_authority':'UNKNOWN',
                 **({'contract':c} if 'contract_sha256' in payload else {})}
+
+class _PreparedRecordHost(object):
+    """Expose only the original DB/reference checks to the prepared bridge."""
+    def __init__(self,host,assessment):
+        self._host=host;self._assessment=assessment;self.db=host.db
+    def _reference(self,*args):return self._host._reference(*args)
+    def _current_task(self,*args):return self._host._current_task(*args)
+    def record(self,session,value):return self._host._record_authenticated(session,value,self._assessment)

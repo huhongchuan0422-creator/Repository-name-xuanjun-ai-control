@@ -37,6 +37,28 @@ class HostDelta(unittest.TestCase):
         self.db.execute('CREATE TABLE role_templates(tenant_id TEXT,role_id TEXT,version TEXT,capabilities_json TEXT,enabled INTEGER)')
         self.db.execute('INSERT INTO role_templates VALUES(?,?,?,?,?)',('tenant-1','role-agent','v1',json.dumps(['code']),1))
         self.db.commit();self.auth=SimulatedHost()
+        # Existing host/ledger unit tests simulate the upstream complete-backup
+        # provider. This per-test module patch is never a runtime configuration
+        # and asserts the host invokes its assessment only inside the record
+        # transaction with the exact preflight binding. Real SOURCE-only
+        # producer/readback/lock behavior is tested separately without this mock.
+        if self._testMethodName!='runTest':
+            import sys,types,threading
+            from unittest.mock import patch
+            module=types.ModuleType('task_center_backup_bridge_v2')
+            class SimulatedPrepared:
+                def __init__(self,host,adapter):self.db=host.db;self.adapter=adapter;self.expected=None;self._guard=threading.Lock()
+                def execute(self,host,session,value,binding):
+                    if self.db.in_transaction:raise RuntimeError('preflight must be outside transaction')
+                    self.expected=copy.deepcopy(binding)
+                    try:return host.record(session,value)
+                    finally:self.expected=None
+                def __call__(self,binding):
+                    if not self.db.in_transaction or binding!=self.expected:return None
+                    return copy.deepcopy(self.adapter.assess_backup(binding))
+            module.PreparedBackupAssessment=SimulatedPrepared
+            patcher=patch.dict(sys.modules,{'task_center_backup_bridge_v2':module});patcher.start();self.addCleanup(patcher.stop)
+            self.auth.prepare_backup_assessment=lambda host:SimulatedPrepared(host,self.auth)
         from task_center_role_contract import RoleContractResolver
         self.policy=dict(contract_id='fixture-contract',contract_version=1,tenant_id='tenant-1',project_id='demo-project',task_id='task-1',attempt_id='attempt-1',task_spec_sha256='a'*64,role_id='role-agent',role_version='v1',role_scope=['code'],provider_id='fixture-only',required_categories=['ARTIFACT','AUTH_ENTRY','CONFIG_REFERENCE','CONTEXT','INSTALL','SOURCE'],not_applicable={})
         self.host=HandoffHost(self.db,'tenant-1','formal-fixture',self.auth,clock=lambda:1000,mcp_config=CONFIG,role_contract=RoleContractResolver(self.db,[self.policy]));self.refs={};self.root_ref=None
