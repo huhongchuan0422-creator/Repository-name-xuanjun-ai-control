@@ -372,15 +372,43 @@ class CandidateLifecycleMCP:
           'CANDIDATE_HANDOFF_RECEIPTS_REQUIRED','CANDIDATE_BACKUP_COMPLETE_REQUIRED',
           'CANDIDATE_EXECUTOR_CONTRACT_REQUIRED','CANDIDATE_ACCEPTOR_CONTRACT_REQUIRED',
           'CANDIDATE_SNAPSHOT_DIGEST_REQUIRED','TASK_CONTRACT_UNKNOWN',
-          'INDEPENDENT_REVIEW_RECEIPTS_REQUIRED','REVIEW_PASS_REQUIRED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED'}
+          'INDEPENDENT_REVIEW_RECEIPTS_REQUIRED','REVIEW_PASS_REQUIRED','UNKNOWN_EFFECTS_RECONCILIATION_REQUIRED','MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED'}
         if reason not in allowed or not isinstance(args,dict):return
         if any(not isinstance(args.get(k),str) for k in ('task_id','attempt_id','candidate_id')):return
         c=self.control;b={k:self.binding[k] for k in ('project_id','principal_id','role_id','role_version','phase','review_kind')}
         b.update(task_id=args['task_id'],attempt_id=args['attempt_id'],candidate_id=args['candidate_id'])
         c.db.execute('BEGIN IMMEDIATE')
         try:
-            c.assert_host_lifecycle(b)
-            event='candidate-evidence-hold-'+hashlib.sha256((args['candidate_id']+':'+reason).encode()).hexdigest()
+            if reason=='MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED':
+                c.assert_host_lifecycle(b,_allow_unsettled_supervision=True)
+                assignment=c.db.execute('''SELECT state FROM model_assignments WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=? AND principal_id=? AND role_version=?''',
+                    (c.tenant_id,args['task_id'],args['attempt_id'],b['role_id'],b['principal_id'],b['role_version'])).fetchone()
+                if assignment is None or assignment['state']!='ASSIGNED':raise ValueError('CURRENT_HOST_LIFECYCLE_ROLE_REQUIRED')
+                # A hold is not authority to take over. Recheck the original
+                # same-DB host's live writer and all resource claims under lock.
+                from task_center_handoff_host import HandoffHost
+                from task_center_role_contract import RoleContractResolver
+                host=self.acceptance_host
+                paths=[r[2] for r in c.db.execute('PRAGMA database_list') if r[1]=='main']
+                if (type(host) is not HandoffHost or type(host.role_contract) is not RoleContractResolver or
+                    host.tenant_id!=c.tenant_id or host.db_path is None or len(paths)!=1 or not paths[0] or os.path.realpath(paths[0])!=host.db_path):
+                    raise ValueError('CANDIDATE_TRUSTED_HOST_REQUIRED')
+                roles=RoleContractResolver(c.db,host.role_contract.contracts,host.role_contract.intake_plans)
+                local=HandoffHost(c.db,host.tenant_id,host.issuer,host.adapter,clock=host.clock,mcp_config=host.mcp_config,role_contract=roles)
+                local._current_task(args['task_id'],args['attempt_id'],c.clock())
+            else:c.assert_host_lifecycle(b)
+            seed={'candidate_id':args['candidate_id'],'reason':reason}
+            if reason=='MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED':
+                # Deduplicate the same unsettled attempts, not a later distinct
+                # unresolved model effect after an intervening reconciliation.
+                pending=c.db.execute('''SELECT request_id,state,attempts FROM model_requests
+                  WHERE tenant_id=? AND task_id=? AND attempt_id=? AND state NOT IN ('SUCCEEDED','FAILED','CANCELLED')
+                  ORDER BY request_id LIMIT 2049''',(c.tenant_id,args['task_id'],args['attempt_id'])).fetchall()
+                if not pending or len(pending)>2048:raise ValueError('MODEL_SUPERVISION_SCOPE_REQUIRED')
+                seed['unsettled']=[list(row) for row in pending]
+            encoded_seed=(canonical(seed) if reason=='MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED'
+                          else args['candidate_id']+':'+reason)
+            event='candidate-evidence-hold-'+hashlib.sha256(encoded_seed.encode()).hexdigest()
             payload={'state':'HOLD','action':'RECONCILE_BEFORE_CONTROLLED_REASSIGN',
               'candidate_id':args['candidate_id'],'reason':reason,'requires_effect_reconciliation':True,'takeover_allowed':False}
             from task_supervisor import canonical

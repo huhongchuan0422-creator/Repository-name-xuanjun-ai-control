@@ -2114,7 +2114,7 @@ class ModelControl(object):
         return {'evaluation_id':evaluation_id,'state':state,
                 'quality_score':score,'duration_ms':duration}
 
-    def assert_host_lifecycle(self, binding):
+    def assert_host_lifecycle(self, binding, _allow_unsettled_supervision=False):
         # Called only by trusted host wiring, never from model content/tool args.
         task_id=binding['task_id'];attempt_id=binding['attempt_id']
         self.gateway.assert_task_context(self.context,task_id)
@@ -2139,9 +2139,16 @@ class ModelControl(object):
         if (task['stage'] not in ('TEST_ONLY','TEST_ONLY_EXECUTION') or not resources
                 or any(not isinstance(key,str) or not key.startswith('fake:') for key in resources)):
             raise ValueError('CONTROLLED_NON_TEST_COMPLETION_REQUIRED')
-        if self.db.execute('''SELECT 1 FROM model_requests WHERE tenant_id=?
+        unsettled=self.db.execute('''SELECT 1 FROM model_requests WHERE tenant_id=?
           AND task_id=? AND attempt_id=? AND state NOT IN ('SUCCEEDED','FAILED','CANCELLED')''',
-          (self.tenant_id,task_id,attempt_id)).fetchone():
+          (self.tenant_id,task_id,attempt_id)).fetchone()
+        if _allow_unsettled_supervision:
+            # This internal switch is only for a locked, read-only authorization
+            # check before writing a HOLD/outbox; it never admits execution.
+            if (_allow_unsettled_supervision is not True or not self.db.in_transaction or not unsettled or
+                binding.get('phase')!='ACCEPTOR' or not binding.get('candidate_id')):
+                raise ValueError('MODEL_SUPERVISION_SCOPE_REQUIRED')
+        elif unsettled:
             raise ValueError('MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED')
         if binding.get('candidate_id'):
             row=self.db.execute('''SELECT task_id,attempt_id FROM delivery_candidates

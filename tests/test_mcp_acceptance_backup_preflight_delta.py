@@ -127,6 +127,97 @@ class TerminalPreflightDelta(unittest.TestCase):
         self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],before)
         self.assertEqual(self.f.h.supervisor._task('demo-b')['state'],'STARTED')
 
+    def test_unknown_model_effects_original_oauth_http_hold(self):
+        import threading
+        from urllib.error import HTTPError
+        from task_center_app import make_server
+        import test_task_center_mcp_http as http_fixture
+        h=self.f.h
+        h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-http-unknown',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN' WHERE idempotency_key='terminal-http-unknown'");self.db.commit()
+        h.f.server.shutdown();h.f.server.server_close();h.f.thread.join(2)
+        h.f.server=make_server(h.f.db,fixture.fx_key(),'tenant-mcp','owner',port=0,model_master_key=h.f.master,
+            identity_provider=h.f.identity,session_store=h.f.sessions,outbound_enabled=False,
+            external_origin='https://'+http_fixture.HOST,base_path='/task-center-test/',
+            mcp_enabled=True,mcp_model_worker_enabled=False,mcp_dispatch_config=self.f.fx.config,handoff_host=self.host)
+        h.f.thread=threading.Thread(target=h.f.server.serve_forever);h.f.thread.daemon=True;h.f.thread.start()
+        h.f.base='http://127.0.0.1:%d/task-center-test'%h.f.server.server_port
+        access=h.token(principal='acceptor')
+        with patch.object(component.BackupComponent,'_readback',side_effect=AssertionError('must not read')) as readback:
+            with self.assertRaises(HTTPError):h.rpc(access,'task_accept_candidate',{'task_id':'demo-b','attempt_id':'attempt-b','candidate_id':self.candidate})
+            self.assertFalse(readback.called)
+        self.assert_hold_alert('MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED')
+        self.assertEqual(h.supervisor._task('demo-b')['state'],'STARTED')
+        self.assertEqual(self.db.execute("SELECT state FROM model_requests WHERE idempotency_key='terminal-http-unknown'").fetchone()[0],'UNKNOWN')
+
+    def test_unsettled_model_hold_is_idempotent_and_does_not_grant_takeover(self):
+        self.f.h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-repeat',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN' WHERE idempotency_key='terminal-repeat'");self.db.commit()
+        for iteration in range(2):
+            with self.assertRaisesRegex(ValueError,'MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED'):self.f.call(self.candidate)
+            if iteration==0:
+                self.db.execute("UPDATE model_requests SET updated_at=updated_at+1 WHERE idempotency_key='terminal-repeat'");self.db.commit()
+        rows=self.db.execute("SELECT payload_json FROM events WHERE evidence_ref='CANDIDATE_ACCEPTANCE_EVIDENCE_HOLD'").fetchall()
+        selected=[json.loads(row[0]) for row in rows if json.loads(row[0])['reason']=='MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED']
+        self.assertEqual(len(selected),1);self.assertFalse(selected[0]['takeover_allowed']);self.assertTrue(selected[0]['requires_effect_reconciliation'])
+        self.assertEqual(self.f.h.supervisor._task('demo-b')['state'],'STARTED')
+    def test_new_unsettled_attempt_is_not_suppressed_as_duplicate(self):
+        self.f.h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-new-effect',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN',attempts=1 WHERE idempotency_key='terminal-new-effect'");self.db.commit()
+        with self.assertRaisesRegex(ValueError,'MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED'):self.f.call(self.candidate)
+        self.db.execute("UPDATE model_requests SET state='SUCCEEDED',attempts=1 WHERE idempotency_key='terminal-new-effect'");self.db.commit()
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN',attempts=2 WHERE idempotency_key='terminal-new-effect'");self.db.commit()
+        with self.assertRaisesRegex(ValueError,'MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED'):self.f.call(self.candidate)
+        rows=self.db.execute("SELECT e.payload_json,o.delivered_at FROM events e JOIN outbox o ON o.task_id=e.task_id AND o.attempt_id=e.attempt_id AND o.event_id=e.event_id WHERE e.evidence_ref='CANDIDATE_ACCEPTANCE_EVIDENCE_HOLD'").fetchall()
+        selected=[row for row in rows if json.loads(row[0])['reason']=='MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED']
+        self.assertEqual(len(selected),2);self.assertTrue(all(row[1] is None for row in selected))
+
+    def test_stale_or_unbound_request_cannot_enqueue_unsettled_hold(self):
+        self.f.h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-denied',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN' WHERE idempotency_key='terminal-denied'");self.db.commit()
+        before=self.db.execute('SELECT count(*) FROM outbox').fetchone()[0]
+        with self.assertRaises(ValueError):self.f.call(self.candidate,attempt='wrong')
+        self.f.identity['principal_id']='unbound-principal'
+        with self.assertRaises(ValueError):self.f.call(self.candidate)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],before)
+    def test_unsettled_hold_event_rolls_back_when_outbox_write_fails(self):
+        from task_supervisor import Supervisor
+        self.f.h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-outbox-error',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN' WHERE idempotency_key='terminal-outbox-error'");self.db.commit()
+        before=self.db.execute('SELECT count(*) FROM outbox').fetchone()[0]
+        with patch.object(Supervisor,'_enqueue',side_effect=RuntimeError('outbox unavailable')):
+            with self.assertRaisesRegex(ValueError,'MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED'):self.f.call(self.candidate)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],before)
+        self.assertFalse(self.db.execute("SELECT 1 FROM events WHERE evidence_ref='CANDIDATE_ACCEPTANCE_EVIDENCE_HOLD'").fetchone())
+        self.assertEqual(self.db.execute("SELECT state FROM model_requests WHERE idempotency_key='terminal-outbox-error'").fetchone()[0],'UNKNOWN')
+
+    def test_revoked_acceptor_assignment_cannot_enqueue_unsettled_hold(self):
+        self.f.h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-revoked-role',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN' WHERE idempotency_key='terminal-revoked-role'")
+        self.db.execute("UPDATE model_assignments SET state='REVOKED' WHERE task_id='demo-b' AND role_id='acceptor'");self.db.commit()
+        before=self.db.execute('SELECT count(*) FROM outbox').fetchone()[0]
+        with self.assertRaises(ValueError):self.f.call(self.candidate)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],before)
+
+    def test_revoked_writer_cannot_enqueue_unsettled_hold(self):
+        self.f.h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-revoked',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN' WHERE idempotency_key='terminal-revoked'")
+        self.db.execute("UPDATE tasks SET authority_state='REVOKED' WHERE task_id='demo-b'");self.db.commit()
+        before=self.db.execute('SELECT count(*) FROM outbox').fetchone()[0]
+        with self.assertRaises(ValueError):self.f.call(self.candidate)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM outbox').fetchone()[0],before)
+        self.assertEqual(self.db.execute("SELECT state FROM model_requests WHERE idempotency_key='terminal-revoked'").fetchone()[0],'UNKNOWN')
+
+    def test_unknown_model_effects_hold_and_notify_without_backup_read(self):
+        self.f.h.control.queue_request('demo-b','developer',[{'role':'user','content':'local fixture'}],'terminal-unknown',8,'fixture-connection')
+        self.db.execute("UPDATE model_requests SET state='UNKNOWN' WHERE idempotency_key='terminal-unknown'");self.db.commit()
+        with patch.object(component.BackupComponent,'_readback',side_effect=AssertionError('must not read')) as readback:
+            with self.assertRaisesRegex(ValueError,'MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED'):self.f.call(self.candidate)
+            self.assertFalse(readback.called)
+        self.assert_hold_alert('MODEL_SIDE_EFFECT_RECONCILIATION_REQUIRED')
+        self.assertEqual(self.f.h.supervisor._task('demo-b')['state'],'STARTED')
+        self.assertEqual(self.db.execute("SELECT state FROM model_requests WHERE idempotency_key='terminal-unknown'").fetchone()[0],'UNKNOWN')
+
     def test_unknown_writer_effects_hold_before_any_backup_read(self):
         now=self.f.h.control.clock()
         self.db.execute('INSERT INTO writer_operations VALUES (?,?,?,?,?,?,?,?,?,?,?)',('fixture-op','demo-b','attempt-b','fixture-event','fake:demo-b','a'*64,'b'*64,'{}','UNKNOWN',now,now));self.db.commit()
