@@ -37,7 +37,7 @@ class DevelopmentHost:
     {ticket,caller,lock_root}; review_keys_provider(task,key_ids) supplies existing keys.
     None is permitted and fails closed only the dependent operation.
     """
-    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None,native_source_provider=None,native_executor=None):
+    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None,contract_provider=None,native_source_provider=None,native_executor=None):
         if not isinstance(bindings,list) or len(bindings)>128:raise ValueError('BOUNDED_DEVELOPMENT_BINDINGS_REQUIRED')
         required={'tenant_id','principal_id','project_id','task_id','spec_sha256','checkpoint_sha256','contract_sha256',
                   'role_id','role_version','phase','review_kind','authority_identity','actions','candidate_root','executor_profile'}
@@ -59,13 +59,13 @@ class DevelopmentHost:
             if b['executor_profile'] is not None:
                 profile=b['executor_profile']
                 expected={'project_id','role_id','role_version','principal_id','repository','branch','repository_root','resource_key','allowed_file','max_source_bytes'}
-                if (not isinstance(profile,dict) or set(profile)!=expected or b['phase']!='EXECUTOR'
+                if (not isinstance(profile,dict) or set(profile) not in (expected, expected | {'producer_snapshot_sha256'}) or b['phase']!='EXECUTOR'
                     or any(profile[k]!=b[k] for k in ('project_id','role_id','role_version','principal_id'))):
                     raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
             key=tuple(b[k] for k in ('tenant_id','principal_id','project_id','task_id'))
             if key in seen:raise ValueError('DUPLICATE_DEVELOPMENT_HOST_BINDING')
             seen.add(key)
-        for fn in (review_keys_provider,writer_context_provider,native_source_provider):
+        for fn in (review_keys_provider,writer_context_provider,native_source_provider,contract_provider):
             if fn is not None and not callable(fn):raise ValueError('TRUSTED_HOST_PROVIDER_REQUIRED')
         self.bindings=copy.deepcopy(bindings);self.review_keys_provider=review_keys_provider;self.writer_context_provider=writer_context_provider
         self.native_source_provider=native_source_provider
@@ -73,6 +73,43 @@ class DevelopmentHost:
         if native_executor is not None and not isinstance(native_executor,NativeDevelopmentExecutor):
             raise ValueError('TRUSTED_NATIVE_EXECUTOR_REQUIRED')
         self.native_executor=native_executor
+        self.contract_provider=contract_provider
+    def register_contract(self,control,task_id):
+        """Admit only an existing host-custodied contract pinned by bindings."""
+        if self.contract_provider is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
+        control._admin()
+        control.gateway.assert_task_context(control.context,task_id)
+        contract=self.contract_provider(task_id)
+        control.gateway.supervisor._development_contract_shape(contract)
+        rows=[b for b in self.bindings if b['tenant_id']==control.tenant_id and b['task_id']==task_id]
+        if not rows:raise ValueError('DEVELOPMENT_HOST_ACTION_REQUIRED')
+        sha=hashlib.sha256(canonical(contract).encode()).hexdigest()
+        if any(b['contract_sha256']!=sha or b['spec_sha256']!=contract['spec_sha256'] or b['checkpoint_sha256']!=contract['checkpoint_sha256'] for b in rows):
+            raise ValueError('CURRENT_PINNED_DEVELOPMENT_SCOPE_REQUIRED')
+        for b in rows:control._assert_expected_project(task_id,b['project_id'])
+        executors=[b for b in rows if b['phase']=='EXECUTOR']
+        reviewers=[b for b in rows if b['phase']=='REVIEWER']
+        from entry_review_gate import identity
+        developer=identity(contract['developer'])
+        policies=contract['trusted_reviewers']
+        identities=[identity(p,True) for p in policies]
+        if (len(executors)!=1 or executors[0]['authority_identity']!=contract['developer'] or
+            len(reviewers)!=2 or set(p['role'] for p in policies)!={'QA','SECURITY'} or
+            len(set(identities))!=2 or developer in identities or
+            len(set(p['key_id'] for p in policies))!=2 or
+            any(not any(b['review_kind']==p['role'] and b['authority_identity']=={'issuer':p['issuer'],'subject':p['subject']} for b in reviewers) for p in policies)):
+            raise ValueError('CANONICAL_DEVELOPMENT_IDENTITY_REQUIRED')
+        profile=executors[0]['executor_profile']
+        if profile is None:
+            from native_sandbox_runner import BubblewrapNativeRunner,CANDIDATE_FILES,REPOSITORY
+            runner=self.native_executor.runner if self.native_executor is not None else None
+            if (not isinstance(runner,BubblewrapNativeRunner) or contract['target_repository']!=REPOSITORY
+                    or contract['target_base_sha']!=runner.base or set(contract['allowed_files'])!=set(CANDIDATE_FILES)):
+                raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
+        elif profile['repository']!=contract['target_repository'] or contract['allowed_files']!=[profile['allowed_file']]:
+            raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
+        return control.gateway.supervisor.register_development_contract(task_id,contract)
+
     def visible(self,identity):
         allowed=set()
         for b in self.bindings:
@@ -94,7 +131,7 @@ class DevelopmentHost:
         if any(getattr(service,k)!=identity[k] for k in ('tenant_id','principal_id','project_id')):raise ValueError('DEVELOPMENT_OAUTH_IDENTITY_MISMATCH')
         s,g,_,_=service._open()
         try:
-            c=ModelControl(g,g.tenants.issue(service.tenant_id,identity['principal_id']),service.master_key)
+            c=ModelControl(g,g.tenants.issue(service.tenant_id,identity['principal_id']),service.master_key,gateway_runtime=getattr(service,'gateway_runtime',None))
             def check(audit=False):
                 g.assert_task_context(c.context,a['task_id']);c._assert_expected_project(a['task_id'],b['project_id'])
                 task=s._task(a['task_id']);contract=s.development_contract(a['task_id'])
@@ -162,11 +199,23 @@ class DevelopmentHost:
             elif name=='task_development_finalize':
                 result=finalize_reviewed_candidate(s,a['task_id'],a['reviewed_event_id'],a['completion_event_id'],admission_check=lambda:check(True))
             else:
-                candidates=list(s.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='DEVELOPMENT_CANDIDATE'",(a['task_id'],a['attempt_id'])))
+                candidates=list(s.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='DEVELOPMENT_CANDIDATE' ORDER BY observed_at,event_id",(a['task_id'],a['attempt_id'])))
                 local=any(json.loads(x[0]).get('source_kind')=='LOCAL_ONLY_CONFIRMED_OPERATION' for x in candidates)
                 result={'task_id':a['task_id'],'attempt_id':a['attempt_id'],'canonical_task_state':task['state'],'authority_state':task['authority_state'],
                     'execution_state':'HOLD_SANDBOX_UNAVAILABLE' if local else 'REFER_TO_CANONICAL_SIGNED_REVIEW',
                     'source_kind':'AUTHENTICATED_MCP','observation_only':True}
+                runner=self.native_executor.runner if self.native_executor is not None else None
+                if callable(getattr(runner,'status',None)):
+                    from native_development_executor import digest
+                    executions=[]
+                    for row in candidates:
+                        candidate=json.loads(row[0]);cid=digest(candidate)
+                        intent=s.db.execute('SELECT 1 FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                            (a['task_id'],a['attempt_id'],'development-execution:'+cid+':intent')).fetchone()
+                        if intent:executions.append(runner.status(cid))
+                    result['sandbox_executions']=executions
+                    result['wake_supported']=False
+                    if executions:result['execution_state']='SANDBOX_'+executions[-1]['state']
             return {'jsonrpc':'2.0','id':value.get('id'),'result':{'content':[{'type':'text','text':json.dumps(result,sort_keys=True)}],'isError':False}}
         finally:s.close()
 
@@ -183,7 +232,7 @@ def _read_host_json(path,code):
     except (OSError,ValueError,TypeError):raise ValueError(code+'_UNAVAILABLE_OR_INVALID') from None
 
 
-def load_host(path,native_executor=None):
+def load_host(path,native_executor=None,db_path=None):
     """Read-only original-host custody references; never generates/saves keys.
 
     Files are owned0600 regular single-link and bounded by secure_file_input.
@@ -192,10 +241,10 @@ def load_host(path,native_executor=None):
     """
     cfg=_read_host_json(path,'DEVELOPMENT_HOST_CONFIG')
     required={'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}
-    if (not isinstance(cfg,dict) or not required.issubset(cfg) or set(cfg)-required-{'native_source_file','claim_registration'}
+    if (not isinstance(cfg,dict) or not required.issubset(cfg) or set(cfg)-required-{'native_source_file','claim_registration','contract_file','native_sandbox'}
             or type(cfg['schema_version']) is not int or cfg['schema_version']!=1 or type(cfg['enabled']) is not bool):
         raise ValueError('EXACT_DEVELOPMENT_HOST_CONFIG_REQUIRED')
-    for k in ('review_keyring_file','writer_context_file','native_source_file'):
+    for k in ('review_keyring_file','writer_context_file','native_source_file','contract_file'):
         if cfg.get(k) is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
             raise ValueError('EXISTING_PROTECTED_HOST_REFERENCE_REQUIRED')
     registration=cfg.get('claim_registration')
@@ -203,10 +252,23 @@ def load_host(path,native_executor=None):
         if (not isinstance(registration,dict) or set(registration)!={'owner_public_key_file','custody_file'}
                 or any(not isinstance(v,str) or not v.startswith('/') for v in registration.values())):
             raise ValueError('EXISTING_CLAIM_REGISTRATION_REFERENCES_REQUIRED')
+    sandbox=cfg.get('native_sandbox')
+    if sandbox is not None:
+        if (not isinstance(sandbox,dict) or set(sandbox)!={'repository_root','base_commit','test_plan_sha256'}
+                or not isinstance(sandbox['repository_root'],str) or not sandbox['repository_root'].startswith('/')
+                or not isinstance(sandbox['base_commit'],str) or re.fullmatch('[0-9a-f]{40}',sandbox['base_commit']) is None
+                or not isinstance(sandbox['test_plan_sha256'],str) or re.fullmatch('[0-9a-f]{64}',sandbox['test_plan_sha256']) is None):
+            raise ValueError('FIXED_NATIVE_SANDBOX_REFERENCES_REQUIRED')
     if not cfg['enabled']:
-        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('native_source_file') is not None or registration is not None:
+        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('native_source_file') is not None or registration is not None or cfg.get('contract_file') is not None or sandbox is not None:
             raise ValueError('DISABLED_DEVELOPMENT_CONFIG_MUST_BE_EMPTY')
         return None
+    if sandbox is not None:
+        if native_executor is not None:raise ValueError('ONE_TRUSTED_NATIVE_EXECUTOR_REQUIRED')
+        from native_sandbox_runner import BubblewrapNativeRunner
+        from native_development_executor import NativeDevelopmentExecutor
+        runner=BubblewrapNativeRunner(db_path,sandbox['repository_root'],sandbox['base_commit'],sandbox['test_plan_sha256'])
+        native_executor=NativeDevelopmentExecutor(runner,runner.plan)
     def keys(task,ids):
         raw=_read_host_json(cfg['review_keyring_file'],'TRUSTED_REVIEW_KEYRING')
         if not isinstance(raw,dict) or any(k not in raw or not isinstance(raw[k],str) or not re.fullmatch('[0-9a-f]{64,256}',raw[k]) or len(raw[k])%2 for k in ids):
@@ -224,9 +286,14 @@ def load_host(path,native_executor=None):
         except (KeyError,TypeError):
             raise ValueError('HOLD_TRUSTED_NATIVE_SOURCE_UNAVAILABLE') from None
         return value
+    def contract(task):
+        raw=_read_host_json(cfg['contract_file'],'TRUSTED_DEVELOPMENT_CONTRACT')
+        if not isinstance(raw,dict) or task not in raw:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
+        return raw[task]
     host=DevelopmentHost(cfg['bindings'],keys if cfg['review_keyring_file'] else None,
                             writer if cfg['writer_context_file'] else None,
-                            native_source if cfg.get('native_source_file') else None,native_executor)
+                            contract_provider=contract if cfg.get('contract_file') else None,
+                            native_source_provider=native_source if cfg.get('native_source_file') else None,native_executor=native_executor)
     if registration is not None:
         from task_center_mcp_claim import load_claim_host
         host.claim_host=load_claim_host(host,registration['owner_public_key_file'],registration['custody_file'])

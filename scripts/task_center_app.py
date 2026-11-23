@@ -46,9 +46,9 @@ from task_center_mcp_service import (MCPModelWorkerLoop,MCPServiceLease,
                                      recover_incomplete_mcp_starts)
 from digital_twin_projection import build_projection as build_twin_projection
 from unified_admin_projection import build_projection as build_admin_projection
+
 from task_center_real_blackbox import (RealAcceptanceGateway,
                                        ensure_schema as ensure_real_acceptance_schema)
-
 
 ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 MCP_BODY_READ_TIMEOUT_SECONDS = 2
@@ -86,6 +86,8 @@ ASSETS = {
     '/login.html': ('login.html', 'text/html; charset=utf-8'),
     '/login.js': ('login.js', 'application/javascript; charset=utf-8'),
     '/oauth-callback.html': ('oauth-callback.html', 'text/html; charset=utf-8'),
+    '/task-center.html': ('task-center.html', 'text/html; charset=utf-8'),
+    '/task-center.js': ('task-center.js', 'application/javascript; charset=utf-8'),
 }
 WORKBENCH_ASSETS = {
     '/workbench/': ('index.html', 'text/html; charset=utf-8'),
@@ -103,7 +105,7 @@ MODEL_TABLES = frozenset((
     'model_usage_events', 'model_evaluations', 'delivery_candidates',
     'candidate_reviews', 'module_settings', 'task_work_specs',
     'model_call_attempts','model_request_bindings','model_call_reservations',
-    'model_usage_attempts','model_runtime_limits','approved_skills',
+    'model_request_reconciliations','model_usage_attempts','model_runtime_limits','approved_skills',
     'role_instances','acceptance_checklists','model_quota_status',
     'codex_execution_intents','codex_execution_events',
     'provider_onboarding_configs','real_acceptance_enforcement','real_acceptance_plans',
@@ -149,6 +151,31 @@ class _ReadOnlySupervisor(object):
         return dict(row)
 
 
+def read_only_skill(db_path, tenant_id, skill_id, skill_version):
+    """Read one exact tenant skill and verify both stored JSON and Markdown hashes."""
+    if not all(isinstance(x, str) and 0 < len(x) <= 200 for x in (skill_id, skill_version)):
+        raise ValueError('INVALID_SKILL_IDENTITY')
+    db = _read_only_connection(db_path, ('approved_skills',))
+    try:
+        row = db.execute("SELECT content_json,content_sha256,review_sha256,state FROM approved_skills WHERE tenant_id=? AND skill_id=? AND skill_version=?", (tenant_id, skill_id, skill_version)).fetchone()
+    finally:
+        db.close()
+    if row is None:
+        raise LookupError('SKILL_NOT_FOUND')
+    content = json.loads(row['content_json'])
+    digest = hashlib.sha256(canonical(content).encode('utf-8')).hexdigest()
+    if not __import__('hmac').compare_digest(digest, row['content_sha256']):
+        raise ValueError('CONTENT_HASH_MISMATCH')
+    if not isinstance(content, dict) or not isinstance(content.get('markdown'), str) or not isinstance(content.get('source_sha256'), str):
+        raise ValueError('MARKDOWN_HASH_REQUIRED')
+    markdown_sha = hashlib.sha256(content['markdown'].encode('utf-8')).hexdigest()
+    if not __import__('hmac').compare_digest(markdown_sha, content['source_sha256']):
+        raise ValueError('MARKDOWN_HASH_MISMATCH')
+    return {'skill_id':skill_id, 'skill_version':skill_version, 'content':content,
+            'content_sha256':digest, 'markdown_sha256':markdown_sha,
+            'review_sha256':row['review_sha256'], 'state':row['state']}
+
+
 def _read_only_connection(db_path, required_tables):
     """Open the live database in SQLite read-only mode, including WAL data."""
     from urllib.parse import quote
@@ -179,6 +206,37 @@ def read_only_projection(db_path, authority_key, tenant_id, principal_id):
         return gateway.projection(authority.issue(tenant_id, principal_id))
     finally:
         connection.close()
+
+
+# Server-side allowlist for the anonymous scheduling display (Owner 2026-11-14
+# 13:56): only board identifiers and scheduling status counts are published.
+# Task bodies, task identifiers, tenants/principals, owners, evidence refs,
+# checkpoints, dependencies, internal paths and every control surface stay in
+# the authenticated projection only; anything not listed here is withheld.
+PUBLIC_BOARD_FIELDS = ('board_id', 'task_count', 'active_count',
+                       'blocked_count', 'health')
+def read_only_public_projection(db_path, authority_key, tenant_id,
+                                principal_id):
+    projection = read_only_projection(db_path, authority_key, tenant_id,
+                                      principal_id)
+    public = {
+        'mode': projection['mode'],
+        'production_status': projection['production_status'],
+        'observed_at': projection['observed_at'],
+        'boards': [{field: board[field] for field in PUBLIC_BOARD_FIELDS}
+                   for board in projection['boards']],
+    }
+    # Version the public payload only: never hash private tasks or identities.
+    snapshot = json.dumps(public, sort_keys=True, separators=(',', ':'),
+                          ensure_ascii=True).encode('ascii')
+    public['source'] = 'task-center-public-projection'
+    public['schema_version'] = 1
+    public['snapshot_sha256'] = hashlib.sha256(snapshot).hexdigest()
+    public['observed_at_unit'] = 'unix_seconds'
+    public['observed_at_semantics'] = 'MAX_CANONICAL_TASK_LAST_EVENT_AT'
+    public['valid_until'] = None
+    public['freshness'] = 'UNKNOWN'
+    return public
 
 
 def read_only_model_projection(db_path, authority_key, tenant_id,
@@ -267,6 +325,58 @@ def read_only_twin_projection(db_path, authority_key, tenant_id,
         connection.close()
 
 
+def read_only_execution_timeline(db_path, tenant_id, task_id, attempt_id,
+                                 limit=20, offset=0):
+    """Tenant- and current-attempt-bound metadata only; never expose payloads."""
+    if not task_id or not attempt_id or not 1 <= limit <= 100 or not 0 <= offset <= 10000:
+        raise ValueError('INVALID_TIMELINE_QUERY')
+    db = _read_only_connection(db_path, {'tasks', 'gateway_task_metadata', 'events'})
+    try:
+        db.execute('BEGIN')
+        task = db.execute("""SELECT t.attempt_id FROM tasks t JOIN gateway_task_metadata m
+          ON m.task_id=t.task_id WHERE m.tenant_id=? AND t.task_id=?""",
+          (tenant_id, task_id)).fetchone()
+        if task is None or task['attempt_id'] != attempt_id:
+            raise LookupError('TASK_OR_ATTEMPT_NOT_FOUND')
+        tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        parts = ["""SELECT observed_at AS at, 'task_event' AS source, kind,
+                   event_id AS sort_id FROM events WHERE task_id=? AND attempt_id=?"""]
+        params = [task_id, attempt_id]
+        missing = []
+        if 'model_requests' in tables:
+            parts.append("""SELECT last_heartbeat AS at, 'heartbeat' AS source,
+              'HEARTBEAT' AS kind, request_id AS sort_id FROM model_requests
+              WHERE tenant_id=? AND task_id=? AND attempt_id=? AND last_heartbeat IS NOT NULL""")
+            params += [tenant_id, task_id, attempt_id]
+        else: missing.append('model_requests')
+        if {'codex_execution_intents','codex_execution_events'}.issubset(tables):
+            parts.append("""SELECT e.observed_at AS at, 'codex_event' AS source,
+              e.event_kind AS kind, e.intent_id || ':' || e.event_id AS sort_id
+              FROM codex_execution_events e JOIN codex_execution_intents i
+              ON i.tenant_id=e.tenant_id AND i.intent_id=e.intent_id
+              WHERE i.tenant_id=? AND i.task_id=? AND i.attempt_id=? AND e.accepted=1""")
+            params += [tenant_id, task_id, attempt_id]
+        else: missing.append('codex_execution_events')
+        rows = db.execute('SELECT * FROM (' + ' UNION ALL '.join(parts) +
+          ') ORDER BY at DESC, source ASC, sort_id ASC LIMIT ? OFFSET ?',
+          params + [limit + 1, offset]).fetchall()
+        kinds = {'RECEIVED','STARTED','RUNNING','SUCCESS','HOLD','FAILURE',
+                 'CANCELLED','ASSIGNED','HEARTBEAT','CHECKPOINT','COMPLETED',
+                 'FAILED','ACCEPTED','REJECTED','SENT_INTENT','ACKED',
+                 'WAITING_APPROVAL','CANCEL_REQUESTED','EXECUTION_COMPLETED',
+                 'SUCCEEDED','UNKNOWN'}
+        items = [{'at': r['at'], 'source': r['source'],
+                  'kind': r['kind'] if r['kind'] in kinds else 'OTHER'}
+                 for r in rows[:limit]]
+        return {'mode':'TEST_ONLY', 'tenant_id':tenant_id, 'task_id':task_id,
+                'attempt_id':attempt_id, 'items':items,
+                'next_offset':offset+limit if len(rows)>limit else None,
+                'unavailable_sources':missing, 'liveness':'UNKNOWN',
+                'terminal_log':'NOT_CONNECTED'}
+    finally:
+        db.close()
+
+
 def _json_bytes(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
                       separators=(',', ':')).encode('utf-8')
@@ -329,7 +439,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
                   mcp_model_worker_enabled=False,mcp_dispatch_config=None,
-                  mcp_development_host=None,mcp_claim_host=None):
+                  mcp_development_host=None,gateway_runtime=None,mcp_claim_host=None):
     mcp_dispatch_config=validate_dispatch_config(mcp_dispatch_config)
     actor_tokens = dict(actor_tokens or {})
     codex_transports = dict(codex_transports or {})
@@ -603,6 +713,19 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   'tenant_id':session['tenant_id'],'roles':session['roles'],
                   'expires_at':session['expires_at']}),
                   'application/json; charset=utf-8');return
+            if path == '/api/public-projection':
+                # Anonymous scheduling display: server-side allowlist fields
+                # only; fail closed without echoing exception details.
+                try:
+                    self._send(200, _json_bytes(read_only_public_projection(
+                               db_path, authority_key, tenant_id,
+                               principal_id)),
+                               'application/json; charset=utf-8')
+                except Exception:
+                    self._send(503,_json_bytes(
+                      {'error':'PUBLIC_PROJECTION_UNAVAILABLE'}),
+                      'application/json; charset=utf-8')
+                return
             if (session_store is not None and path in ('/','/index.html',
                     '/admin.html','/workbench/','/workbench/index.html') and
                     self._session() is None):
@@ -636,6 +759,54 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 except Exception as exc:
                     self._send(400,_json_bytes({'error':str(exc)}),
                                'application/json; charset=utf-8')
+                return
+            if path == '/api/admin/skill-readback':
+                # Full content is restricted to an authenticated tenant administrator.
+                try:
+                    session = self._session()
+                    admin = self._admin_allowed()
+                except Exception:
+                    self._send(503,_json_bytes({'error':'SKILL_READBACK_UNAVAILABLE'}),'application/json; charset=utf-8'); return
+                if session is None or not admin:
+                    self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),'application/json; charset=utf-8'); return
+                if session.get('tenant_id') != tenant_id:
+                    self._send(403,_json_bytes({'error':'TENANT_MISMATCH'}),'application/json; charset=utf-8'); return
+                try:
+                    query=__import__('urllib.parse').parse.parse_qs(urlsplit(self.path).query,keep_blank_values=True)
+                    if set(query) != {'skill_id','skill_version'} or any(len(v)!=1 for v in query.values()):
+                        raise ValueError('INVALID_SKILL_QUERY')
+                    result=read_only_skill(db_path,tenant_id,query['skill_id'][0],query['skill_version'][0])
+                    self._send(200,_json_bytes(result),'application/json; charset=utf-8')
+                except LookupError:
+                    self._send(404,_json_bytes({'error':'SKILL_NOT_FOUND'}),'application/json; charset=utf-8')
+                except (ValueError, TypeError):
+                    self._send(400,_json_bytes({'error':'SKILL_READBACK_INVALID'}),'application/json; charset=utf-8')
+                except Exception:
+                    self._send(503,_json_bytes({'error':'SKILL_READBACK_UNAVAILABLE'}),'application/json; charset=utf-8')
+                return
+            if path == '/api/admin/execution-timeline':
+                if not self._admin_allowed():
+                    self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),
+                               'application/json; charset=utf-8'); return
+                session = self._session()
+                if session is not None and session.get('tenant_id') != tenant_id:
+                    self._send(403,_json_bytes({'error':'TENANT_MISMATCH'}),
+                               'application/json; charset=utf-8'); return
+                try:
+                    query=__import__('urllib.parse').parse.parse_qs(
+                      urlsplit(self.path).query,keep_blank_values=True)
+                    if not set(query).issubset({'task_id','attempt_id','limit','offset'}) or any(len(v)!=1 for v in query.values()):
+                        raise ValueError('INVALID_TIMELINE_QUERY')
+                    result=read_only_execution_timeline(db_path,tenant_id,
+                      query.get('task_id',[''])[0],query.get('attempt_id',[''])[0],
+                      int(query.get('limit',['20'])[0]),int(query.get('offset',['0'])[0]))
+                    self._send(200,_json_bytes(result),'application/json; charset=utf-8')
+                except LookupError:
+                    self._send(404,_json_bytes({'error':'TASK_OR_ATTEMPT_NOT_FOUND'}),'application/json; charset=utf-8')
+                except (ValueError, OverflowError):
+                    self._send(400,_json_bytes({'error':'INVALID_TIMELINE_QUERY'}),'application/json; charset=utf-8')
+                except Exception:
+                    self._send(500,_json_bytes({'error':'TIMELINE_UNAVAILABLE'}),'application/json; charset=utf-8')
                 return
             if path == '/api/admin/digital-twin':
                 if not self._admin_allowed():
@@ -753,7 +924,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                             raise ValueError('AUTHENTICATED_ACTOR_REQUIRED')
                         control=ModelControl(control.gateway,
                           control.gateway.tenants.issue(tenant_id,actor),
-                          model_master_key)
+                          model_master_key,gateway_runtime=gateway_runtime)
                     if action in ('PREPARE_RESULT_RECOVERY','REVIEW_RESULT_RECOVERY','ACCEPT_RESULT_RECOVERY','RESULT_RECOVERY_STATUS'):
                         from task_center_mcp_result_recovery import ResultRecoveryMCP
                         names={'PREPARE_RESULT_RECOVERY':'task_prepare_result_recovery','REVIEW_RESULT_RECOVERY':'task_review_result_recovery','ACCEPT_RESULT_RECOVERY':'task_accept_result_recovery','RESULT_RECOVERY_STATUS':'task_result_recovery_status'}
@@ -848,6 +1019,10 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     elif action=='TASK_ADMISSION_STATUS':
                         from task_center_admission import admission_status
                         result=admission_status(control,value)
+                    elif action=='REGISTER_DEVELOPMENT_CONTRACT':
+                        if set(value)!={'task_id'}:raise ValueError('EXACT_DEVELOPMENT_REGISTRATION_ARGUMENTS_REQUIRED')
+                        if mcp_development_host is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
+                        result=mcp_development_host.register_contract(control,value['task_id'])
                     elif action=='REGISTER_GRAPH':
                         result=control.gateway.register_graph(control.context,value['graph'])
                     elif action=='CREATE_PROJECT_TASK':
@@ -948,6 +1123,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                                 value['task_id']))
                     elif action=='CANCEL_REQUEST':
                         result=control.request_cancel(value['request_id'])
+                    elif action=='RECONCILE_REQUEST':
+                        result=control.reconcile_request(
+                          value['request_id'],value['provider_receipt'],
+                          expected_task_id=value['task_id'],
+                          expected_attempt_id=value['attempt_id'],
+                          expected_project_id=value['project_id'])
                     elif action=='REGISTER_BENCHMARK':
                         result=control.register_benchmark_suite(
                           value['suite_version'],value['cases'])
@@ -1194,7 +1375,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     self._mcp_challenge(scope);return
                 service=MCPTaskService(db_path,authority_key,tenant_id,
                   model_master_key,identity['principal_id'],identity['project_id'],
-                  execution_enabled=mcp_model_worker_enabled)
+                  execution_enabled=mcp_model_worker_enabled,gateway_runtime=gateway_runtime)
                 rejection_stage=('MCP_TASK_SUBMIT' if method=='tools/call' and
                   (value.get('params') or {}).get('name')=='task_submit'
                   else 'MCP_TOOL_CALL')
@@ -1290,7 +1471,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             current=(session['principal_id'] if session is not None else
                      principal_id)
             context=authority.issue(tenant_id,'admin:'+current)
-            return supervisor,ModelControl(gateway,context,model_master_key)
+            return supervisor,ModelControl(gateway,context,model_master_key,gateway_runtime=gateway_runtime)
 
     return TaskCenterHandler
 
@@ -1302,8 +1483,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,mcp_claim_host=None,
-                correction_observer_interval=None):
+                mcp_dispatch_config=None,mcp_development_host=None,
+                correction_observer_interval=None,gateway_runtime=None,mcp_claim_host=None):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if mcp_claim_host is not None:
@@ -1338,7 +1519,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
             authority=TestTenantAuthority(authority_key)
             gateway=GatewayKernel(supervisor,authority)
             ModelControl(gateway,authority.issue(tenant_id,
-              'admin:'+principal_id),model_master_key)
+              'admin:'+principal_id),model_master_key,gateway_runtime=gateway_runtime)
             ensure_onboarding_schema(supervisor.db)
             ConnectionManager(gateway,authority.issue(tenant_id,
               'admin:'+principal_id),model_master_key)
@@ -1372,7 +1553,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
                                 mcp_model_worker_enabled,mcp_dispatch_config,
-                                mcp_development_host,mcp_claim_host)
+                                mcp_development_host,gateway_runtime,mcp_claim_host)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None
@@ -1391,7 +1572,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         if mcp_model_worker_enabled:
             server.mcp_worker=MCPModelWorkerLoop(os.path.realpath(db_path),
               authority_key,tenant_id,model_master_key,
-              adapters=mcp_worker_adapters);server.mcp_worker.start()
+              adapters=mcp_worker_adapters,gateway_runtime=gateway_runtime);server.mcp_worker.start()
         return server
     except Exception:
         if server is not None:server.server_close()
@@ -1399,8 +1580,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise
 
 
-def main(argv=None, mcp_claim_host=None, mcp_development_host=None):
-    # Original trusted in-process factory only; no executable CLI/env loader.
+def main(argv=None, gateway_runtime=None, mcp_claim_host=None, mcp_development_host=None):
+    # Trusted in-process injection and protected data only, never executable CLI/env loaders.
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
     authority = parser.add_mutually_exclusive_group(required=True)
@@ -1470,7 +1651,7 @@ def main(argv=None, mcp_claim_host=None, mcp_development_host=None):
         raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
     from task_center_mcp_development import load_host as load_development_host
     if mcp_development_host is None and args.mcp_development_config_file:
-        mcp_development_host=load_development_host(args.mcp_development_config_file)
+        mcp_development_host=load_development_host(args.mcp_development_config_file,db_path=args.db)
     if mcp_claim_host is None and mcp_development_host is not None:
         mcp_claim_host=getattr(mcp_development_host,'claim_host',None)
     server = make_server(args.db, key, args.tenant, args.principal,
@@ -1484,7 +1665,8 @@ def main(argv=None, mcp_claim_host=None, mcp_development_host=None):
                            if args.mcp_dispatch_config_file else None),
                          mcp_development_host=mcp_development_host,
                          mcp_claim_host=mcp_claim_host,
-                         correction_observer_interval=args.correction_observer_interval)
+                         correction_observer_interval=args.correction_observer_interval,
+                         gateway_runtime=gateway_runtime)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)
@@ -1506,7 +1688,9 @@ def main(argv=None, mcp_claim_host=None, mcp_development_host=None):
                'mcp': ('ENABLED' if args.enable_mcp else 'DISABLED'),
                'mcp_model_outbound': ('ENABLED_ZERO_SPEND_GATES' if
                   args.allow_mcp_model_outbound else 'DISABLED'),
-               'production_status': 'NOT_IMPLEMENTED'}
+               'production_status': 'NOT_IMPLEMENTED',
+               'gateway_native_runtime': ('TRUSTED_INSTANCE_INJECTED' if
+                  gateway_runtime is not None else 'NOT_CONNECTED')}
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True), flush=True)
     previous_term = signal.getsignal(signal.SIGTERM)
     signal.signal(signal.SIGTERM,

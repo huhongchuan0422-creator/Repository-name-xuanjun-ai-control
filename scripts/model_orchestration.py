@@ -7,6 +7,8 @@ credentials or paid calls are admitted by this module.
 from __future__ import print_function
 
 import hashlib
+import hmac
+import base64
 import json
 import math
 import sqlite3
@@ -24,6 +26,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from reusable_task_gateway import _text, _sha
 from task_supervisor import UNKNOWN, canonical
+from model_fallback import init_schema as gateway_schema, mark_request, run_controlled
 from connection_management import (ConnectionManager,
                                    project_openai_channel_preference)
 
@@ -35,6 +38,71 @@ REQUEST_STATES = frozenset(('QUEUED', 'RUNNING', 'RETRY_WAIT', 'SUCCEEDED',
                             'FAILED', UNKNOWN, 'CANCELLED','HOLD'))
 QUOTA_STATES = frozenset(('AVAILABLE', 'EXHAUSTED', UNKNOWN))
 QUOTA_VERIFICATION_MAX_AGE_SECONDS = 3600
+PROVIDER_RECEIPT_KEYS = frozenset((
+    'schema','kind','tenant_id','request_id','task_id','attempt_id',
+    'provider_id','provider_config_version','connection_id',
+    'connection_config_version','credential_generation','credential_identity',
+    'model_id','payload_sha256',
+    'provider_request_id','authority_id','observed_at','expires_at','result'))
+
+
+def issue_provider_reconciliation_receipt(master_key, body):
+    """Sign a receipt produced by the trusted provider-query adapter.
+
+    This primitive is intentionally not exposed by the admin HTTP or MCP
+    surfaces.  Those surfaces may only consume a receipt returned by the
+    controlled adapter that owns the model master key.
+    """
+    if not isinstance(body,dict) or set(body)!=PROVIDER_RECEIPT_KEYS:
+        raise ValueError('EXACT_PROVIDER_RECONCILIATION_RECEIPT_REQUIRED')
+    if (body['schema']!=1 or body['kind'] not in
+            ('PROVIDER_QUOTA_AVAILABILITY','PROVIDER_RESULT_QUERY') or
+            type(body['provider_config_version']) is not int or
+            (body['connection_config_version'] is not None and
+             type(body['connection_config_version']) is not int) or
+            type(body['credential_generation']) is not int or
+            body['credential_generation']<0 or
+            type(body['observed_at']) not in (int,float) or
+            type(body['expires_at']) not in (int,float) or
+            body['expires_at']!=body['observed_at']+600 or
+            any(not isinstance(body[key],str) or not body[key]
+                for key in ('tenant_id','request_id','task_id','attempt_id',
+                'provider_id','model_id','payload_sha256',
+                'provider_request_id','authority_id','credential_identity')) or
+            body['provider_request_id']==UNKNOWN):
+        raise ValueError('VALID_PROVIDER_RECONCILIATION_RECEIPT_REQUIRED')
+    _sha(body['payload_sha256'],'payload_sha256')
+    _sha(body['credential_identity'],'credential_identity')
+    if body['kind']=='PROVIDER_QUOTA_AVAILABILITY' and body['result'] is not None:
+        raise ValueError('AVAILABILITY_RECEIPT_HAS_NO_RESULT')
+    encoded=base64.urlsafe_b64encode(
+        canonical(body).encode('utf-8')).decode('ascii').rstrip('=')
+    signature=hmac.new(master_key,encoded.encode('ascii'),
+                       hashlib.sha256).hexdigest()
+    return encoded+'.'+signature
+
+
+def verify_provider_reconciliation_receipt(master_key, token, now):
+    if not isinstance(token,str) or len(token)>16384:
+        raise ValueError('PROVIDER_RECONCILIATION_RECEIPT_INVALID')
+    try:
+        encoded,signature=token.split('.',1)
+        expected=hmac.new(master_key,encoded.encode('ascii'),
+                          hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature,expected):raise ValueError()
+        padded=encoded+'='*((4-len(encoded)%4)%4)
+        body=json.loads(base64.urlsafe_b64decode(
+            padded.encode('ascii')).decode('utf-8'))
+        # Reuse the exact-shape validator and compare the canonical token to
+        # reject alternative encodings or extra fields.
+        if issue_provider_reconciliation_receipt(master_key,body)!=token:
+            raise ValueError()
+    except Exception:
+        raise ValueError('PROVIDER_RECONCILIATION_RECEIPT_INVALID')
+    if (body['observed_at']>now+5 or now>=body['expires_at'] or
+            now-body['observed_at']>600):
+        raise ValueError('PROVIDER_RECONCILIATION_RECEIPT_EXPIRED')
+    return body
 
 
 def _number(value, name, minimum=0):
@@ -143,8 +211,10 @@ class OpenAICompatibleAdapter(object):
         try:
             if self.opener is None:
                 connection,response=self._pinned_open(parsed,body,headers,timeout)
-                if response.status in (401,429) or response.status>=300:
-                    kind='AUTH' if response.status==401 else ('RATE_LIMIT' if response.status==429 else 'HTTP')
+                if response.status in (401,402,429) or response.status>=300:
+                    kind=('AUTH' if response.status==401 else
+                          'BILLING' if response.status==402 else
+                          'RATE_LIMIT' if response.status==429 else 'HTTP')
                     raise ProviderError(kind,'HTTP_%d'%response.status,response.status==429 or response.status>=500)
             else:response = self.opener(request, timeout=timeout)
             raw = response.read(2 * 1024 * 1024 + 1)
@@ -154,6 +224,8 @@ class OpenAICompatibleAdapter(object):
         except urllib.error.HTTPError as exc:
             if exc.code == 401:
                 raise ProviderError('AUTH', 'HTTP_401')
+            if exc.code == 402:
+                raise ProviderError('BILLING', 'HTTP_402')
             if exc.code == 429:
                 raise ProviderError('RATE_LIMIT', 'HTTP_429', True)
             raise ProviderError('HTTP', 'HTTP_%d' % exc.code,
@@ -276,7 +348,7 @@ def _host_lifecycle_transaction(method):
 
 
 class ModelControl(object):
-    def __init__(self, gateway, context, master_key, clock=None):
+    def __init__(self, gateway, context, master_key, clock=None, gateway_runtime=None):
         self.gateway = gateway
         self.db = gateway.db
         self.context = context
@@ -285,6 +357,10 @@ class ModelControl(object):
         self.fernet = Fernet(master_key)
         self.clock = clock or time.time
         self._schema()
+        self.gateway_runtime=gateway_runtime if gateway_runtime is not None else getattr(gateway,'native_model_runtime',None)
+        if self.gateway_runtime is not None:gateway.native_model_runtime=self.gateway_runtime
+        gateway_schema(self.db)
+        self.db.commit()
 
     def _schema(self):
         statements = (
@@ -408,12 +484,21 @@ class ModelControl(object):
               tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
               provider_config_version INTEGER NOT NULL,
               connection_id TEXT,connection_config_version INTEGER,
+              credential_generation INTEGER,credential_fingerprint TEXT,
               expected_input_tokens INTEGER NOT NULL,
               max_output_tokens INTEGER NOT NULL,allow_paid INTEGER NOT NULL,
               writer_principal TEXT,writer_fence INTEGER,writer_epoch INTEGER,
               writer_valid_until REAL,skill_snapshot_sha256 TEXT,
               work_spec_sha256 TEXT,module_version TEXT,
               PRIMARY KEY(tenant_id,request_id))''',
+            '''CREATE TABLE IF NOT EXISTS model_request_reconciliations(
+              tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
+              attempt_number INTEGER NOT NULL,outcome TEXT NOT NULL,
+              evidence_ref TEXT NOT NULL,result_sha256 TEXT,
+              observed_at REAL NOT NULL,
+              PRIMARY KEY(tenant_id,request_id,attempt_number),
+              FOREIGN KEY(tenant_id,request_id) REFERENCES
+              model_requests(tenant_id,request_id))''',
             '''CREATE TABLE IF NOT EXISTS model_call_reservations(
               tenant_id TEXT NOT NULL,reservation_id TEXT NOT NULL,
               request_id TEXT NOT NULL,attempt_number INTEGER NOT NULL,
@@ -469,6 +554,12 @@ class ModelControl(object):
               'PRAGMA table_info(model_request_bindings)')}
             if 'writer_principal' not in binding_columns:
                 self.db.execute('ALTER TABLE model_request_bindings ADD COLUMN writer_principal TEXT')
+            if 'credential_fingerprint' not in binding_columns:
+                self.db.execute('''ALTER TABLE model_request_bindings ADD COLUMN
+                  credential_fingerprint TEXT''')
+            if 'credential_generation' not in binding_columns:
+                self.db.execute('''ALTER TABLE model_request_bindings ADD COLUMN
+                  credential_generation INTEGER''')
             evaluation_columns={x['name'] for x in self.db.execute(
               'PRAGMA table_info(model_evaluations)')}
             for name in ('input_usage_state','output_usage_state'):
@@ -846,6 +937,38 @@ class ModelControl(object):
         try:return self.fernet.decrypt(row['secret_cipher']).decode('utf-8')
         except InvalidToken:raise ValueError('PROVIDER_SECRET_DECRYPT_FAILED')
 
+    def _credential_fingerprint(self,provider_id,connection_id,secret):
+        identity=canonical({'tenant_id':self.tenant_id,
+          'provider_id':provider_id,'connection_id':connection_id})
+        return hmac.new(self.master_key,(identity+'\0'+secret).encode('utf-8'),
+                        hashlib.sha256).hexdigest()
+
+    def _binding_credential(self,provider_id,connection_id,base_url,now):
+        if connection_id:
+            row=self.db.execute('''SELECT * FROM service_connections WHERE
+              tenant_id=? AND connection_id=?''',(self.tenant_id,
+              connection_id)).fetchone()
+            if (row is None or row['provider_id']!=provider_id or
+                    row['status']!='ACTIVE' or row['secret_cipher'] is None or
+                    row['purpose']!='MODEL_INFERENCE' or
+                    row['destination_origin']!=self._origin(base_url) or
+                    (row['auth_type']=='OAUTH2_AUTH_CODE_PKCE' and
+                     (row['access_expires_at'] is None or
+                      now>=row['access_expires_at']))):
+                raise ValueError('ACTIVE_PROVIDER_CONNECTION_REQUIRED')
+            try:secret=self.fernet.decrypt(row['secret_cipher']).decode('utf-8')
+            except InvalidToken:
+                raise ValueError('CONNECTION_CREDENTIAL_DECRYPT_FAILED')
+            version=row['config_version']
+            generation=row['credential_generation']
+        else:
+            secret=self.provider_secret(provider_id);version=None
+            generation=self.db.execute('''SELECT config_version FROM
+              model_providers WHERE tenant_id=? AND provider_id=?''',(
+              self.tenant_id,provider_id)).fetchone()['config_version']
+        return secret,version,generation,self._credential_fingerprint(
+          provider_id,connection_id,secret)
+
     def upsert_model(self, value):
         self._admin()
         required={'provider_id','model_id','capabilities','enabled','price_state',
@@ -1033,7 +1156,11 @@ class ModelControl(object):
     def queue_request(self, task_id, role_id, messages, idempotency_key,
                       max_output_tokens=None,connection_id=None,now=None,
                       expected_attempt_id=None,expected_assignment_binding=None,
-                      expected_project_id=None):
+                      expected_project_id=None, dispatch_mode=None):
+        if dispatch_mode is None:
+            dispatch_mode='gateway-native' if self.gateway_runtime is not None else 'direct'
+        if dispatch_mode not in ('direct','gateway-native'):
+            raise ValueError('INVALID_DISPATCH_MODE')
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
@@ -1055,7 +1182,7 @@ class ModelControl(object):
         if role is None:raise ValueError('ACTIVE_ROLE_REQUIRED')
         if (role['phase']=='EXECUTOR' and not role['writer_allowed']):
             raise ValueError('CURRENT_WRITER_EXECUTOR_REQUIRED')
-        provider=self.db.execute('''SELECT config_version,price_state,enabled
+        provider=self.db.execute('''SELECT config_version,price_state,enabled,base_url
           FROM model_providers WHERE tenant_id=? AND provider_id=?''',(
           self.tenant_id,assignment['provider_id'])).fetchone()
         if provider is None or not provider['enabled']:
@@ -1121,6 +1248,10 @@ class ModelControl(object):
         existing=self.db.execute('''SELECT * FROM model_requests
           WHERE tenant_id=? AND idempotency_key=?''',(self.tenant_id,idempotency_key)).fetchone()
         if existing:
+            prior_mode=self.db.execute('SELECT 1 FROM model_gateway_dispatch WHERE tenant_id=? AND request_id=?',
+                (self.tenant_id,existing['request_id'])).fetchone()
+            if bool(prior_mode)!=(dispatch_mode=='gateway-native'):
+                raise ValueError('IDEMPOTENCY_DISPATCH_CONFLICT')
             actual=(existing['task_id'],existing['attempt_id'],existing['role_id'],
               existing['provider_id'],existing['model_id'],existing['payload_sha256'])
             expected=(task_id,task['attempt_id'],role_id,
@@ -1142,6 +1273,24 @@ class ModelControl(object):
         self.db.execute('BEGIN IMMEDIATE')
         try:
             self._assert_expected_project(task_id, expected_project_id)
+            fresh_provider=self.db.execute('''SELECT config_version,enabled,
+              base_url FROM model_providers WHERE tenant_id=? AND provider_id=?''',
+              (self.tenant_id,assignment['provider_id'])).fetchone()
+            if (fresh_provider is None or not fresh_provider['enabled'] or
+                    fresh_provider['config_version']!=provider['config_version'] or
+                    fresh_provider['base_url']!=provider['base_url']):
+                raise ValueError('PROVIDER_CHANGED_BEFORE_QUEUE_COMMIT')
+            if dispatch_mode=='gateway-native':
+                if connection_id is not None:raise ValueError('GATEWAY_CONNECTION_CREDENTIAL_FORBIDDEN')
+                _credential=None;credential_version=None
+                credential_generation=0;credential_fingerprint='GATEWAY_NATIVE_NO_TC_SECRET'
+            else:
+                (_credential,credential_version,credential_generation,
+                 credential_fingerprint)=(
+                  self._binding_credential(assignment['provider_id'],connection_id,
+                    fresh_provider['base_url'],now))
+            if connection_id and credential_version!=connection_version:
+                raise ValueError('CONNECTION_CHANGED_BEFORE_QUEUE_COMMIT')
             if expected_assignment_binding is not None:
                 fresh_assignment = self.db.execute('''SELECT * FROM model_assignments
                     WHERE tenant_id=? AND task_id=? AND attempt_id=? AND role_id=?''',
@@ -1171,16 +1320,21 @@ class ModelControl(object):
               digest,0,now,None,None,None,None,None,checkpoint,0,now,now))
             self.db.execute('''INSERT INTO model_request_bindings(
               tenant_id,request_id,provider_config_version,connection_id,
-              connection_config_version,expected_input_tokens,max_output_tokens,
+              connection_config_version,credential_generation,
+              credential_fingerprint,
+              expected_input_tokens,max_output_tokens,
               allow_paid,writer_principal,writer_fence,writer_epoch,
               writer_valid_until,skill_snapshot_sha256,work_spec_sha256,
-              module_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
+              module_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(
               self.tenant_id,request_id,
-              provider['config_version'],connection_id,connection_version,expected_input,
+              provider['config_version'],connection_id,connection_version,
+              credential_generation,credential_fingerprint,expected_input,
               max_output_tokens,int(assignment['reason']!='QUALIFIED_FREE_FINAL_COST'),
               task_state['authority_caller_id'],task_state['fence'],task_state['epoch'],
               task_state['authority_valid_until'],skill_sha,spec_sha,
               module['version'] if module else 'legacy-test-only'))
+            if dispatch_mode=='gateway-native':
+                mark_request(self.db,self.tenant_id,request_id)
             self.db.commit()
         except Exception:
             self.db.rollback();raise
@@ -1194,9 +1348,32 @@ class ModelControl(object):
         if row is None or row['project_id'] != expected_project_id:
             raise ValueError('PROJECT_TASK_NOT_VISIBLE')
 
+    def _cancel_principal(self, expected_task_id, expected_attempt_id):
+        # Canonical main-chain authorization for cancel (Owner decision
+        # 2026-11-14): the legacy admin surface is unchanged, and a real
+        # authenticated subject may cancel only when the call is scoped to
+        # the exact task/attempt to which it is CURRENTLY BOUND in the
+        # canonical model_assignments ledger (the same binding table that
+        # task_assign_role writes).  Tenant scoping comes from the verified
+        # context; project/attempt/duplicate checks below stay untouched.
+        # Unscoped cancel and any unbound principal keep raising
+        # MODEL_ADMIN_REQUIRED; nothing here mints or fakes admin identity.
+        principal = self._principal()
+        if principal.startswith('admin:'):
+            return principal
+        if expected_task_id is None or expected_attempt_id is None:
+            raise ValueError('MODEL_ADMIN_REQUIRED')
+        bound = self.db.execute('''SELECT 1 FROM model_assignments WHERE
+            tenant_id=? AND task_id=? AND attempt_id=? AND principal_id=?''',
+            (self.tenant_id,expected_task_id,expected_attempt_id,
+             principal)).fetchone()
+        if bound is None:
+            raise ValueError('MODEL_ADMIN_REQUIRED')
+        return principal
+
     def request_cancel(self, request_id, now=None, expected_task_id=None,
                        expected_attempt_id=None, expected_project_id=None):
-        principal=self._admin();now=self.clock() if now is None else now
+        principal=self._cancel_principal(expected_task_id,expected_attempt_id);now=self.clock() if now is None else now
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
             if expected_task_id is not None:
@@ -1229,6 +1406,358 @@ class ModelControl(object):
                         {'resulting_state':state},now)
         return {'request_id':request_id,'state':state,
                 'cancel_requested':True}
+
+    def query_provider_reconciliation(self, request_id, kind, query_adapter,
+                                      now=None):
+        """Ask a trusted provider-specific status adapter and sign its reply.
+
+        This method is intentionally absent from the admin HTTP/MCP actions.
+        The adapter must perform a provider status/query operation, not a new
+        inference call, and the returned receipt remains bound to the frozen
+        request payload and provider/connection configuration.
+        """
+        self._admin();now=self.clock() if now is None else now
+        if kind not in ('PROVIDER_QUOTA_AVAILABILITY','PROVIDER_RESULT_QUERY'):
+            raise ValueError('PROVIDER_RECONCILIATION_QUERY_KIND_REQUIRED')
+        if query_adapter is None or not callable(
+                getattr(query_adapter,'query_request',None)):
+            raise ValueError('TRUSTED_PROVIDER_QUERY_ADAPTER_REQUIRED')
+        authority_id=getattr(query_adapter,'authority_id',None)
+        if (not isinstance(authority_id,str) or not authority_id or
+                len(authority_id)>128):
+            raise ValueError('PROVIDER_QUERY_AUTHORITY_ID_REQUIRED')
+        def read_binding():
+            return self.db.execute('''SELECT r.*,b.provider_config_version,
+              b.connection_id,b.connection_config_version,
+              b.credential_generation,b.credential_fingerprint,p.base_url,
+              p.config_version AS current_provider_config_version,
+              p.enabled AS provider_enabled FROM model_requests r JOIN
+              model_request_bindings b ON b.tenant_id=r.tenant_id AND
+              b.request_id=r.request_id LEFT JOIN model_providers p ON
+              p.tenant_id=r.tenant_id AND p.provider_id=r.provider_id WHERE
+              r.tenant_id=? AND r.request_id=?''',
+              (self.tenant_id,request_id)).fetchone()
+        def binding_identity(row):
+            if (row['current_provider_config_version'] is None or
+                    not row['provider_enabled'] or
+                    row['current_provider_config_version']!=
+                    row['provider_config_version']):
+                return None
+            try:
+                _secret,version,generation,fingerprint=self._binding_credential(
+                  row['provider_id'],row['connection_id'],row['base_url'],now)
+            except ValueError:return None
+            if ((row['connection_id'] and version!=
+                    row['connection_config_version']) or
+                    (not row['connection_id'] and
+                     row['connection_config_version'] is not None) or
+                    generation!=row['credential_generation'] or
+                    fingerprint!=row['credential_fingerprint']):
+                return None
+            return fingerprint
+        def hold_changed(row):
+            config_changed=(row['current_provider_config_version'] is None or
+              not row['provider_enabled'] or
+              row['current_provider_config_version']!=
+              row['provider_config_version'])
+            reason=('PROVIDER_CONFIG_CHANGED_HOLD' if config_changed else
+                    'PROVIDER_CREDENTIAL_CHANGED_HOLD')
+            self.db.execute('''UPDATE model_requests SET state='HOLD',
+              error_kind=?,lease_owner=NULL,
+              lease_until=NULL,updated_at=? WHERE tenant_id=? AND request_id=?
+              AND state IN ('FAILED','UNKNOWN','RETRY_WAIT')''',(reason,now,
+              self.tenant_id,request_id))
+            self._audit(self._principal(),reason,
+              request_id,{'frozen_provider_config_version':
+              row['provider_config_version'],'current_provider_config_version':
+              row['current_provider_config_version'],'connection_id':
+              row['connection_id'],'frozen_connection_config_version':
+              row['connection_config_version']},now)
+            return reason
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=read_binding()
+            if row is None:raise KeyError(request_id)
+            required_state=('FAILED' if kind=='PROVIDER_QUOTA_AVAILABILITY'
+                            else UNKNOWN)
+            if row['state']!=required_state:
+                raise ValueError('PROVIDER_RECONCILIATION_QUERY_STATE_REQUIRED')
+            credential_identity=binding_identity(row)
+            if credential_identity is None:
+                reason=hold_changed(row);self.db.commit()
+                raise ValueError(reason)
+            query_snapshot=(row['provider_config_version'],row['base_url'],
+              row['connection_id'],row['connection_config_version'],
+              row['credential_generation'],credential_identity)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
+        try:
+            secret,version,actual_generation,actual_identity=(
+              self._binding_credential(
+              row['provider_id'],row['connection_id'],row['base_url'],now)
+            )
+            if (actual_generation!=row['credential_generation'] or
+                    actual_identity!=credential_identity or
+                    (row['connection_id'] and
+                     version!=row['connection_config_version'])):
+                raise ValueError('PROVIDER_QUERY_CREDENTIAL_CHANGED')
+        except ValueError:
+            self.db.execute('BEGIN IMMEDIATE')
+            changed=read_binding()
+            changed_identity=(binding_identity(changed)
+                              if changed is not None else None)
+            changed_snapshot=((changed['provider_config_version'],
+              changed['base_url'],changed['connection_id'],
+              changed['connection_config_version'],
+              changed['credential_generation'],changed_identity)
+              if changed is not None else None)
+            if changed_snapshot!=query_snapshot:
+                reason=(hold_changed(changed) if changed is not None else
+                        'PROVIDER_CONFIG_CHANGED_HOLD')
+                self.db.commit()
+                raise ValueError(reason)
+            self.db.rollback();raise
+        query=query_adapter.query_request({'base_url':row['base_url'],
+          'credential':secret,'kind':kind,'request_id':request_id,
+          'task_id':row['task_id'],'attempt_id':row['attempt_id'],
+          'provider_id':row['provider_id'],'model_id':row['model_id'],
+          'payload_sha256':row['payload_sha256']})
+        if (not isinstance(query,dict) or set(query)!=
+                {'provider_request_id','available','result'} or
+                not isinstance(query['provider_request_id'],str) or
+                not query['provider_request_id'] or
+                query['provider_request_id']==UNKNOWN or
+                query['available'] is not True):
+            raise ValueError('AUTHORITATIVE_PROVIDER_QUERY_REQUIRED')
+        if kind=='PROVIDER_QUOTA_AVAILABILITY' and query['result'] is not None:
+            raise ValueError('AVAILABILITY_QUERY_HAS_NO_RESULT')
+        if kind=='PROVIDER_RESULT_QUERY' and query['result'] is None:
+            raise ValueError('RESULT_QUERY_RESULT_REQUIRED')
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=read_binding()
+            current_identity=binding_identity(row) if row is not None else None
+            current_snapshot=(row['provider_config_version'],row['base_url'],
+              row['connection_id'],row['connection_config_version'],
+              row['credential_generation'],current_identity) if row is not None else None
+            if current_snapshot!=query_snapshot:
+                reason=(hold_changed(row) if row is not None else
+                        'PROVIDER_CONFIG_CHANGED_HOLD')
+                self.db.commit()
+                raise ValueError(reason)
+            body={'schema':1,'kind':kind,'tenant_id':self.tenant_id,
+              'request_id':request_id,'task_id':row['task_id'],
+              'attempt_id':row['attempt_id'],'provider_id':row['provider_id'],
+              'provider_config_version':row['provider_config_version'],
+              'connection_id':row['connection_id'],
+              'connection_config_version':row['connection_config_version'],
+              'credential_generation':row['credential_generation'],
+              'credential_identity':current_identity,
+              'model_id':row['model_id'],'payload_sha256':row['payload_sha256'],
+              'provider_request_id':query['provider_request_id'],
+              'authority_id':authority_id,
+              'observed_at':now,'expires_at':now+600,'result':query['result']}
+            token=issue_provider_reconciliation_receipt(self.master_key,body)
+            self._audit(self._principal(),'PROVIDER_RECONCILIATION_QUERY',
+              request_id,{'kind':kind,'provider_id':row['provider_id'],
+              'provider_config_version':row['provider_config_version'],
+              'authority_id':authority_id,
+              'provider_receipt_sha256':hashlib.sha256(
+                token.encode('utf-8')).hexdigest()},now)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
+        return token
+
+    def reconcile_request(self, request_id, provider_receipt, now=None,
+                          expected_task_id=None, expected_attempt_id=None,
+                          expected_project_id=None):
+        """Consume one signed provider-query receipt without replaying work."""
+        principal=self._admin();now=self.clock() if now is None else now
+        receipt=verify_provider_reconciliation_receipt(
+            self.master_key,provider_receipt,now)
+        receipt_sha=hashlib.sha256(
+            provider_receipt.encode('utf-8')).hexdigest()
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            row=self.db.execute('''SELECT r.*,b.provider_config_version,
+              b.connection_id,b.connection_config_version,
+              b.credential_generation,b.credential_fingerprint,b.writer_principal,
+              b.writer_fence,b.writer_epoch,p.config_version AS
+              current_provider_config_version,p.base_url,p.enabled AS
+              provider_enabled FROM model_requests r JOIN
+              model_request_bindings b ON b.tenant_id=r.tenant_id AND
+              b.request_id=r.request_id LEFT JOIN model_providers p ON
+              p.tenant_id=r.tenant_id AND p.provider_id=r.provider_id WHERE
+              r.tenant_id=? AND
+              r.request_id=?''',(self.tenant_id,request_id)).fetchone()
+            if row is None:raise KeyError(request_id)
+            if expected_task_id is not None:
+                self._assert_expected_project(expected_task_id,
+                                              expected_project_id)
+                if (row['task_id']!=expected_task_id or
+                        row['attempt_id']!=expected_attempt_id):
+                    raise ValueError('REQUEST_RECONCILIATION_BINDING_MISMATCH')
+            expected={'tenant_id':self.tenant_id,'request_id':request_id,
+              'task_id':row['task_id'],'attempt_id':row['attempt_id'],
+              'provider_id':row['provider_id'],
+              'provider_config_version':row['provider_config_version'],
+              'connection_id':row['connection_id'],
+              'connection_config_version':row['connection_config_version'],
+              'credential_generation':row['credential_generation'],
+              'credential_identity':row['credential_fingerprint'],
+              'model_id':row['model_id'],
+              'payload_sha256':row['payload_sha256']}
+            if any(receipt[key]!=value for key,value in expected.items()):
+                raise ValueError('PROVIDER_RECONCILIATION_BINDING_MISMATCH')
+            outcome=('NO_SIDE_EFFECT' if receipt['kind']==
+                     'PROVIDER_QUOTA_AVAILABILITY' else 'RESULT_RECOVERED')
+            recovered_result=receipt['result'];result_json=None;result_sha=None
+            if outcome=='RESULT_RECOVERED':
+                if (not isinstance(recovered_result,dict) or
+                        set(recovered_result)!=
+                        {'content','usage','provider_request_id'} or
+                        not isinstance(recovered_result['content'],str) or
+                        not recovered_result['content'] or
+                        recovered_result['provider_request_id']!=
+                        receipt['provider_request_id']):
+                    raise ValueError('EXACT_RECOVERED_RESULT_REQUIRED')
+                usage=recovered_result['usage']
+                if (not isinstance(usage,dict) or set(usage)!=
+                        {'input_tokens','output_tokens','total_tokens'} or
+                        any(type(usage[key]) is not int or usage[key]<0
+                            for key in usage) or
+                        usage['total_tokens']!=usage['input_tokens']+
+                        usage['output_tokens']):
+                    raise ValueError('EXACT_RECOVERED_USAGE_REQUIRED')
+                result_json=canonical(recovered_result)
+                result_sha=hashlib.sha256(
+                    result_json.encode('utf-8')).hexdigest()
+            prior=self.db.execute('''SELECT * FROM
+              model_request_reconciliations WHERE tenant_id=? AND request_id=?
+              AND attempt_number=?''',(self.tenant_id,request_id,
+              row['attempts'])).fetchone()
+            if prior is not None:
+                if (prior['outcome']!=outcome or
+                        prior['evidence_ref']!=receipt_sha or
+                        prior['result_sha256']!=result_sha):
+                    raise ValueError('REQUEST_RECONCILIATION_CONFLICT')
+                self.db.rollback()
+                return {'request_id':request_id,'state':row['state'],
+                        'outcome':outcome,'duplicate':True,
+                        'attempt_number':row['attempts']}
+            credential_current=False
+            try:
+                (_secret,version,current_generation,current_fingerprint)=(
+                  self._binding_credential(
+                  row['provider_id'],row['connection_id'],row['base_url'],now)
+                )
+                credential_current=(current_fingerprint==
+                  row['credential_fingerprint'] and
+                  current_generation==row['credential_generation'] and
+                  (not row['connection_id'] or version==
+                   row['connection_config_version']))
+            except ValueError:pass
+            config_current=not (row['current_provider_config_version'] is None or
+                    not row['provider_enabled'] or
+                    row['current_provider_config_version']!=
+                    row['provider_config_version'])
+            if not config_current or not credential_current:
+                reason=('PROVIDER_CONFIG_CHANGED_HOLD' if not config_current else
+                        'PROVIDER_CREDENTIAL_CHANGED_HOLD')
+                self.db.execute('''UPDATE model_requests SET state='HOLD',
+                  error_kind=?,lease_owner=NULL,
+                  lease_until=NULL,updated_at=? WHERE tenant_id=? AND
+                  request_id=? AND state IN ('FAILED','UNKNOWN','RETRY_WAIT')''',
+                  (reason,now,self.tenant_id,request_id))
+                self._audit(principal,reason,request_id,
+                  {'frozen_provider_config_version':row['provider_config_version'],
+                   'current_provider_config_version':
+                   row['current_provider_config_version'],'connection_id':
+                   row['connection_id'],'frozen_connection_config_version':
+                   row['connection_config_version']},now)
+                self.db.commit()
+                raise ValueError(reason)
+            if receipt['observed_at']<=row['updated_at']:
+                raise ValueError('POST_FAILURE_PROVIDER_RECEIPT_REQUIRED')
+            task=self.gateway.supervisor._task(row['task_id'])
+            if (task['attempt_id']!=row['attempt_id'] or
+                    task['authority_state']!='VALID' or
+                    task['authority_valid_until'] is None or
+                    not now<task['authority_valid_until'] or
+                    task['authority_caller_id']!=row['writer_principal'] or
+                    task['fence']!=row['writer_fence'] or
+                    task['epoch']!=row['writer_epoch']):
+                raise ValueError('CURRENT_REQUEST_AUTHORITY_REQUIRED')
+            if outcome=='NO_SIDE_EFFECT':
+                if (row['state']!='FAILED' or
+                        row['error_kind'] not in ('AUTH','BILLING') or
+                        recovered_result is not None):
+                    raise ValueError('PROVEN_NO_SIDE_EFFECT_FAILURE_REQUIRED')
+                state='RETRY_WAIT';error='RECONCILED_NO_SIDE_EFFECT'
+                next_attempt_at=now
+            else:
+                if row['state']!=UNKNOWN or result_json is None:
+                    raise ValueError('UNKNOWN_REQUEST_AND_RESULT_REQUIRED')
+                state='SUCCEEDED';error='RECOVERED_PROVIDER_RESULT'
+                next_attempt_at=row['next_attempt_at']
+            assignment=self.db.execute('''SELECT principal_id FROM
+              model_assignments WHERE tenant_id=? AND task_id=? AND
+              attempt_id=? AND role_id=?''',(self.tenant_id,row['task_id'],
+              row['attempt_id'],row['role_id'])).fetchone()
+            if assignment is None:
+                raise ValueError('CURRENT_REQUEST_ASSIGNMENT_REQUIRED')
+            instance=self.db.execute('''SELECT desired_state FROM role_instances
+              WHERE tenant_id=? AND instance_id=? AND current_request_id=?''',(
+              self.tenant_id,assignment['principal_id'],request_id)).fetchone()
+            if instance is None:
+                raise ValueError('REQUEST_INSTANCE_BINDING_CHANGED')
+            instance_state=('STOPPED' if instance['desired_state']=='STOPPED'
+                            else 'IDLE')
+            next_current=(request_id if outcome=='NO_SIDE_EFFECT' else None)
+            checkpoint=canonical({'state':state,'request_id':request_id,
+              'reconciliation':outcome,
+              'checkpoint':'SAME_REQUEST_SAME_ATTEMPT'})
+            changed_instance=self.db.execute('''UPDATE role_instances SET
+              state=?,current_request_id=?,last_checkpoint_json=?,updated_at=?
+              WHERE tenant_id=? AND instance_id=? AND current_request_id=?''',(
+              instance_state,next_current,checkpoint,now,self.tenant_id,
+              assignment['principal_id'],request_id)).rowcount
+            if changed_instance!=1:
+                raise ValueError('REQUEST_INSTANCE_BINDING_CHANGED')
+            self.db.execute('''INSERT INTO model_request_reconciliations
+              VALUES (?,?,?,?,?,?,?)''',(self.tenant_id,request_id,
+              row['attempts'],outcome,receipt_sha,result_sha,now))
+            changed=self.db.execute('''UPDATE model_requests SET state=?,
+              result_json=?,error_kind=?,next_attempt_at=?,lease_owner=NULL,
+              lease_until=NULL,updated_at=? WHERE tenant_id=? AND request_id=?
+              AND state=? AND attempts=?''',(state,result_json,error,
+              next_attempt_at,now,self.tenant_id,request_id,row['state'],
+              row['attempts'])).rowcount
+            if changed!=1:raise ValueError('REQUEST_RECONCILIATION_CAS_FAILED')
+            if outcome=='RESULT_RECOVERED':
+                usage=recovered_result['usage']
+                self.db.execute('''UPDATE model_usage_attempts SET
+                  input_tokens=?,output_tokens=?,cost_state=?,cost_value=NULL,
+                  outcome='RECOVERED_RESULT',observed_at=? WHERE tenant_id=?
+                  AND request_id=? AND attempt_number=?''',(
+                  usage['input_tokens'],usage['output_tokens'],UNKNOWN,now,
+                  self.tenant_id,request_id,row['attempts']))
+            else:
+                self.db.execute('''INSERT OR REPLACE INTO model_quota_status
+                  VALUES (?,?,?,?,?,?,?)''',(self.tenant_id,row['provider_id'],
+                  'AVAILABLE','SIGNED_PROVIDER_AVAILABILITY:'+receipt_sha,
+                  receipt['observed_at'],None,now))
+            self._audit(principal,'REQUEST_RECONCILE',request_id,
+                        {'attempt_number':row['attempts'],'outcome':outcome,
+                         'provider_receipt_sha256':receipt_sha,
+                         'result_sha256':result_sha},now)
+            self.db.commit()
+        except Exception:
+            self.db.rollback();raise
+        return {'request_id':request_id,'state':state,'outcome':outcome,
+                'duplicate':False,'attempt_number':row['attempts']}
 
     def _reserve_call_locked(self,provider_id,model_id,request_id,task_id,
                              attempt_number,input_tokens,output_tokens,
@@ -1942,6 +2471,10 @@ class ModelControl(object):
           last_heartbeat,checkpoint_json,cancel_requested,created_at,updated_at
           FROM model_requests WHERE tenant_id=?
           ORDER BY created_at,request_id''',(self.tenant_id,))],
+          'request_reconciliations':[dict(x) for x in self.db.execute('''SELECT
+          request_id,attempt_number,outcome,evidence_ref,result_sha256,
+          observed_at FROM model_request_reconciliations WHERE tenant_id=?
+          ORDER BY observed_at,request_id,attempt_number''',(self.tenant_id,))],
           'assignments':[dict(x) for x in self.db.execute('''SELECT task_id,
           attempt_id,role_id,role_version,principal_id,provider_id,model_id,
           state,reason,created_at FROM model_assignments WHERE tenant_id=?
@@ -2015,10 +2548,14 @@ class ModelScheduler(object):
         except Exception:self.db.rollback();raise
         candidates=list(self.db.execute('''WITH eligible AS (SELECT r.*,
           ROW_NUMBER() OVER (PARTITION BY r.provider_id ORDER BY
-          r.created_at,r.request_id) AS provider_rank FROM model_requests r WHERE
-          r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND
+          CASE WHEN r.state IN ('RUNNING','UNKNOWN') THEN r.next_attempt_at
+          ELSE r.created_at END,r.created_at,r.request_id) AS provider_rank FROM model_requests r WHERE
+          r.tenant_id=? AND (r.state IN ('QUEUED','RETRY_WAIT') OR
+          (r.state IN ('RUNNING','UNKNOWN') AND EXISTS (SELECT 1 FROM
+          model_gateway_dispatch gd WHERE gd.tenant_id=r.tenant_id AND gd.request_id=r.request_id))) AND
           r.next_attempt_at<=?) SELECT r.*,b.provider_config_version,
-          b.connection_id,b.connection_config_version,b.expected_input_tokens,
+          b.connection_id,b.connection_config_version,b.credential_fingerprint,
+          b.credential_generation,b.expected_input_tokens,
           b.max_output_tokens,b.allow_paid,b.writer_fence,b.writer_epoch,
           b.writer_principal,b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
           b.module_version,p.adapter_type,p.base_url,p.timeout_seconds,
@@ -2036,11 +2573,27 @@ class ModelScheduler(object):
           AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id JOIN
           role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id
           AND rt.version=a.role_version
-          ORDER BY r.provider_rank,r.created_at,r.request_id''',
+          ORDER BY r.provider_rank,CASE WHEN r.state IN ('RUNNING','UNKNOWN')
+          THEN r.next_attempt_at ELSE r.created_at END,r.created_at,r.request_id''',
           (self.control.tenant_id,now)))
         if not candidates:return {'state':'IDLE'}
-        row=None;reservation=None;last_limit=None
+        row=None;reservation=None;reserved_secret=None;last_limit=None
+        reconciliation=None
         for candidate in candidates:
+            controlled=self.db.execute('SELECT 1 FROM model_gateway_dispatch WHERE tenant_id=? AND request_id=?',
+                (candidate['tenant_id'],candidate['request_id'])).fetchone() is not None
+            # Query original effects even after authority/config changes; never execute.
+            if controlled and candidate['state'] in ('RUNNING','UNKNOWN'):
+                # At most one read-only reconciliation per tick; keep scanning
+                # so pending effects cannot monopolize native or direct dispatch.
+                if reconciliation is None:
+                    reconciliation=run_controlled(self,candidate,now)
+                    with self.db:
+                        self.db.execute('''UPDATE model_requests SET next_attempt_at=?
+                          WHERE tenant_id=? AND request_id=? AND attempts=?
+                          AND state IN ('RUNNING','UNKNOWN')''',(now,
+                          candidate['tenant_id'],candidate['request_id'],candidate['attempts']))
+                continue
             task=self.control.gateway.supervisor._task(candidate['task_id'])
             fatal=None
             if (candidate['cancel_requested'] or task['attempt_id']!=candidate['attempt_id'] or
@@ -2112,6 +2665,8 @@ class ModelScheduler(object):
                   updated_at=? WHERE tenant_id=? AND request_id=? AND state IN
                   ('QUEUED','RETRY_WAIT')''',(fatal,now,candidate['tenant_id'],
                   candidate['request_id']));self.db.commit();continue
+            if controlled:
+                return run_controlled(self,candidate,now)
             try:
                 self.db.execute('BEGIN IMMEDIATE')
                 fresh=self.db.execute('''SELECT state,cancel_requested FROM
@@ -2120,6 +2675,14 @@ class ModelScheduler(object):
                 if fresh is None or fresh['state'] not in ('QUEUED','RETRY_WAIT'):
                     raise ValueError('LOST_RACE')
                 if fresh['cancel_requested']:raise ValueError('CANCELLED_BEFORE_CALL')
+                _secret,_version,current_generation,current_fingerprint=(
+                  self.control._binding_credential(candidate['provider_id'],
+                    candidate['connection_id'],candidate['base_url'],now))
+                if (current_fingerprint!=candidate['credential_fingerprint'] or
+                        current_generation!=candidate['credential_generation'] or
+                        (candidate['connection_id'] and _version!=
+                         candidate['connection_config_version'])):
+                    raise ValueError('PROVIDER_CREDENTIAL_CHANGED_HOLD')
                 reservation=self.control._reserve_call_locked(
                   candidate['provider_id'],candidate['model_id'],
                   candidate['request_id'],candidate['task_id'],
@@ -2144,7 +2707,7 @@ class ModelScheduler(object):
                   'request_id':candidate['request_id'],'attempt_number':
                   candidate['attempts']+1}),now,candidate['tenant_id'],
                   candidate['instance_id']))
-                self.db.commit();row=candidate;break
+                self.db.commit();row=candidate;reserved_secret=_secret;break
             except ValueError as exc:
                 self.db.rollback();last_limit=str(exc)
                 if str(exc) not in ('LOCAL_RPM_LIMIT','LOCAL_TPM_LIMIT',
@@ -2156,22 +2719,13 @@ class ModelScheduler(object):
                       candidate['tenant_id'],candidate['request_id']));self.db.commit()
                 continue
         if row is None:
+            if reconciliation is not None:return reconciliation
             return {'state':last_limit if last_limit=='CIRCUIT_OPEN' else
                     ('HOLD' if last_limit not in (None,'LOCAL_RPM_LIMIT',
                     'LOCAL_TPM_LIMIT','LOCAL_CONCURRENCY_LIMIT',
                     'TENANT_BUDGET_EXHAUSTED','TASK_BUDGET_EXHAUSTED') else
                     'QUEUED_LIMIT'),'reason':last_limit}
-        if row['connection_id']:
-            secret,connection_version=ConnectionManager(self.control.gateway,
-              self.control.context,self.control.master_key).credential(
-              row['connection_id'],row['base_url'],'MODEL_INFERENCE',now)
-            if (row['connection_config_version'] is not None and
-                    connection_version!=row['connection_config_version']):
-                self._finish(row,UNKNOWN,'CONNECTION_CONFIG_CHANGED',None,now,
-                             reservation['reservation_id'])
-                return {'request_id':row['request_id'],'state':UNKNOWN,
-                        'error':'CONNECTION_CONFIG_CHANGED'}
-        else:secret=self.control.provider_secret(row['provider_id'])
+        secret=reserved_secret
         payload=json.loads(row['payload_json'])
         adapter=self.adapters[row['adapter_type']]
         try:
@@ -2277,9 +2831,10 @@ class ModelScheduler(object):
                    usage['output_tokens'],cost_state,cost_value,state,now))
             self.db.execute('''UPDATE role_instances SET state=CASE WHEN
               desired_state='STOPPED' THEN 'STOPPED' ELSE 'IDLE' END,
-              current_request_id=NULL,last_checkpoint_json=?,updated_at=? WHERE
+              current_request_id=CASE WHEN ? IN ('FAILED','UNKNOWN') THEN
+              current_request_id ELSE NULL END,last_checkpoint_json=?,updated_at=? WHERE
               tenant_id=? AND instance_id=? AND current_request_id=?''',(
-              canonical({'state':state,'request_id':row['request_id'],
+              state,canonical({'state':state,'request_id':row['request_id'],
               'error_kind':error,'result_present':result is not None}),now,
               row['tenant_id'],row['instance_id'],row['request_id']))
             if state=='SUCCEEDED':

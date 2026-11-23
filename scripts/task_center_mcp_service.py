@@ -146,20 +146,21 @@ class MCPTaskService(object):
     """Authenticated, project-scoped adapter for the minimal MCP journey."""
     def __init__(self, db_path, authority_key, tenant_id, master_key,
                  principal_id, project_id, clock=None,phase_hook=None,
-                 execution_enabled=True):
+                 execution_enabled=True,gateway_runtime=None):
         self.db_path=db_path;self.authority_key=authority_key
         self.tenant_id=tenant_id;self.master_key=master_key
         self.principal_id=principal_id;self.project_id=project_id
         self.clock=clock or time.time
         self.phase_hook=phase_hook
         self.execution_enabled=bool(execution_enabled)
+        self.gateway_runtime=gateway_runtime
 
     def _open(self):
         supervisor=Supervisor(self.db_path)
         authority=TestTenantAuthority(self.authority_key)
         gateway=GatewayKernel(supervisor,authority)
         context=authority.issue(self.tenant_id,'admin:mcp:'+self.principal_id)
-        control=ModelControl(gateway,context,self.master_key)
+        control=ModelControl(gateway,context,self.master_key,gateway_runtime=self.gateway_runtime)
         return supervisor,gateway,control,context
 
     def capabilities(self):
@@ -548,11 +549,12 @@ class MCPTaskService(object):
 class MCPModelWorkerLoop(object):
     """Persistent loop over the existing model_requests queue."""
     def __init__(self,db_path,authority_key,tenant_id,master_key,interval=1.0,
-                 adapters=None):
+                 adapters=None,gateway_runtime=None):
         import threading
         self.db_path=db_path;self.authority_key=authority_key
         self.tenant_id=tenant_id;self.master_key=master_key
         self.interval=interval;self.adapters=adapters
+        self.gateway_runtime=gateway_runtime
         self.stop_event=threading.Event()
         self.thread=threading.Thread(target=self._run,name='mcp-model-worker')
         self.thread.daemon=True
@@ -563,11 +565,11 @@ class MCPModelWorkerLoop(object):
         try:
             authority=TestTenantAuthority(self.authority_key)
             control=ModelControl(GatewayKernel(supervisor,authority),
-              authority.issue(self.tenant_id,'admin:mcp-worker'),self.master_key)
+              authority.issue(self.tenant_id,'admin:mcp-worker'),self.master_key,gateway_runtime=self.gateway_runtime)
             scheduler=ModelScheduler(control,adapters=self.adapters,
               worker_id='mcp-worker')
             while not self.stop_event.is_set():
                 result=scheduler.run_once()
-                if result.get('state') in ('IDLE','QUEUED_LIMIT','HOLD'):
+                if result.get('state') in ('IDLE','QUEUED_LIMIT','HOLD','RUNNING','UNKNOWN','NOT_CONNECTED'):
                     self.stop_event.wait(self.interval)
         finally:supervisor.close()

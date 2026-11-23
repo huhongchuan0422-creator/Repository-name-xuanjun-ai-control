@@ -109,14 +109,33 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         if completion:
             result['result']['tools'].extend(x for x in completion_tools() if x['name'] in completion['actions'])
         return result
-    if method=='tools/call' and name=='task_dispatch_contract' and claim_host is not None:
+    if method=='tools/call' and name=='task_dispatch_contract':
+        # Preserve source-only readiness claims; separately report this token's
+        # advertised surface, not permission to invoke it or proof of gates.
         result=RemoteTaskCenterMCP(service).rpc(value)
         contract=json.loads(result['result']['content'][0]['text'])
-        visible=claim_host.visible(identity)
-        contract['canonical_claim']={'host_bound':bool(visible),'tools':visible,
-            'admission_source':'EXISTING_CANONICAL_POLICY_AND_SIGNED_REGISTRATION',
-            'claim_is_execution':False,'identity_is_authenticated_not_inferred':True}
-        result['result']['content'][0]['text']=json.dumps(contract,sort_keys=True)
+        listing=dispatch_rpc(service,identity,config,
+                             {'method':'tools/list','id':value.get('id')},
+                             worker_enabled,development_host,claim_host)
+        visible=[tool['name'] for tool in listing['result']['tools']]
+        # Classification only: development's own rpc treats every action
+        # except these two readbacks as task:submit. Do not alter WRITE_TOOLS,
+        # which is also used by the HTTP authorization path.
+        development_writes=set(DEVELOPMENT_ACTIONS)-{
+            'task_development_status','task_development_gateway_readback'}
+        contract['mutating_orchestration_tools']=[
+            tool for tool in visible if tool!='task_submit' and
+            (tool in WRITE_TOOLS or tool in development_writes)]
+        contract['host_surface']={
+            'visible_tools':visible,
+            'task_submit_is_separate_test_only_entry': 'task_submit' in visible,
+            'visibility_is_not_authorization_or_execution_readiness':True}
+        if claim_host is not None:
+            claim_tools=claim_host.visible(identity)
+            contract['canonical_claim']={'host_bound':bool(claim_tools),'tools':claim_tools,
+                'admission_source':'EXISTING_CANONICAL_POLICY_AND_SIGNED_REGISTRATION',
+                'claim_is_execution':False,'identity_is_authenticated_not_inferred':True}
+        result['result']['content'][0]['text']=json.dumps(contract,ensure_ascii=False,sort_keys=True)
         return result
     if method=='tools/call' and name in ('task_claim','task_claim_status'):
         if claim_host is None:raise ValueError('TRUSTED_CLAIM_HOST_UNAVAILABLE')
@@ -146,7 +165,7 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
             # Existing host-verified OAuth subject, not admin:mcp:<subject> and
             # never a principal supplied in tool arguments. No credentials minted.
             actor_context=gateway.tenants.issue(service.tenant_id,identity['principal_id'])
-            actor_control=ModelControl(gateway,actor_context,service.master_key)
+            actor_control=ModelControl(gateway,actor_context,service.master_key,gateway_runtime=getattr(service,'gateway_runtime',None))
             return CandidateLifecycleMCP(actor_control,completion,service.db_path+'.test-only-locks').rpc(value)
         finally:supervisor.close()
     if method!='tools/call' or name not in DISPATCH_TOOLS:
@@ -156,9 +175,17 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         raise ValueError('MCP_DISPATCH_SUBMIT_SCOPE_REQUIRED')
     if name=='task_dispatch' and not worker_enabled:
         raise ValueError('MCP_DISPATCH_WORKER_DISABLED')
+    if (service.tenant_id!=identity['tenant_id'] or
+            service.project_id!=identity['project_id'] or
+            service.principal_id!=identity['principal_id']):
+        raise ValueError('MCP_DISPATCH_IDENTITY_MISMATCH')
     supervisor,gateway,control,context=service._open()
     try:
-        return RegisteredTaskDispatchMCP(control,identity['project_id'],roles).rpc(value)
+        # Match completion's existing host-authenticated subject binding. Never
+        # use _open()'s synthetic admin:mcp:<subject> for registered dispatch.
+        actor_context=gateway.tenants.issue(service.tenant_id,identity['principal_id'])
+        actor_control=ModelControl(gateway,actor_context,service.master_key,gateway_runtime=getattr(service,'gateway_runtime',None))
+        return RegisteredTaskDispatchMCP(actor_control,identity['project_id'],roles).rpc(value)
     finally:supervisor.close()
 
 
