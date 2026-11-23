@@ -1652,11 +1652,12 @@ class Supervisor(object):
             raise ValueError('TRUSTED_REVOCATION_CONTROLLER_REQUIRED')
         return caller
 
-    def begin_revocation(self, task_id, caller):
+    def begin_revocation(self, task_id, caller, admission_check=None):
         self._controller(caller)
         now = self.clock()
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             task = self._task(task_id)
             if task['authority_state'] == 'REVOKING':
                 return self._exact_resource_keys(

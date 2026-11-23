@@ -34,7 +34,10 @@ class TerminalInterruptions(unittest.TestCase):
                         out=a.call('task_accept_candidate',args);retry='result:'+out['state']
                     except Exception as e:retry=type(e).__name__+':'+str(e)
                     print('INTERRUPTION',name,task['state'],task['authority_state'],json.dumps(counts,sort_keys=True),'retry',retry,flush=True)
-                    expected_error=('ValueError:HOLD_RESOURCE_RELEASE_RECONCILIATION' if name=='release_revoked_resources' else 'ValueError:CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+                    expected_error=('result:ACCEPTED' if name in ('save_checkpoint','begin_revocation') else
+                        'ValueError:HOLD_RESOURCE_RELEASE_RECONCILIATION' if name=='release_revoked_resources' else
+                        'ValueError:CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
                     self.assertEqual(retry,expected_error)
-                    self.assertEqual(db.execute('SELECT state FROM delivery_candidates WHERE candidate_id=?',(cid,)).fetchone()[0],'REVIEW_PASSED')
+                    self.assertEqual(db.execute('SELECT state FROM delivery_candidates WHERE candidate_id=?',(cid,)).fetchone()[0],
+                        'ACCEPTED' if name in ('save_checkpoint','begin_revocation') else 'REVIEW_PASSED')
                 finally:f.tearDown()

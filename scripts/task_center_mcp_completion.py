@@ -268,6 +268,53 @@ class CandidateLifecycleMCP:
             candidate=c.validate_accept_candidate(args['candidate_id'],actor)
             if self.enforce_acceptance:CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)
             return candidate
+        # Reconcile only the original committed terminal with a still-valid
+        # writer; never replay the terminal event or unsettled effects.
+        task=self.supervisor._task(args['task_id'])
+        if task['state']=='SUCCESS' and task['authority_state']=='VALID':
+            def recovery_admission():
+                task=c.assert_host_lifecycle(b)
+                if task['state']!='SUCCESS' or task['authority_state']!='VALID':
+                    raise ValueError('TERMINAL_RECOVERY_STATE_CHANGED')
+                candidate=c.validate_accept_candidate(args['candidate_id'],actor,_terminal_recovery=True)
+                event=c.db.execute('SELECT kind,evidence_kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                    (args['task_id'],args['attempt_id'],'terminal-'+args['attempt_id'])).fetchone()
+                expected={'state':'SUCCESS','artifact_sha256':candidate['artifact_sha256'],
+                    'writer_stopped':True,'effects_reconciled':True,'next_action':'DEPENDENCIES_RECHECK',
+                    'completion_evidence':json.loads(task['completion_json'])}
+                if (event is None or event['kind']!='TERMINAL' or event['evidence_kind']!='TEST_RUN' or
+                    event['evidence_ref']!='test-terminal-'+args['attempt_id'] or json.loads(event['payload_json'])!=expected or
+                    self.supervisor.unresolved_operations(args['task_id'])):
+                    raise ValueError('TERMINAL_RECOVERY_EVIDENCE_REQUIRED')
+                c._require_terminal_artifact(candidate)
+                if self.enforce_acceptance:CandidateAcceptanceEvidence(c,self.acceptance_host,self._backup_assessor).check(b)
+                checkpoint_id='terminal-checkpoint-'+args['attempt_id']
+                resources=json.loads(task['resource_scope_json'])
+                checkpoint=c.db.execute('SELECT * FROM gateway_checkpoints WHERE task_id=? AND attempt_id=? AND checkpoint_id=?',
+                    (args['task_id'],args['attempt_id'],checkpoint_id)).fetchone()
+                if checkpoint is not None and (json.loads(checkpoint['payload_json'])!={'terminal_state':'SUCCESS'} or
+                    json.loads(checkpoint['inflight_json']) or checkpoint['effects_state']!='RECONCILED' or
+                    json.loads(checkpoint['resources_json'])!=sorted(resources)):
+                    raise ValueError('TERMINAL_RECOVERY_CHECKPOINT_CONFLICT')
+                return task,checkpoint_id,resources,checkpoint
+            c.db.execute('BEGIN IMMEDIATE')
+            try:task,checkpoint_id,resources,checkpoint=recovery_admission()
+            finally:c.db.rollback()
+            fence=Fence(self.supervisor,self.lock_dir)
+            try:
+                if task['authority_lock_provider_id']!=fence.locks.provider_id:
+                    raise ValueError('EXISTING_WRITER_LOCK_PROVIDER_REQUIRED')
+                if checkpoint is None:
+                    c.gateway.save_checkpoint(c.context,args['task_id'],args['attempt_id'],checkpoint_id,
+                        {'terminal_state':'SUCCESS'},[],'RECONCILED',resources)
+                controller={'role':'REVOCATION_CONTROLLER','caller_id':'test-executor-finalizer'}
+                fence.begin_revocation(args['task_id'],controller,admission_check=recovery_admission)
+                fence.drain(args['task_id'],controller,timeout=1)
+                fence.invalidate_source_resources(args['task_id'],'terminal-release')
+                self.supervisor.complete_revocation(args['task_id'])
+                c.gateway.release_revoked_resources(c.context,args['task_id'],args['attempt_id'],checkpoint_id,
+                    'test-terminal-release',resume_ready=False)
+            finally:fence.close()
         c.db.execute('BEGIN IMMEDIATE')
         try:
             c.assert_host_lifecycle(b)
@@ -315,7 +362,7 @@ class CandidateLifecycleMCP:
             row=c.db.execute('SELECT state FROM delivery_candidates WHERE tenant_id=? AND candidate_id=?',(c.tenant_id,args['candidate_id'])).fetchone()
             if row is None:raise ValueError('EXACT_HOST_CANDIDATE_REQUIRED')
             duplicate=row['state']=='ACCEPTED'
-            if not duplicate:c.validate_accept_candidate(args['candidate_id'],binding['principal_id'])
+            if not duplicate:c.validate_accept_candidate(args['candidate_id'],binding['principal_id'],_terminal_recovery=True)
         finally:c.db.rollback()
         if duplicate:
             self._backup_attempted=True

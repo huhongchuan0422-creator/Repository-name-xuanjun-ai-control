@@ -2411,7 +2411,7 @@ class ModelControl(object):
                     raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
             except (TypeError,ValueError):raise ValueError('INDEPENDENT_REVIEW_RECEIPTS_REQUIRED')
 
-    def validate_accept_candidate(self, candidate_id, acceptor):
+    def validate_accept_candidate(self, candidate_id, acceptor, _terminal_recovery=False):
         now=self.clock()
         row=self.db.execute('''SELECT rowid AS candidate_seq,* FROM delivery_candidates WHERE tenant_id=?
           AND candidate_id=?''',(self.tenant_id,candidate_id)).fetchone()
@@ -2422,7 +2422,8 @@ class ModelControl(object):
                   task['authority_state']=='VALID' and
                   task['authority_valid_until'] is not None and
                   now<task['authority_valid_until'] and
-                  task['state'] in ('STARTED','RUNNING')) or
+                  (task['state'] in ('STARTED','RUNNING') or
+                   (_terminal_recovery is True and task['state']=='SUCCESS'))) or
                  (task['attempt_id']==row['attempt_id'] and
                   task['authority_state']=='REVOKED' and task['state']=='SUCCESS'))
         if not current and not self._recovery_ready(task,row['artifact_sha256']):

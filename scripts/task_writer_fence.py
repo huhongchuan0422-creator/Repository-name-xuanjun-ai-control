@@ -404,8 +404,9 @@ class Fence(object):
     def commit_lease(self, ticket, caller, operation_id):
         return CommitLease(self, ticket, caller, operation_id)
 
-    def begin_revocation(self, task_id, controller):
-        return self.supervisor.begin_revocation(task_id, controller)
+    def begin_revocation(self, task_id, controller, admission_check=None):
+        if admission_check is None:return self.supervisor.begin_revocation(task_id, controller)
+        return self.supervisor.begin_revocation(task_id, controller, admission_check=admission_check)
 
     def drain(self, task_id, controller, timeout):
         keys = self.supervisor.begin_revocation(task_id, controller)
