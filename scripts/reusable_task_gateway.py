@@ -727,11 +727,12 @@ class GatewayKernel(object):
 
     def release_revoked_resources(self, context, task_id, attempt_id,
                                   checkpoint_id, evidence_ref, now=None,
-                                  resume_ready=True):
+                                  resume_ready=True, admission_check=None):
         self.assert_task_context(context, task_id)
         now = self.clock() if now is None else _finite(now, 'time')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             task = self.supervisor._task(task_id)
             checkpoint = self.db.execute('''SELECT * FROM gateway_checkpoints
               WHERE task_id=? AND attempt_id=? AND checkpoint_id=?''',
