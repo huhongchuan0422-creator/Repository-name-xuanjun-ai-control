@@ -842,6 +842,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         value['provider_id'],value['quota_state'],
                         value['quota_source'],value.get('verified_at'),
                         value.get('unavailable_reason'))
+                    elif action=='RECORD_EXISTING_TASK_ADMISSION':
+                        from task_center_admission import record_existing_admission
+                        result=record_existing_admission(control,value)
+                    elif action=='TASK_ADMISSION_STATUS':
+                        from task_center_admission import admission_status
+                        result=admission_status(control,value)
                     elif action=='REGISTER_GRAPH':
                         result=control.gateway.register_graph(control.context,value['graph'])
                     elif action=='CREATE_PROJECT_TASK':
