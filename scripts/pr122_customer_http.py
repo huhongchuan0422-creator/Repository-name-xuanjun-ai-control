@@ -88,7 +88,7 @@ class App:
                     if self.command=='POST':
                         if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length',[]))!=1:raise ValueError('CONTENT_LENGTH_REQUIRED')
                         length=self.headers.get('Content-Length','')
-                        if not re.fullmatch(r'[0-9]{1,8}',length) or not 1<=int(length)<=7_000_000:return self.reply(413,{'error':'REQUEST_TOO_LARGE'})
+                        if not re.fullmatch(r'[0-9]+',length) or int(length)<1:raise ValueError('INVALID_CONTENT_LENGTH')
                         if service_identity and int(length)>8192:return self.reply(413,{'error':'REQUEST_TOO_LARGE'})
                         if self.headers.get_content_type()!='application/json':raise ValueError('JSON_REQUIRED')
                         raw=self.rfile.read(int(length))
