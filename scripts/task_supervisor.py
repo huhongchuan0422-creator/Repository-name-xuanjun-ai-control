@@ -1770,7 +1770,7 @@ class Supervisor(object):
                 (task_id, task['attempt_id'], provider_id, body, sha, now))
             return {'duplicate': False, 'receipt_sha256': sha}
 
-    def record_resource_invalidation(self, task_id, receipt):
+    def record_resource_invalidation(self, task_id, receipt, admission_check=None):
         now = self.clock()
         required = {'schema','kind','capability','adapter_id','provider_id',
                     'task_id','old_attempt_id','old_lease_id','old_fence',
@@ -1786,6 +1786,7 @@ class Supervisor(object):
             raise ValueError('RESOURCE_INVALIDATION_RECEIPT_REQUIRED')
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             task = self._task(task_id)
             if task['authority_state'] != 'REVOKING':
                 raise ValueError('REVOKING_AUTHORITY_REQUIRED')
@@ -1831,10 +1832,11 @@ class Supervisor(object):
               (task_id, task['attempt_id'], resource_key, body, sha, now))
             return {'duplicate': False, 'receipt_sha256': sha}
 
-    def complete_revocation(self, task_id):
+    def complete_revocation(self, task_id, admission_check=None):
         now = self.clock()
         self.db.execute('BEGIN IMMEDIATE')
         with self.db:
+            if admission_check is not None:admission_check()
             task = self._task(task_id)
             if task['authority_state'] != 'REVOKING':
                 raise ValueError('REVOKING_AUTHORITY_REQUIRED')

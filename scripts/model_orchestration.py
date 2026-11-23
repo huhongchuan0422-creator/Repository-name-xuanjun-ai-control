@@ -2424,8 +2424,9 @@ class ModelControl(object):
                   now<task['authority_valid_until'] and
                   (task['state'] in ('STARTED','RUNNING') or
                    (_terminal_recovery is True and task['state']=='SUCCESS'))) or
-                 (task['attempt_id']==row['attempt_id'] and
-                  task['authority_state']=='REVOKED' and task['state']=='SUCCESS'))
+                 (task['attempt_id']==row['attempt_id'] and task['state']=='SUCCESS' and
+                  (task['authority_state']=='REVOKED' or
+                   (_terminal_recovery is True and task['authority_state']=='REVOKING'))))
         if not current and not self._recovery_ready(task,row['artifact_sha256']):
             raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
         if task['state']=='SUCCESS':

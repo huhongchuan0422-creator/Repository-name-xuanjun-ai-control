@@ -7,7 +7,7 @@ from reusable_task_gateway import TestOnlyExecutor
 from task_supervisor import Supervisor
 
 class MultiResourceObservation(unittest.TestCase):
-    def test_partial_invalidation_preserves_existing_receipt_and_holds(self):
+    def test_partial_invalidation_preserves_existing_receipt_and_recovers(self):
         graph=models.demo_graph;start=TestOnlyExecutor.start
         def two_graph(tenant):
             value=graph(tenant);next(t for t in value['tasks'] if t['task_id']=='demo-b')['resources']=['fake:demo-b','fake:extra'];return value
@@ -26,6 +26,9 @@ class MultiResourceObservation(unittest.TestCase):
         rows=db.execute("SELECT resource_key,receipt_sha256 FROM resource_invalidation_receipts WHERE task_id='demo-b' ORDER BY resource_key").fetchall()
         self.assertEqual(task['authority_state'],'REVOKING');self.assertEqual(len(rows),1)
         self.assertEqual(rows[0]['resource_key'],calls[0]);self.assertFalse(f.f.supervisor.unresolved_operations('demo-b'))
-        with self.assertRaisesRegex(ValueError,'CURRENT_CANDIDATE_ATTEMPT_REQUIRED'):a.call('task_accept_candidate',args)
-        self.assertEqual(db.execute("SELECT resource_key,receipt_sha256 FROM resource_invalidation_receipts WHERE task_id='demo-b' ORDER BY resource_key").fetchall(),rows)
-        self.assertEqual(db.execute("SELECT state FROM delivery_candidates WHERE candidate_id=?",(cid,)).fetchone()[0],'REVIEW_PASSED')
+        self.assertEqual(a.call('task_accept_candidate',args)['state'],'ACCEPTED')
+        after=db.execute("SELECT resource_key,receipt_sha256 FROM resource_invalidation_receipts WHERE task_id='demo-b' ORDER BY resource_key").fetchall()
+        self.assertEqual(len(after),2);self.assertEqual(tuple(after[0]),tuple(rows[0]))
+        self.assertEqual(db.execute("SELECT state FROM delivery_candidates WHERE candidate_id=?",(cid,)).fetchone()[0],'ACCEPTED')
+        self.assertEqual(f.f.supervisor._task('demo-b')['authority_state'],'REVOKED')
+        self.assertTrue(a.call('task_accept_candidate',args)['duplicate'])

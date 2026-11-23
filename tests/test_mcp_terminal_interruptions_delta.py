@@ -34,9 +34,9 @@ class TerminalInterruptions(unittest.TestCase):
                         out=a.call('task_accept_candidate',args);retry='result:'+out['state']
                     except Exception as e:retry=type(e).__name__+':'+str(e)
                     print('INTERRUPTION',name,task['state'],task['authority_state'],json.dumps(counts,sort_keys=True),'retry',retry,flush=True)
-                    expected_error=('result:ACCEPTED' if name in ('save_checkpoint','begin_revocation','release_revoked_resources') else
+                    expected_error=('result:ACCEPTED' if name in ('save_checkpoint','begin_revocation','invalidate_source_resources','complete_revocation','release_revoked_resources') else
                         'ValueError:CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
                     self.assertEqual(retry,expected_error)
                     self.assertEqual(db.execute('SELECT state FROM delivery_candidates WHERE candidate_id=?',(cid,)).fetchone()[0],
-                        'ACCEPTED' if name in ('save_checkpoint','begin_revocation','release_revoked_resources') else 'REVIEW_PASSED')
+                        'ACCEPTED' if name in ('save_checkpoint','begin_revocation','invalidate_source_resources','complete_revocation','release_revoked_resources') else 'REVIEW_PASSED')
                 finally:f.tearDown()

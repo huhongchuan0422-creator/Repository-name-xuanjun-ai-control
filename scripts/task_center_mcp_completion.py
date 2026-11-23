@@ -229,6 +229,10 @@ class CandidateLifecycleMCP:
         if ACTIONS[name] and ACTIONS[name]!=b['phase']:raise ValueError('HOST_LIFECYCLE_PHASE_REQUIRED')
         c=self.control;actor=b['principal_id']
         if name=='task_accept_candidate' and not self.enforce_acceptance:
+            task=self.supervisor._task(args['task_id'])
+            if task['state']=='SUCCESS' and task['authority_state']=='REVOKING':
+                self._resume_local_test_invalidation(args,b)
+                return self.call(name,args)
             # The non-enforced TEST_ONLY entry can finish its original DB-only
             # release after a crash; this must not bypass enforced backup.
             task=self.supervisor._task(args['task_id'])
@@ -406,6 +410,86 @@ class CandidateLifecycleMCP:
         result=c.accept_candidate(args['candidate_id'],actor,_host_binding=b,_host_acceptance_check=accept_check)
         result.update(canonical_task_state='SUCCESS',model_invoked=False)
         return result
+    def _resume_local_test_invalidation(self,args,b):
+        """Continue only pure LOCAL_ONLY fake-resource receipt persistence."""
+        from task_writer_fence import SourceResourceAdapter
+        from task_supervisor import canonical
+        c=self.control;tid=args['task_id'];attempt=args['attempt_id'];actor=b['principal_id']
+        fence=Fence(self.supervisor,self.lock_dir)
+        try:
+            if type(fence.adapter) is not SourceResourceAdapter:
+                raise ValueError('TERMINAL_RECOVERY_LOCAL_ADAPTER_REQUIRED')
+            def admission():
+                task=c.assert_host_lifecycle(b)
+                candidate=c.validate_accept_candidate(args['candidate_id'],actor,_terminal_recovery=True)
+                if (task['state']!='SUCCESS' or task['authority_state']!='REVOKING' or
+                    task['authority_lock_provider_id']!=fence.locks.provider_id or
+                    self.supervisor.unresolved_operations(tid)):
+                    raise ValueError('TERMINAL_RECOVERY_EVIDENCE_REQUIRED')
+                resources=json.loads(task['resource_scope_json'])
+                if (not resources or resources!=sorted(set(resources)) or any(not r.startswith('fake:') for r in resources) or
+                    self.supervisor._scope_digest(resources)!=task['resource_scope_digest']):
+                    raise ValueError('TERMINAL_RECOVERY_EVIDENCE_REQUIRED')
+                event=c.db.execute('SELECT kind,evidence_kind,evidence_ref,payload_json FROM events WHERE task_id=? AND attempt_id=? AND event_id=?',
+                    (tid,attempt,'terminal-'+attempt)).fetchone()
+                expected={'state':'SUCCESS','artifact_sha256':candidate['artifact_sha256'],
+                    'writer_stopped':True,'effects_reconciled':True,'next_action':'DEPENDENCIES_RECHECK',
+                    'completion_evidence':json.loads(task['completion_json'])}
+                if (event is None or event['kind']!='TERMINAL' or event['evidence_kind']!='TEST_RUN' or
+                    event['evidence_ref']!='test-terminal-'+attempt or json.loads(event['payload_json'])!=expected):
+                    raise ValueError('TERMINAL_RECOVERY_EVIDENCE_REQUIRED')
+                checkpoint=c.db.execute('SELECT * FROM gateway_checkpoints WHERE task_id=? AND attempt_id=? AND checkpoint_id=?',
+                    (tid,attempt,'terminal-checkpoint-'+attempt)).fetchone()
+                if (checkpoint is None or json.loads(checkpoint['payload_json'])!={'terminal_state':'SUCCESS'} or
+                    json.loads(checkpoint['inflight_json']) or checkpoint['effects_state']!='RECONCILED' or
+                    json.loads(checkpoint['resources_json'])!=resources):
+                    raise ValueError('TERMINAL_RECOVERY_CHECKPOINT_CONFLICT')
+                claims=c.db.execute('SELECT resource_key,attempt_id,fence,epoch,state FROM resource_claims WHERE task_id=? ORDER BY resource_key',(tid,)).fetchall()
+                if ([r['resource_key'] for r in claims]!=resources or
+                    any((r['attempt_id'],r['fence'],r['epoch'],r['state'])!=(attempt,task['fence'],task['epoch'],'REVOKING') for r in claims)):
+                    raise ValueError('TERMINAL_RECOVERY_EVIDENCE_REQUIRED')
+                drain=c.db.execute('SELECT * FROM revocation_drains WHERE task_id=? AND attempt_id=?',(tid,attempt)).fetchone()
+                ticket_sha=self.supervisor._ticket_sha(self.supervisor._authority_ticket(task))
+                drain_expected={'schema':1,'kind':'LOCAL_DRAIN','capability':'LOCAL_ONLY','task_id':tid,
+                    'old_attempt_id':attempt,'old_lease_id':task['lease_id'],'old_fence':task['fence'],
+                    'old_epoch':task['epoch'],'ticket_sha256':ticket_sha,'spec_sha256':task['spec_sha256'],
+                    'provider_id':fence.locks.provider_id,'resource_scope_digest':task['resource_scope_digest'],'outcome':'DRAINED'}
+                if drain is None:raise ValueError('CURRENT_CANDIDATE_ATTEMPT_REQUIRED')
+                if (drain['provider_id']!=fence.locks.provider_id or
+                    drain['receipt_json']!=canonical(drain_expected) or
+                    drain['receipt_sha256']!=hashlib.sha256(drain['receipt_json'].encode()).hexdigest()):
+                    raise ValueError('TERMINAL_RECOVERY_DRAIN_REQUIRED')
+                receipts=c.db.execute('SELECT * FROM resource_invalidation_receipts WHERE task_id=? AND old_attempt_id=? ORDER BY resource_key',(tid,attempt)).fetchall()
+                present=set()
+                for row in receipts:
+                    key=row['resource_key']
+                    if key not in resources:raise ValueError('TERMINAL_RECOVERY_RECEIPT_CONFLICT')
+                    # Independently check each persisted source-test receipt,
+                    # including its original deterministic resource index.
+                    expected_receipt={'schema':1,'kind':'RESOURCE_INVALIDATION','capability':'LOCAL_ONLY',
+                        'adapter_id':'source-resource-adapter-v1','provider_id':fence.locks.provider_id,
+                        'task_id':tid,'old_attempt_id':attempt,'old_lease_id':task['lease_id'],
+                        'old_fence':task['fence'],'old_epoch':task['epoch'],'ticket_sha256':ticket_sha,
+                        'spec_sha256':task['spec_sha256'],'resource_scope_digest':task['resource_scope_digest'],
+                        'resource_key':key,'outcome':'INVALIDATED','evidence_id':'terminal-release-%d'%resources.index(key)}
+                    if (row['receipt_json']!=canonical(expected_receipt) or
+                        row['receipt_sha256']!=hashlib.sha256(row['receipt_json'].encode()).hexdigest()):
+                        raise ValueError('TERMINAL_RECOVERY_RECEIPT_CONFLICT')
+                    present.add(key)
+                return resources,present
+            c.db.execute('BEGIN IMMEDIATE')
+            try:resources,present=admission()
+            finally:c.db.rollback()
+            for index,key in enumerate(resources):
+                if key in present:continue
+                # Exact built-in LOCAL_ONLY adapter is a pure fixture mapping,
+                # not a real resource call; never use for other adapters.
+                receipt=fence.adapter.invalidation_receipt(self.supervisor,tid,key,
+                    fence.locks.provider_id,'terminal-release-%d'%index)
+                self.supervisor.record_resource_invalidation(tid,receipt,admission_check=admission)
+            self.supervisor.complete_revocation(tid,admission_check=admission)
+        finally:fence.close()
+
     def _accept_with_prepared_backup(self,name,args,binding):
         """Run the original producer outside the terminal DB transaction."""
         from task_center_handoff_host import HandoffHost
