@@ -71,6 +71,70 @@ class DevelopmentBridgeTests(unittest.TestCase):
             record={'schema':1,'key_id':r['key_id'],'record_id':gate.digest(gate.canonical(payload)),'payload':payload}
             record['signature']=hmac.new(self.keys[r['key_id']],gate.canonical(record),hashlib.sha256).hexdigest();reviews.append(record)
         return candidate['candidate_event_id'],reviews
+    def native_apply_host(self):
+        # Real dispatch -> DevelopmentHost -> checked git object -> canonical DB.
+        # All identity, GitHub event and authority values here are test fixtures.
+        self.native_candidate()
+        f=self.f
+        payload=dict(schema=1,entry='CHATGPT',execution_path='CHATGPT_NATIVE',
+            task_id='demo-b',spec_sha256='b'*64,checkpoint_sha256='a'*64,
+            target_repository='owner/repo',target_base_sha=f.base,code_commit=f.base,
+            event='CODE_READY',attempt_id='attempt-b',lease_id=f.ticket['lease_id'],
+            fence=f.ticket['fence'],epoch=f.ticket['epoch'],
+            lock_provider_id=f.fence.locks.provider_id,**f.caller)
+        source={'control_repository':'owner/control','trusted_owner':'owner',
+            'destination':{'task_id':'demo-b','pull_request_number':23},
+            'event':{'action':'created','repository':{'full_name':'owner/control'},
+                'sender':{'login':'owner'},'issue':{'number':23,'pull_request':{}},
+                'comment':{'id':2,'user':{'login':'owner'},
+                    'body':'<!-- XJ_DEV_ENTRY '+json.dumps(payload)+' -->'}}}
+        self.bindings[0]['executor_profile']=None
+        self.host=DevelopmentHost(self.bindings,native_source_provider=lambda *args:source)
+        return source,payload
+
+    def test_native_apply_dispatch_imports_same_commit_without_model_or_writer(self):
+        source,payload=self.native_apply_host()
+        before=self.f.git('rev-parse','refs/heads/main')
+        result=self.call('developer-1','task_development_apply',request_id='native-2')
+        self.assertEqual(result['execution_state'],'HOLD_TRUSTED_NATIVE_EXECUTION_UNAVAILABLE')
+        self.assertFalse(result['generated_code_executed'])
+        candidate=self.f.s.development_candidate('demo-b',result['candidate_event_id'])
+        self.assertEqual(candidate['code_commit'],before)
+        self.assertEqual(candidate['files'],{'module.py':hashlib.sha256(self.f.before_raw).hexdigest()})
+        again=self.call('developer-1','task_development_apply',request_id='native-2')
+        self.assertTrue(again['duplicate'])
+        self.assertEqual(self.f.git('rev-parse','refs/heads/main'),before)
+        self.assertEqual(self.f.s.db.execute('SELECT count(*) FROM writer_operations').fetchone()[0],0)
+
+    def test_native_apply_rejects_wrong_event_commit_and_stale_generation(self):
+        source,payload=self.native_apply_host()
+        for field,value,error in [('event','RECEIVED','CODE_READY'),
+                ('code_commit','0'*40,'CHECKOUT_IDENTITY'),
+                ('lease_id','stale','BINDING_MISMATCH')]:
+            bad=dict(payload,**{field:value})
+            source['event']['comment']['body']='<!-- XJ_DEV_ENTRY '+json.dumps(bad)+' -->'
+            with self.assertRaisesRegex(ValueError,error):
+                self.call('developer-1','task_development_apply',request_id='invalid')
+        self.host.native_source_provider=None
+        with self.assertRaisesRegex(ValueError,'NATIVE_SOURCE_UNAVAILABLE'):
+            self.call('developer-1','task_development_apply',request_id='missing')
+
+    def test_native_apply_protected_loader_and_exact_request_lookup(self):
+        from task_center_mcp_development import load_host
+        source,payload=self.native_apply_host();f=self.f
+        native=f.root/'native-source.json';config=f.root/'native-host.json'
+        native.write_text(json.dumps({'demo-b':{'attempt-b':{'native-2':source}}}));native.chmod(0o600)
+        config.write_text(json.dumps({'schema_version':1,'enabled':True,'bindings':self.bindings,
+            'review_keyring_file':None,'writer_context_file':None,'native_source_file':str(native)}));config.chmod(0o600)
+        self.host=load_host(str(config))
+        with self.assertRaisesRegex(ValueError,'NATIVE_SOURCE_UNAVAILABLE'):
+            self.call('developer-1','task_development_apply',request_id='missing')
+        result=self.call('developer-1','task_development_apply',request_id='native-2')
+        self.assertEqual(result['source_kind'],'AUTHENTICATED_NATIVE_IMPORT')
+        native.chmod(0o644)
+        with self.assertRaisesRegex(ValueError,'NATIVE_SOURCE'):
+            self.call('developer-1','task_development_apply',request_id='native-2')
+
     def test_source_apply_uses_original_writer_and_never_executes_code(self):
         rid=self.f.proposal();result=self.call('developer-1','task_development_apply',request_id=rid)
         self.assertEqual(result['execution_state'],'HOLD_SANDBOX_UNAVAILABLE');self.assertFalse(result['generated_code_executed'])
@@ -99,7 +163,13 @@ class DevelopmentBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'SIGNATURE'):self.call('qa','task_development_review',candidate_event_id=candidate,reviewed_event_id='review-bad',reviews=reviews)
         self.host.bindings[0]['spec_sha256']='0'*64
         with self.assertRaisesRegex(ValueError,'PINNED'):self.call('developer-1','task_development_status')
+    def test_real_http_oauth_native_apply(self):
+        self._http_development_case(native=True)
+
     def test_real_http_oauth_signed_review(self):
+        self._http_development_case(native=False)
+
+    def _http_development_case(self,native):
         import base64,sqlite3,threading
         from urllib.parse import parse_qs,urlsplit
         from urllib.request import Request,urlopen
@@ -107,12 +177,17 @@ class DevelopmentBridgeTests(unittest.TestCase):
         from task_center_app import make_server
         from task_center_mcp_auth import MCPAuthorizationStore
         from task_center_session_auth import FileTestIdentityProvider,SessionStore,password_hash
-        candidate,reviews=self.native_candidate();f=self.f
+        f=self.f
+        if native:self.native_apply_host()
+        else:candidate,reviews=self.native_candidate()
+        actor='developer-1' if native else 'qa'
         f.s.db.execute("UPDATE gateway_task_metadata SET project_id='project-mcp' WHERE task_id='demo-b'");f.s.db.commit()
         for b in self.bindings:
             b['project_id']='project-mcp'
             if b['executor_profile'] is not None:b['executor_profile']['project_id']='project-mcp'
-        self.host=self.makehost()
+        if native:
+            self.host=DevelopmentHost(self.bindings,native_source_provider=self.host.native_source_provider)
+        else:self.host=self.makehost()
         path=f.root/'http-identities.json';path.write_text(json.dumps({'users':{'qa':{'enabled':True,
             'password_hash':password_hash('TEST_FIXTURE_PASSWORD_ONLY'),'tenant_id':'tenant-a','principal_id':'qa','roles':['TASK_CENTER_ADMIN']}}}));path.chmod(0o600)
         def connect():
@@ -127,7 +202,7 @@ class DevelopmentBridgeTests(unittest.TestCase):
             redirect='https://chatgpt.com/connector_platform_oauth_redirect';verifier='v'*64
             client=store.register({'redirect_uris':[redirect],'grant_types':['authorization_code'],'response_types':['code'],'token_endpoint_auth_method':'none'})
             challenge=base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip('=')
-            location=store.authorize({'principal_id':'qa'},{'response_type':'code','client_id':client['client_id'],
+            location=store.authorize({'principal_id':actor},{'response_type':'code','client_id':client['client_id'],
                 'redirect_uri':redirect,'code_challenge':challenge,'code_challenge_method':'S256','state':'s','resource':origin+'/mcp','scope':'task:read task:submit'})
             token=store.exchange({'grant_type':'authorization_code','code':parse_qs(urlsplit(location).query)['code'][0],
                 'client_id':client['client_id'],'redirect_uri':redirect,'code_verifier':verifier,'resource':origin+'/mcp'})['access_token']
@@ -137,9 +212,16 @@ class DevelopmentBridgeTests(unittest.TestCase):
                 request=Request('http://127.0.0.1:%d/mcp'%server.server_port,data=json.dumps(value).encode(),
                     headers={'Host':'development.example.invalid','Authorization':'Bearer '+token,'Content-Type':'application/json'})
                 return json.loads(urlopen(request,timeout=3).read())
-            self.assertIn('task_development_review',[x['name'] for x in rpc('tools/list')['result']['tools']])
-            result=rpc('tools/call',{'name':'task_development_review','arguments':{'task_id':'demo-b','attempt_id':'attempt-b',
-                'candidate_event_id':candidate,'reviewed_event_id':'http-reviewed','reviews':reviews}})
+            action='task_development_apply' if native else 'task_development_review'
+            self.assertIn(action,[x['name'] for x in rpc('tools/list')['result']['tools']])
+            args={'task_id':'demo-b','attempt_id':'attempt-b'}
+            args.update({'request_id':'native-http'} if native else
+                {'candidate_event_id':candidate,'reviewed_event_id':'http-reviewed','reviews':reviews})
+            result=rpc('tools/call',{'name':action,'arguments':args})
+            if native:
+                payload=json.loads(result['result']['content'][0]['text'])
+                self.assertEqual(payload['execution_state'],'HOLD_TRUSTED_NATIVE_EXECUTION_UNAVAILABLE')
+                self.assertEqual(payload['candidate']['code_commit'],f.base)
             self.assertFalse(result['result']['isError'])
             self.assertEqual(f.s._task('demo-b')['state'],'STARTED')
         finally:server.shutdown();server.server_close();thread.join(2)

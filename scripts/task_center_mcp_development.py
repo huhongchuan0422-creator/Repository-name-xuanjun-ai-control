@@ -12,7 +12,7 @@ from task_supervisor import canonical
 from task_writer_fence import Fence
 from local_development_executor import LocalDevelopmentExecutor
 from entry_review_gate import complete_reviewed_candidate,finalize_reviewed_candidate
-from development_entry_intake import _controlled_candidate_files
+from development_entry_intake import _controlled_candidate_files, validate_event
 
 ACTIONS={'task_development_apply':'EXECUTOR','task_development_review':'REVIEWER',
          'task_development_finalize':'ACCEPTOR','task_development_status':None}
@@ -37,7 +37,7 @@ class DevelopmentHost:
     {ticket,caller,lock_root}; review_keys_provider(task,key_ids) supplies existing keys.
     None is permitted and fails closed only the dependent operation.
     """
-    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None):
+    def __init__(self,bindings,review_keys_provider=None,writer_context_provider=None,native_source_provider=None):
         if not isinstance(bindings,list) or len(bindings)>128:raise ValueError('BOUNDED_DEVELOPMENT_BINDINGS_REQUIRED')
         required={'tenant_id','principal_id','project_id','task_id','spec_sha256','checkpoint_sha256','contract_sha256',
                   'role_id','role_version','phase','review_kind','authority_identity','actions','candidate_root','executor_profile'}
@@ -65,9 +65,10 @@ class DevelopmentHost:
             key=tuple(b[k] for k in ('tenant_id','principal_id','project_id','task_id'))
             if key in seen:raise ValueError('DUPLICATE_DEVELOPMENT_HOST_BINDING')
             seen.add(key)
-        for fn in (review_keys_provider,writer_context_provider):
+        for fn in (review_keys_provider,writer_context_provider,native_source_provider):
             if fn is not None and not callable(fn):raise ValueError('TRUSTED_HOST_PROVIDER_REQUIRED')
         self.bindings=copy.deepcopy(bindings);self.review_keys_provider=review_keys_provider;self.writer_context_provider=writer_context_provider
+        self.native_source_provider=native_source_provider
     def visible(self,identity):
         allowed=set()
         for b in self.bindings:
@@ -108,7 +109,29 @@ class DevelopmentHost:
                     {'source_kind':'AUTHENTICATED_MCP','action':name,'attempt_id':a['attempt_id']},s.clock())
                 return task,contract
             task,contract=check()
-            if name=='task_development_apply':
+            if name=='task_development_apply' and b['executor_profile'] is None:
+                # Reuse apply for host-supplied native source; no regeneration.
+                if self.native_source_provider is None:
+                    raise ValueError('HOLD_TRUSTED_NATIVE_SOURCE_UNAVAILABLE')
+                source=self.native_source_provider(a['task_id'],a['attempt_id'],a['request_id'])
+                if (not isinstance(source,dict) or set(source)!=
+                        {'event','control_repository','trusted_owner','destination'}):
+                    raise ValueError('EXACT_HOST_NATIVE_SOURCE_REQUIRED')
+                if (not isinstance(source['destination'],dict)
+                        or source['destination'].get('task_id')!=a['task_id']):
+                    raise ValueError('HOST_NATIVE_DESTINATION_MISMATCH')
+                receipt=validate_event(source['event'],source['control_repository'],
+                                       source['trusted_owner'],source['destination'])
+                if receipt['event']!='CODE_READY':
+                    raise ValueError('NATIVE_CODE_READY_REQUIRED')
+                files=_controlled_candidate_files(s,receipt,b['candidate_root'])
+                result=s._bind_development_candidate(receipt,
+                    {path:hashlib.sha256(raw).hexdigest() for path,raw in files.items()},
+                    admission_check=lambda:check(True))
+                result.update(execution_state='HOLD_TRUSTED_NATIVE_EXECUTION_UNAVAILABLE',
+                    generated_code_executed=False,source_kind='AUTHENTICATED_NATIVE_IMPORT',
+                    next_action='RUN_SAME_COMMIT_WITH_ORIGINAL_TRUSTED_EXECUTOR')
+            elif name=='task_development_apply':
                 if self.writer_context_provider is None:raise ValueError('HOLD_EXISTING_WRITER_CONTEXT_UNAVAILABLE')
                 profile=b['executor_profile']
                 if profile is None or any(profile[k]!=b[k] for k in ('project_id','role_id','role_version','principal_id')):raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
@@ -158,14 +181,15 @@ def load_host(path):
     not a producer of authority and does not copy canonical Writer fields.
     """
     cfg=_read_host_json(path,'DEVELOPMENT_HOST_CONFIG')
-    if (not isinstance(cfg,dict) or set(cfg)!={'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}
+    required={'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}
+    if (not isinstance(cfg,dict) or set(cfg) not in (required,required|{'native_source_file'})
             or type(cfg['schema_version']) is not int or cfg['schema_version']!=1 or type(cfg['enabled']) is not bool):
         raise ValueError('EXACT_DEVELOPMENT_HOST_CONFIG_REQUIRED')
-    for k in ('review_keyring_file','writer_context_file'):
-        if cfg[k] is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
+    for k in ('review_keyring_file','writer_context_file','native_source_file'):
+        if cfg.get(k) is not None and (not isinstance(cfg[k],str) or not cfg[k].startswith('/')):
             raise ValueError('EXISTING_PROTECTED_HOST_REFERENCE_REQUIRED')
     if not cfg['enabled']:
-        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None:
+        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('native_source_file') is not None:
             raise ValueError('DISABLED_DEVELOPMENT_CONFIG_MUST_BE_EMPTY')
         return None
     def keys(task,ids):
@@ -179,5 +203,12 @@ def load_host(path):
         if not isinstance(value,dict) or set(value)!={'attempt_id','ticket','caller','lock_root'} or value['attempt_id']!=attempt:
             raise ValueError('EXISTING_EXACT_WRITER_CONTEXT_REQUIRED')
         return {k:value[k] for k in ('ticket','caller','lock_root')}
+    def native_source(task,attempt,request):
+        raw=_read_host_json(cfg['native_source_file'],'TRUSTED_NATIVE_SOURCE')
+        try:value=raw[task][attempt][request]
+        except (KeyError,TypeError):
+            raise ValueError('HOLD_TRUSTED_NATIVE_SOURCE_UNAVAILABLE') from None
+        return value
     return DevelopmentHost(cfg['bindings'],keys if cfg['review_keyring_file'] else None,
-                            writer if cfg['writer_context_file'] else None)
+                            writer if cfg['writer_context_file'] else None,
+                            native_source if cfg.get('native_source_file') else None)
