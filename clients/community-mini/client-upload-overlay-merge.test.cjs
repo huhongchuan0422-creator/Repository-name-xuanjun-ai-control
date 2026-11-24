@@ -39,11 +39,13 @@ test('merged JS differs from approved 8a3 only by preserving original uploaded s
  assert.match(source,/recognizeCurrentDocument\(kind,options=\{\}\)\{\n  if\(kind==='bank_card'\)return/);
 });
 
-test('merged CSS preserves every uploaded style byte and appends only approved symbol rule',()=>{
- const uploaded=read('upload-base',CSS_PATH),review=read('reviewed-8a3',CSS_PATH).toString();
- const rule=review.match(/\.storefront-symbol\{[^}]+\}/)[0];
+test('palette CSS preserves latest upload-tip bytes and adds only palette-inheriting icon rule',()=>{
+ const tip=fs.readFileSync(path.join(evidence,'warm-rose-css/upload-tip.css'));
+ assert.equal(sha(tip),'1731bb8ea0327b8e40d0c92161efb42aee187ba6f82a4803ab1b29299cc4153c');
+ const oldRule=read('reviewed-8a3',CSS_PATH).toString().match(/\.storefront-symbol\{[^}]+\}/)[0];
+ const rule=oldRule.replace('color:#728b7b;','color:inherit;');
  const actual=fs.readFileSync(path.join(__dirname,CSS_PATH));
- assert.deepEqual(actual,Buffer.concat([uploaded,Buffer.from('\n'+rule+'\n')]));
+ assert.deepEqual(actual,Buffer.concat([tip,Buffer.from('\n'+rule+'\n')]));
  assert.equal((actual.toString().match(/\.storefront-symbol\{/g)||[]).length,1);
 });
 
@@ -64,4 +66,42 @@ test('merged selection path keeps read failure retry without changing or creatin
  f.allowRetry();await f.page.retryApplicantRead();assert.equal(f.page.data.ready,true);assert.equal(f.page.data.step,3);
  assert.deepEqual(f.calls.filter(x=>Array.isArray(x)),[['load','approved-original'],['load','approved-original']]);
  assert.ok(!f.calls.some(x=>['save','wechat_submit_review','wechat_apply'].includes(x)));
+});
+
+
+test('palette CSS retains MERGED2 icon geometry while inheriting the warm-rose placeholder color',()=>{
+ const actual=fs.readFileSync(path.join(__dirname,CSS_PATH),'utf8');
+ const parse=rule=>Object.fromEntries(rule.slice(rule.indexOf('{')+1,-1).split(';').filter(Boolean).map(x=>x.split(':')));
+ const previous=parse(read('reviewed-8a3',CSS_PATH).toString().match(/\.storefront-symbol\{[^}]+\}/)[0]);
+ const current=parse(actual.match(/\.storefront-symbol\{[^}]+\}/)[0]);
+ assert.equal(current.color,'inherit');delete current.color;delete previous.color;assert.deepEqual(current,previous);
+ assert.match(actual,/\.shop-photo-placeholder\{[^}]*color:#756068;/);
+ assert.ok(!actual.includes('color:#728b7b'));
+});
+
+test('palette CSS static mobile viewport checks fit icon and text at 320 375 and 414 pixels',()=>{
+ const css=fs.readFileSync(path.join(__dirname,CSS_PATH),'utf8');
+ function declarations(selector){const result={};for(const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)){if(m[1].trim().split(',').includes(selector))for(const item of m[2].split(';')){const k=item.indexOf(':');if(k>0)result[item.slice(0,k).trim()]=item.slice(k+1).trim();}}return result;}
+ const page=declarations('.page'),card=declarations('.card'),photo=declarations('.shop-photo-placeholder'),shop=declarations('.shop-card'),icon=declarations('.storefront-symbol');
+ const unit=value=>{assert.match(value,/^[\d.]+rpx$/);return Number.parseFloat(value);};
+ for(const width of [320,375,414]){
+  const scale=width/750,photoWidth=unit(photo.width)*scale,photoHeight=unit(photo.height)*scale,iconSize=unit(icon['font-size'])*scale;
+  const copyWidth=width-2*unit(page.padding)*scale-2*unit(card.padding)*scale-2*Number.parseFloat(card.border)*scale-unit(shop.gap)*scale-photoWidth;
+  assert.ok(copyWidth>0,'copy width '+width);assert.ok(iconSize<=photoWidth&&iconSize<=photoHeight,'icon within original placeholder '+width);
+  assert.equal(icon.width,'100%');assert.equal(icon.height,'100%');assert.equal(icon.display,'flex');assert.equal(icon['align-items'],'center');assert.equal(icon['justify-content'],'center');
+ }
+});
+
+test('palette CSS merge leaves all seven other palette files unchanged in the author worktree',()=>{
+ const proof=JSON.parse(fs.readFileSync(path.join(evidence,'warm-rose-css/PALETTE-BASE-PINS.json'),'utf8'));
+ assert.equal(proof.upload_tip,'193627c0b5c57f38a290db56cfcb536dc0479c4a');assert.equal(proof.preserve_seven.length,7);
+ for(const row of proof.preserve_seven){const file=path.resolve(__dirname,'../..',row.file);assert.equal(sha(fs.readFileSync(file)),row.author_before_sha256,row.file);}
+});
+
+
+test('palette CSS preserves all MERGED2 non-palette layout declarations',()=>{
+ function layout(css){const result={};css=css.replace(/\/\*[\s\S]*?\*\//g,'');for(const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)){for(const selector of m[1].split(',').map(x=>x.trim())){for(const item of m[2].split(';')){const k=item.indexOf(':');if(k<1)continue;const prop=item.slice(0,k).trim(),value=item.slice(k+1).trim();if(prop==='color'||prop.startsWith('background')||prop.endsWith('-color'))continue;(result[selector]??={})[prop]=value.replace(/#[0-9a-f]{3,8}\b/gi,'PALETTE');}}}return result;}
+ const before=fs.readFileSync(path.join(evidence,'warm-rose-css/merged2.css'),'utf8');
+ const after=fs.readFileSync(path.join(__dirname,CSS_PATH),'utf8');
+ assert.deepEqual(layout(after),layout(before));
 });
