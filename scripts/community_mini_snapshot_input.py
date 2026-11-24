@@ -8,15 +8,15 @@ def prepare(archive,manifest_raw,expected_manifest_sha,expected_zip_sha,destinat
  # Pins are explicit caller inputs; never derive approval from archive contents.
  need(sha(manifest_raw)==expected_manifest_sha,'MANIFEST_PIN_MISMATCH')
  need(sha(archive)==expected_zip_sha,'ZIP_PIN_MISMATCH')
- m=json.loads(manifest_raw);need(m.get('format')==1 and m.get('file_count')==51,'EXACT_SNAPSHOT_FORMAT')
- files=m.get('files');need(type(files)is dict and len(files)==51,'COMPLETE_51_FILE_MANIFEST')
+ m=json.loads(manifest_raw);need(m.get('format')==1 and m.get('file_count')==57,'EXACT_SNAPSHOT_FORMAT')
+ files=m.get('files');need(type(files)is dict and len(files)==57,'COMPLETE_57_FILE_MANIFEST')
  for n,h in files.items():
   need(type(n)is str and re.fullmatch(r'[A-Za-z0-9_./-]+',n) and not n.startswith('/') and all(x not in ('','..','.') for x in n.split('/')),'UNSAFE_PATH')
   need(type(h)is str and re.fullmatch('[0-9a-f]{64}',h),'BAD_FILE_PIN')
  need('CONNECTED_PREVIEW_RECEIPT.json' not in files,'RECEIPT_NOT_SOURCE')
  import io
  with zipfile.ZipFile(io.BytesIO(archive)) as z:
-  entries=z.infolist();need(len(entries)==51 and len({e.filename for e in entries})==51 and set(z.namelist())==set(files),'EXACT_ARCHIVE_SET')
+  entries=z.infolist();need(len(entries)==57 and len({e.filename for e in entries})==57 and set(z.namelist())==set(files),'EXACT_ARCHIVE_SET')
   need(sum(e.file_size for e in entries)<=10000000,'SOURCE_BUDGET')
   data={}
   for e in entries:
@@ -52,7 +52,7 @@ def identity(env):
  for p in mini.rglob('*'):
   need(not p.is_symlink(),'SOURCE_SYMLINK')
   if p.is_file():actual[p.relative_to(mini).as_posix()]=sha(p.read_bytes())
- need(actual==b['source_files'] and len(actual)==51,'STAGED_DRIFT')
+ need(actual==b['source_files'] and len(actual)==57,'STAGED_DRIFT')
  return dict(product_source_sha=b['manifest_sha256'],control_source_sha=head,fixed_product=True,backend_source_sha=b['backend_source_sha'],compatibility='EXACT_REVIEWED_SNAPSHOT_BACKEND_PAIR',snapshot_binding=b)
 
 if __name__=='__main__':
