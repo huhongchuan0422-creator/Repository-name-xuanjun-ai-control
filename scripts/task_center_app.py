@@ -458,9 +458,27 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
     if ledger_bridge is not None:
         from task_center_handoff_ledger import HandoffLedgerBridge
         if (type(ledger_bridge) is not HandoffLedgerBridge or handoff_host is not ledger_bridge.host
-            or handoff_host.db_path is None or os.path.realpath(handoff_host.db_path)!=os.path.realpath(db_path)
-            or delivery_ledger_reader is not None):raise ValueError('HANDOFF_LEDGER_HOST_BINDING_REQUIRED')
-        delivery_ledger_reader=MetadataReader(ledger_bridge.root,ledger_bridge.namespace,ledger_bridge.writer,tenant_id,ledger_authority=ledger_bridge)
+            or handoff_host.db_path is None or os.path.realpath(handoff_host.db_path)!=os.path.realpath(db_path)):
+            raise ValueError('HANDOFF_LEDGER_HOST_BINDING_REQUIRED')
+        # Use the final configured host for reads; never create a Store here.
+        reader_options={}
+        if delivery_ledger_reader is not None:
+            if (type(delivery_ledger_reader) is not MetadataReader
+                    or os.path.realpath(delivery_ledger_reader.root)!=os.path.realpath(ledger_bridge.root)
+                    or delivery_ledger_reader.namespace!=ledger_bridge.namespace
+                    or delivery_ledger_reader.writer!=ledger_bridge.writer
+                    or delivery_ledger_reader.tenant_id!=tenant_id):
+                raise ValueError('HANDOFF_LEDGER_READER_BINDING_REQUIRED')
+            for name in ('observation_reader','backup_observation_reader','local_backup_reader'):
+                reader_options[name]=getattr(delivery_ledger_reader,name)
+            if (delivery_ledger_reader.ledger_authority is not None
+                    and delivery_ledger_reader.ledger_authority is not ledger_bridge):
+                raise ValueError('HANDOFF_LEDGER_READER_BINDING_REQUIRED')
+            if (delivery_ledger_reader.handoff_verifier is not None
+                    and delivery_ledger_reader.handoff_verifier!=ledger_bridge.verify_current):
+                raise ValueError('HANDOFF_LEDGER_READER_BINDING_REQUIRED')
+        delivery_ledger_reader=MetadataReader(ledger_bridge.root,ledger_bridge.namespace,
+            ledger_bridge.writer,tenant_id=tenant_id,ledger_authority=ledger_bridge,**reader_options)
 
     def host_call(method, *args):
         if ledger_bridge is None:return getattr(handoff_host,method)(*args)
