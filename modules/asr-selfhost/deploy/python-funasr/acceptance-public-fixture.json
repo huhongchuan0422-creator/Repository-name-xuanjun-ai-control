@@ -1,0 +1,16 @@
+{
+  "fixture_sha256": "a1bd32dc78493c123f9625a66deee562aed2895f53fbc39f2cca3be7e6f4f20f",
+  "real_audio_frames": 209494,
+  "samples_per_clip": 88747,
+  "inserted_pause_ms": 2000,
+  "real_events": 18,
+  "first_draft_ms": 1916,
+  "first_confirmed_ms": 7767,
+  "completed_before_stop": true,
+  "first_sentence_chars": 19,
+  "final_chars": 38,
+  "entire_session_confirmed": true,
+  "exact_repeated_audio_transcript_match": true,
+  "second_pass_seen": true,
+  "elapsed_ms": 13903
+}

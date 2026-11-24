@@ -1,0 +1,46 @@
+{
+  "streaming": {
+    "repository": "funasr/paraformer-zh-streaming",
+    "revision": "fd2af606b37d7fb8b3b8a218c5be5b07b53ef6ba",
+    "license_metadata": "Apache-2.0",
+    "license_file_present": true,
+    "files": {
+      "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "README.md": "d24e63307ab08112836f3f8c2be89ec014898064f4aa3145a8d16b18b71fe40a",
+      "am.mvn": "29b3c740a2c0cfc6b308126d31d7f265fa2be74f3bb095cd2f143ea970896ae5",
+      "config.yaml": "35e6bf41f8c7eaf9a0f787af7fdc8fc5ed75fa8009ade7d3c2f3ef5bce20c648",
+      "configuration.json": "1aae0f45e3e503f52512eee4798d241611a44cc732a7a91d2e2d2f65dd9755be",
+      "model.pt": "4fdfb48ed4471777c9a511e96a2acae17f77cac9d709cc756634622769192a64",
+      "seg_dict": "59a2ef803a3f1648ad03a2e1480db1c1ee0c0d7dc4ef4dbd16cea33944329022",
+      "tokens.json": "2b20c2b12572d682afff84ce1c8d560f67b8b32a4c1f21567411d141ed352127"
+    }
+  },
+  "offline": {
+    "repository": "funasr/paraformer-zh",
+    "revision": "d7811ee3ac581fbcfdeb37c98c6ba674028433dc",
+    "license_metadata": "Apache-2.0",
+    "license_file_present": false,
+    "files": {
+      "README.md": "513555aa084cc8a00e7bf1c916e659dfa9f70166ce6aaf6fe281c537bd6f1053",
+      "am.mvn": "29b3c740a2c0cfc6b308126d31d7f265fa2be74f3bb095cd2f143ea970896ae5",
+      "config.yaml": "bfd424b9f61846aac63591e96fe24d66b35f4643bddcb4b9bb759db8f987ab79",
+      "configuration.json": "b7d2917954fc547e43ad61486a5248596738cf5909907eade11e71c56f446f34",
+      "model.pt": "5bba782a5e9196166233b9ab12ba04cadff9ef9212b4ff6153ed9290ff679025",
+      "seg_dict": "59a2ef803a3f1648ad03a2e1480db1c1ee0c0d7dc4ef4dbd16cea33944329022",
+      "tokens.json": "2b20c2b12572d682afff84ce1c8d560f67b8b32a4c1f21567411d141ed352127"
+    }
+  },
+  "vad": {
+    "repository": "funasr/fsmn-vad",
+    "revision": "df20e6b30c653645fa4ff125cacfcabd1020a669",
+    "license_metadata": "Apache-2.0",
+    "license_file_present": false,
+    "files": {
+      "README.md": "bc7ed04222f932ea519e5969140a7fa14944becbbb3c0728a267c5bf9dc9c200",
+      "am.mvn": "df189fd5f4352df84a0fd464eeab4e450a5e645665d6b38f13c832492261a739",
+      "config.yaml": "486861ca26ddb79081663b6179cb204c6bfae71c52f04aafc48a9e9d8dde1e93",
+      "configuration.json": "7bce8867e37d55c3dd8f672695ced18077a2be199ea529a5d432d5350fc0acba",
+      "model.pt": "b3be75be477f0780277f3bae0fe489f48718f585f3a6e45d7dd1fbb1a4255fc5"
+    }
+  }
+}

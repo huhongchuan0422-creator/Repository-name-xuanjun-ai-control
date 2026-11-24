@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>语音 · 语音转文字</title><link rel="stylesheet" href="./styles.css"></head>
+<body>
+<main>
+  <header><div class="brand"><span aria-hidden="true">语</span>语音组件</div><div class="tag">语音工具</div></header>
+  <section class="intro"><p class="kicker">语音输入 / TRANSCRIPT</p><h1>把话说出来。</h1><p>边说边出字，停顿后校正。定稿随时可以手改。</p></section>
+  <div class="workspace">
+    <section class="controls" aria-label="语音输入">
+      <div class="eyebrow">01　录音</div>
+      <h2>开始说话</h2>
+      <p id="provider">正在检查识别服务…</p>
+      <button class="primary" id="record" type="button" disabled><span aria-hidden="true">●</span> 开始录音</button>
+      <button class="subtle" id="sample" type="button">体验示例</button>
+      <p class="connection" id="status" role="status" aria-live="polite">可以先手动输入。</p>
+      <details><summary>识别热词</summary><label for="hotwords">添加地名、校名或专有词，每行一项。</label><textarea id="hotwords" rows="3" placeholder="比如：示例三中"></textarea></details>
+    </section>
+    <section class="editor" aria-label="可编辑文稿">
+      <div class="line"><div class="eyebrow">02　文稿</div><span id="phase" class="tag">可编辑</span></div>
+      <label for="transcript" class="visually-hidden">转写文稿</label>
+      <textarea id="transcript" rows="9" placeholder="识别结果会出现在这里，也可以直接输入。"></textarea>
+      <aside id="suggestion" hidden><span class="eyebrow">待处理的识别结果</span><p id="candidate"></p><button id="append" type="button">追加到文稿</button><button id="copy-suggestion" type="button">复制识别结果</button></aside>
+      <div class="line tools"><small id="count">0 个字</small><button id="copy" type="button">复制文字</button></div>
+    </section>
+  </div>
+  <footer>给想说的话留点空间。</footer>
+</main>
+<script type="module" src="./app.mjs"></script>
+</body></html>

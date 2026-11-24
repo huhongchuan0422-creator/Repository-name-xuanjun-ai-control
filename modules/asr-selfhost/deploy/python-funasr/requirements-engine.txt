@@ -1,0 +1,4 @@
+# Engine-specific requirements. Install the matching official CPU wheel separately.
+funasr==1.4.29
+numpy>=1.24,<3
+websockets>=15,<17

@@ -1,0 +1,10 @@
+[
+  {"id":"school","reference":"明天去示例三中，不是示例二中。","critical_clauses":["示例三中","不是示例二中"]},
+  {"id":"decimal","reference":"金额是三百一十六点二五元，不是三百一十六点五二元。","critical_clauses":["三百一十六点二五元","不是三百一十六点五二元"]},
+  {"id":"date","reference":"十一月二十六日星期四，下午三点半。","critical_clauses":["十一月二十六日","下午三点半"]},
+  {"id":"negation","reference":"录音不用发出去，先给家长看文字。","critical_clauses":["不用发出去"]},
+  {"id":"chongqing","reference":"今天下雨，过哈儿再去教室。","critical_clauses":["过哈儿"]},
+  {"id":"same-sound","reference":"请联系张瑞老师，不是张锐老师。","critical_clauses":["张瑞老师","不是张锐老师"]},
+  {"id":"identifier","reference":"设备编号是零零二五，不是二五。","critical_clauses":["零零二五","不是二五"]},
+  {"id":"silence","reference":"","critical_clauses":[]}
+]
