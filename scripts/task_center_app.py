@@ -1600,9 +1600,14 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 if length<2 or length>8192:raise ValueError('BODY_LIMIT')
                 value=json.loads(self.rfile.read(length).decode('utf-8'))
                 if set(value)!={'username','password'}:raise ValueError('EXACT_LOGIN_REQUIRED')
-                identity=identity_provider.verify(value['username'],value['password'])
-                if identity is None:raise ValueError('INVALID_CREDENTIALS')
-                token,csrf,expires=session_store.create(identity)
+                guarded_login=getattr(identity_provider,'guarded_login',None)
+                if callable(guarded_login):
+                    identity,(token,csrf,expires)=guarded_login(
+                        session_store,value['username'],value['password'])
+                else:
+                    identity=identity_provider.verify(value['username'],value['password'])
+                    if identity is None:raise ValueError('INVALID_CREDENTIALS')
+                    token,csrf,expires=session_store.create(identity)
                 self._send(200,_json_bytes({'state':'AUTHENTICATED',
                   'principal_id':identity['principal_id'],'roles':identity['roles'],
                   'csrf_token':csrf,'expires_at':expires}),

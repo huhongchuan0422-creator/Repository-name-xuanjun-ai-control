@@ -26,6 +26,18 @@ class CanonicalHandoffBackend:
         self.db_path=os.path.realpath(paths[0])
         self.sessions=sessions;self.identity_provider=identity_provider;self.issuer=issuer;self.clock=clock
 
+    @property
+    def guarded_login(self):
+        login=getattr(self.identity_provider,'guarded_login',None)
+        if not callable(login):return None
+        def admitted(sessions,username,password):
+            try:
+                db=self._read();db.close()
+            except Exception:
+                raise ValueError('FORMAL_PROVENANCE_UNAVAILABLE') from None
+            return login(sessions,username,password)
+        return admitted
+
     def verify(self,username,password):
         # Original login path; no password/token/key is stored or logged here.
         try:

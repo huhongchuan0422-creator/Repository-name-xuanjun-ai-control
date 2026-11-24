@@ -33,6 +33,12 @@ class HostIdentityProvider(FormalHandoffIdentityProvider):
             raise ValueError('FORMAL_IDENTITY_BACKEND_UNAVAILABLE')
         self.tenant_id=tenant_id;self.backend=backend;self.clock=clock
 
+    @property
+    def guarded_login(self):
+        # Preserve legacy injected providers; the new consumer owns its login
+        # transaction rather than losing provenance through verify's dict.
+        return getattr(self.backend,'guarded_login',None)
+
     def verify(self,username,password):
         # Credentials stay in the original login path; never log backend errors.
         try:identity=self.backend.verify(username,password)
@@ -127,12 +133,18 @@ def main(argv=None, *, db=None,tenant_id=None,issuer=None,identity_backend=None,
          session_store=None,evidence=None,role_contract=None,mcp_config=None,
          lifecycle_root=None,ledger_root=None,namespace=None,writer=None,
          gateway_runtime=None,mcp_claim_host=None,mcp_development_host=None,
-         execution_provider=None):
+         execution_provider=None,provenance_source=None,principal_mapper=None):
     """Original host startup calls this with custodied objects, never RPC data.
 
     SessionStore uses the existing canonical DB. app.main performs its existing
     tenant/DB/CSRF/MCP checks; no listener can bind with absent authority.
     """
+    if provenance_source is not None or principal_mapper is not None:
+        if identity_backend is not None or identity_provider is not None:
+            raise ValueError('SINGLE_IDENTITY_SOURCE_REQUIRED')
+        from task_center_provenance_consumer import GuardedProvenanceConsumer
+        identity_provider=GuardedProvenanceConsumer(
+            session_store,provenance_source,principal_mapper)
     if identity_backend is None and identity_provider is not None:
         from task_center_handoff_backend import CanonicalHandoffBackend
         identity_backend=CanonicalHandoffBackend(session_store,identity_provider,issuer,db)

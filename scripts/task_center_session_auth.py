@@ -88,7 +88,7 @@ class SessionStore(object):
     def _hash(value):
         return hashlib.sha256(value.encode('utf-8')).hexdigest()
 
-    def create(self, identity):
+    def create(self, identity, *, admission=None):
         if identity.get('tenant_id') != self.tenant_id:
             raise ValueError('SESSION_TENANT_MISMATCH')
         token = secrets.token_urlsafe(32)
@@ -101,7 +101,17 @@ class SessionStore(object):
               identity['principal_id'], json.dumps(identity['roles'],
               separators=(',', ':')), self._hash(csrf), now,
               now + self.ttl_seconds))
+            # Trusted in-process callback only; no JSON/CLI capability. This is
+            # the storage owner's final synchronous admission before commit.
+            if admission is not None:
+                admission({'tenant_id': self.tenant_id,
+                    'principal_id': identity['principal_id'],
+                    'session_hash': self._hash(token),
+                    'expires_at': now + self.ttl_seconds})
             db.commit()
+        except BaseException:
+            db.rollback()
+            raise
         finally:
             db.close()
         return token, csrf, now + self.ttl_seconds
