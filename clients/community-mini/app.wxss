@@ -52,14 +52,14 @@ picker { background:#fff5f6; border:1rpx solid #f1d5da; padding:20rpx; border-ra
 page{background:#fff5f6;color:#34292d}
 .consumer-page{background:transparent}
 .title,.section-title{color:#34292d;font-weight:700}
-button.primary{background:linear-gradient(115deg,#c54450,#d9535e);color:#fff;border-radius:22rpx}
+button.primary{background:linear-gradient(115deg,#c54450,#c54450);color:#fff;border-radius:22rpx}
 button.primary[disabled],button[disabled]{background:#eee9ec;color:#75666e}
 .card{box-shadow:0 8rpx 30rpx rgba(105,39,59,.06)}
 .xj-nav{background:#fdf9fa;border-color:#f2dce0;box-shadow:0 -8rpx 28rpx rgba(99,31,48,.07)}
 .xj-nav .nav-item{color:#66515a}
 .xj-nav .nav-item.is-active{color:#c54450}
 .xj-nav .is-active .nav-icon{filter:drop-shadow(0 4rpx 7rpx rgba(191,41,70,.22))}
-.consumer-section-header{background:linear-gradient(110deg,#c54450,#d9535e)}
+.consumer-section-header{background:linear-gradient(110deg,#c54450,#c54450)}
 
 .xj-nav .nav-item.is-active .nav-icon{color:#c54450}
 

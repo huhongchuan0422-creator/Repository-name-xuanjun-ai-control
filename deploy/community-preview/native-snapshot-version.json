@@ -3,8 +3,8 @@
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
   "startup_source_manifest_sha256": "57dfbfd2b8886a85cddecd74ec7a6061b9e01e4ea5aea59561069111f126315c",
-  "frontend_manifest_sha256": "4fae87dbfbd56cf54832cbdb6799d3a5e3e539b8c2f6d6b8efaa9963f5d914f0",
-  "frontend_archive_sha256": "a4b7c60caae5ce90b4361d66fa1bb63eeb351c2e7a320a13cdda01681e9af214",
+  "frontend_manifest_sha256": "729f41e7632a1aebe45edcec59881bd94dcbca1c733be767c9ee70f51d8195ec",
+  "frontend_archive_sha256": "ec534ad8a842f8eeb42dc00232f6b33fa6ab8dde3f471ed3c135c31db36b8498",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
   "evidence": "Ordinary same-store HTTPS QR; exact 4 backend pins installed; native amount live HTTP200; two real supplier photos; payment remains disabled"
 }
