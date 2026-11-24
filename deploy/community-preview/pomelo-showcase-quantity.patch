@@ -1,0 +1,11 @@
+--- a/scripts/community_platform_showcase.py
++++ b/scripts/community_platform_showcase.py
+@@ -90,7 +90,7 @@
+                     platform_self_operated=False,scene=None,version=row['version'],profile_version=row['version'],
+                     platform_showcase=True,display_number=SLOT)
+         if detail:
+-            result['showcase_item']={k:row[k] for k in ('id','name','description','image_data','unit_minor')}
++            result['showcase_item']={k:row[k] for k in ('id','name','description','image_data','unit_minor','quantity')}
+             result['showcase_item'].update(available=False,display_only=True)
+             if 'gallery' in row:result['showcase_item']['gallery']=gallery(row['gallery'])
+         return result

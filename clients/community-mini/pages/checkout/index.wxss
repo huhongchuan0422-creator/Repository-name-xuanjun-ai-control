@@ -26,3 +26,11 @@ page{background:#f5f8f7;color:#192e30}.page{padding:36rpx}.hero{padding:24rpx 6r
 
 /* Product artwork is square; owned advertisement artwork is a 3:1 banner. */
 .product-card{display:flex;gap:24rpx;align-items:flex-start}.product-image{width:176rpx;height:176rpx;flex:0 0 176rpx;border-radius:20rpx}.product-copy{flex:1;min-width:0}.product-price{display:block;margin-top:12rpx;color:#cf3f2f;font-size:32rpx;font-weight:650}.payment-ad-slot{padding:0 0 22rpx;overflow:hidden}.payment-ad-image{display:block;width:100%;height:200rpx;margin-bottom:20rpx}.payment-ad-label,.payment-ad-title{margin-left:28rpx;margin-right:28rpx}
+
+/* Read-only catalog: orchard green, quiet editorial gallery. */
+.showcase-label{display:block;color:#45673a;font-size:24rpx;letter-spacing:3rpx;margin-bottom:16rpx}
+.showcase-cover,.showcase-gallery image{display:block;width:100%;border-radius:16rpx}
+.showcase-price{display:block;color:#36552d;font-size:44rpx;font-weight:600;margin-bottom:20rpx}
+.showcase-notice{display:block;color:#45673a;border-top:1rpx solid #dbe4d5;margin-top:24rpx;padding-top:20rpx}
+.showcase-gallery .section-title{display:block;margin-top:20rpx}
+.showcase-source{display:block;font-size:22rpx;color:#65715e;word-break:break-all;margin-top:12rpx}

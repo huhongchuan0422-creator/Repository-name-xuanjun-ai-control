@@ -26,12 +26,17 @@ Page({
   onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前订单和客户资料已清除，请重新进入对应门店',false);return;}if(this._sceneStale)return;const mode=getApp().globalData.checkoutMode;getApp().globalData.checkoutMode='';const view=mode||this.data.viewMode||'recommendations';const selectedRecommendation=view==='store-detail'?this.data.selectedRecommendation:null;this.setData({viewMode:view,activeSection:view==='orders'?'orders':view==='services'||view==='profile'?'profile':'recommendations',selectedRecommendation,sceneStorefront:view==='store-detail'?this.data.sceneStorefront:null});if((mode||this.data.demoStore)&&this.data.sessionReady){if(view==='recommendations')this.loadDirectory();else if(view==='orders')this.loadOrders();else if(view==='services'&&!this.scene)this.loadContexts();}if(!mode&&this.data.sessionReady&&this.data.selectedRecommendation&&this.data.selectedRecommendation.is_demo)this.openRecommendation({currentTarget:{dataset:{id:this.data.selectedRecommendation.id}}});if(this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated()&&!this.data.pending&&!this._sceneStale){this.onLoad({scene:this.scene,view:this.data.viewMode});}},
   async openRecommendation(e){
     const id=e&&e.currentTarget.dataset.id,listed=this.data.directory.find(r=>r.id===id);if(!listed&&!(this.data.demoStore&&this.data.demoStore.id===id))return;
-    if(listed&&listed.platform_self_operated===true)return this.openPlatformMall(listed);
+    if(listed&&listed.platform_self_operated===true&&listed.platform_showcase!==true)return this.openPlatformMall(listed);
     const request={...this.customerReadToken(),id};this._detailRequest=request;
     this.setData({viewMode:'store-detail',selectedRecommendation:null,sceneStorefront:null,detailState:'LOADING',detailError:'',activeSection:'recommendations'});
     try{const r=await request.session.customer('store',{id});if(!this.customerReadCurrent(request)||this._detailRequest!==request)return;
       if(!(id.startsWith('demo_')?this.validDemoStore(r):this.validPublicStore(r))||r.id!==id)throw Error('门店资料返回未确认');
-      this.setData({selectedRecommendation:r,detailState:'READY',demoPhotoFailed:false});
+      if(r.platform_showcase===true){
+        const item=r.showcase_item;
+        if(!item||item.display_only!==true||item.available!==false||typeof item.name!=='string'||typeof item.description!=='string'||!Number.isSafeInteger(item.unit_minor)||item.unit_minor<1||typeof item.image_data!=='string')throw Error('展示商品资料返回未确认');
+        if(item.gallery!==undefined&&(!Array.isArray(item.gallery)||item.gallery.length!==4||item.gallery.some(image=>!image||typeof image.image_data!=='string'||typeof image.credit!=='string'||typeof image.label!=='string')))throw Error('展示商品图片返回未确认');
+        this.setData({selectedRecommendation:{...r,showcase_item:{...item,price_yuan:yuanAmount(item.unit_minor),quantity_label:Number.isSafeInteger(item.quantity)&&item.quantity>=0?String(item.quantity):'待同步'}},detailState:'READY'});
+      }else this.setData({selectedRecommendation:r,detailState:'READY',demoPhotoFailed:false});
     }catch(e){if(this.customerReadDenied(request,e))return;if(this.customerReadCurrent(request)&&this._detailRequest===request){if(id.startsWith('demo_'))this.clearDemoProjection('展示商家暂不可用');this.setData({detailState:'FAILED',directoryError:e.message});}}
   },
   async openPlatformMall(record){
