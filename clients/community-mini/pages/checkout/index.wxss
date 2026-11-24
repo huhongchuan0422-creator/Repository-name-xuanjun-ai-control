@@ -36,3 +36,5 @@ page{background:#fff5f6;color:#34292d}.page{padding:36rpx}.hero{padding:24rpx 6r
 .showcase-source{display:block;font-size:22rpx;color:#756068;word-break:break-all;margin-top:12rpx}
 
 page{background:linear-gradient(180deg,#ffe4e8 0,#fff5f6 460rpx)}
+
+.storefront-symbol{font-size:64rpx;line-height:1;color:#728b7b;display:flex;align-items:center;justify-content:center;width:100%;height:100%;}
