@@ -72,6 +72,9 @@ def factory(config,*,mail_configuration=None):
     try:
         from scripts.pr122_customer_identity import install as install_identity
         install_identity(center)
+        if selected==FULL:
+            from scripts.pr122_customer_geo import install as install_geo
+            install_geo(center)
         if mail_configuration is not None:
             from scripts.community_mail_delivery import install as install_mail
             bindings,transports=mail_configuration
@@ -174,7 +177,7 @@ def restore(backup_file,target,backup_key,keys,active_key):
     finally:c.db.close()
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','publisher','import-authority','import-identity-mapping','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('action',choices=('serve','worker','publisher','import-authority','import-geo-authority','import-identity-mapping','import-change-authority','issue-preview-delivery','integrity','backup','restore-isolated'));ap.add_argument('--input');ap.add_argument('--output');args=ap.parse_args()
     if os.geteuid()!=0 and args.action not in ('serve','worker'):raise SystemExit('HOLD: PROTECTED_OPERATOR_REQUIRED')
     if os.uname().nodename!=HOST:raise SystemExit('HOLD: WRONG_HOST')
     config=None
@@ -246,6 +249,9 @@ def main():
             if selected==FULL:result['message']=drain_message(c,p)
         elif args.action=='import-authority':
             result=c.import_authority(json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))
+        elif args.action=='import-geo-authority':
+            from scripts.pr122_customer_geo import import_authority as import_geo_authority
+            result=import_geo_authority(c,json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))
         elif args.action=='import-identity-mapping':
             from scripts.pr122_customer_identity import import_mapping
             result=import_mapping(c,mapping_input,base64.b64decode(config['authority_verify_key'],validate=True),config.get('identity_mapping_confirmers'),mapping_evidence.__getitem__)

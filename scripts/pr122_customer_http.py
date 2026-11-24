@@ -156,6 +156,8 @@ class App:
                         center.logout(self.token())
                         return self.reply(200,{'logged_out':True},cookie=COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0')
                     uid=center.session(self.token(),self.headers.get('X-CSRF-Token','') if self.command=='POST' else None)
+                    if operation.startswith('geo/'):
+                        status,value=center.geo.handle(uid,self.command,operation,body);return self.reply(status,value)
                     if operation.startswith('ecosystem/'):
                         if app.ecosystem is None:return self.reply(404,{'error':'NOT_FOUND'})
                         status,value=app.ecosystem.handle(center,uid,self.command,operation,body);return self.reply(status,value)
