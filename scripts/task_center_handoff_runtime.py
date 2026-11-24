@@ -123,7 +123,7 @@ class HostActionAdapter(HostAuthAdapter):
         return self._evidence('assess_candidate_bundle',(binding,))
 
 
-def main(argv=None, *, db=None,tenant_id=None,issuer=None,identity_backend=None,
+def main(argv=None, *, db=None,tenant_id=None,issuer=None,identity_backend=None,identity_provider=None,
          session_store=None,evidence=None,role_contract=None,mcp_config=None,
          lifecycle_root=None,ledger_root=None,namespace=None,writer=None,
          gateway_runtime=None,mcp_claim_host=None,mcp_development_host=None,
@@ -133,6 +133,9 @@ def main(argv=None, *, db=None,tenant_id=None,issuer=None,identity_backend=None,
     SessionStore uses the existing canonical DB. app.main performs its existing
     tenant/DB/CSRF/MCP checks; no listener can bind with absent authority.
     """
+    if identity_backend is None and identity_provider is not None:
+        from task_center_handoff_backend import CanonicalHandoffBackend
+        identity_backend=CanonicalHandoffBackend(session_store,identity_provider,issuer,db)
     identity=HostIdentityProvider(tenant_id,identity_backend)
     if not isinstance(session_store,SessionStore) or session_store.tenant_id!=tenant_id:
         raise ValueError('HOST_SESSION_STORE_REQUIRED')
