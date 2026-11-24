@@ -29,7 +29,7 @@ button.service-link { display:block; width:100%; text-align:left; padding:22rpx 
 input { background:#fff; border:1rpx solid #f1d5da; min-height:84rpx; padding:18rpx 20rpx; border-radius:12rpx; margin:12rpx 0 22rpx; width:100%; }
 label { display:block; margin:20rpx 0; }
 picker { background:#fff5f6; border:1rpx solid #f1d5da; padding:20rpx; border-radius:14rpx; margin:14rpx 0; }
-.scene-photo-card,.material-slot { margin-top:20rpx; padding:22rpx; border:1rpx dashed #e7bdc4; border-radius:16rpx; background:#fff5f6; }
+.scene-photo-card,.material-slot { margin-top:20rpx; padding:22rpx; border:1rpx dashed #f1d5da; border-radius:16rpx; background:#fff5f6; }
 .row { display:flex; justify-content:space-between; align-items:center; gap:14rpx; }
 .xj-nav { position:fixed; left:0; right:0; bottom:0; z-index:999; display:flex; padding:12rpx 8rpx calc(12rpx + env(safe-area-inset-bottom)); background:#fff; border-top:1rpx solid #f1d5da; box-shadow:0 -3rpx 18rpx rgba(105,39,59,.04); }
 .xj-nav .nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:0; padding:6rpx 0; min-height:88rpx; font-size:22rpx; line-height:1.5; background:transparent; color:#756068; border-radius:0; }
@@ -55,8 +55,8 @@ page{background:#fff5f6;color:#34292d}
 button.primary{background:linear-gradient(115deg,#c54450,#c54450);color:#fff;border-radius:22rpx}
 button.primary[disabled],button[disabled]{background:#eee9ec;color:#75666e}
 .card{box-shadow:0 8rpx 30rpx rgba(105,39,59,.06)}
-.xj-nav{background:#fdf9fa;border-color:#f2dce0;box-shadow:0 -8rpx 28rpx rgba(99,31,48,.07)}
-.xj-nav .nav-item{color:#66515a}
+.xj-nav{background:#fff5f6;border-color:#f1d5da;box-shadow:0 -8rpx 28rpx rgba(99,31,48,.07)}
+.xj-nav .nav-item{color:#756068}
 .xj-nav .nav-item.is-active{color:#c54450}
 .xj-nav .is-active .nav-icon{filter:drop-shadow(0 4rpx 7rpx rgba(191,41,70,.22))}
 .consumer-section-header{background:linear-gradient(110deg,#c54450,#c54450)}

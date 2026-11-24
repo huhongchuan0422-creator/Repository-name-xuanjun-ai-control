@@ -11,7 +11,7 @@ page{background:#fff5f6;color:#34292d}.page{padding:36rpx}.hero{padding:24rpx 6r
 .order-list-item:last-child{border-bottom:0}
 .order-list-main,.order-list-footer{display:flex;align-items:center;justify-content:space-between;gap:18rpx}
 .order-number{min-width:0;overflow-wrap:anywhere;color:#34292d;font-size:25rpx;font-weight:600}
-.order-state{flex:0 0 auto;padding:5rpx 12rpx;border-radius:999rpx;background:#eef6f1;color:#b83b48;font-size:21rpx}
+.order-state{flex:0 0 auto;padding:5rpx 12rpx;border-radius:999rpx;background:#fff5f6;color:#b83b48;font-size:21rpx}
 .order-list-footer{margin-top:16rpx}
 .order-amount{font-size:30rpx;font-weight:700;color:#34292d}
 .order-detail-action{width:auto!important;min-height:58rpx;margin:0!important;padding:0 20rpx!important;border-radius:29rpx!important;background:#ffe4e8!important;color:#b83b48!important;font-size:23rpx!important}
@@ -22,17 +22,17 @@ page{background:#fff5f6;color:#34292d}.page{padding:36rpx}.hero{padding:24rpx 6r
 .demo-card,.demo-detail{position:relative;}.demo-card{padding-top:64rpx;}.demo-badge{position:absolute;right:16rpx;top:14rpx;background:#fff0c6;color:#70551d;border:1rpx solid #e0c77c;border-radius:8rpx;padding:5rpx 12rpx;font-size:22rpx;font-weight:600;z-index:2;}.demo-detail .detail-photo{display:block;border-radius:20rpx;}
 
 /* Reserved owned-ad surfaces. Rendering never changes payment state. */
-.payment-ad-slot{box-sizing:border-box;min-height:150rpx;margin:24rpx 0;padding:24rpx 28rpx;border:1rpx solid #f1d5da;border-radius:22rpx;background:linear-gradient(135deg,#fff5f6,#ffe4e8);display:flex;flex-direction:column;justify-content:center}.payment-ad-success{border-color:#d9eadf;background:linear-gradient(135deg,#f7fcf8,#edf8f1)}.payment-ad-label{font-size:20rpx;color:#756068;letter-spacing:2rpx}.payment-ad-title{display:block;margin-top:12rpx;color:#34292d;font-size:28rpx;font-weight:600;line-height:1.55;overflow-wrap:anywhere}
+.payment-ad-slot{box-sizing:border-box;min-height:150rpx;margin:24rpx 0;padding:24rpx 28rpx;border:1rpx solid #f1d5da;border-radius:22rpx;background:linear-gradient(135deg,#fff5f6,#ffe4e8);display:flex;flex-direction:column;justify-content:center}.payment-ad-success{border-color:#f1d5da;background:linear-gradient(135deg,#fff5f6,#fff5f6)}.payment-ad-label{font-size:20rpx;color:#756068;letter-spacing:2rpx}.payment-ad-title{display:block;margin-top:12rpx;color:#34292d;font-size:28rpx;font-weight:600;line-height:1.55;overflow-wrap:anywhere}
 
 /* Product artwork is square; owned advertisement artwork is a 3:1 banner. */
-.product-card{display:flex;gap:24rpx;align-items:flex-start}.product-image{width:176rpx;height:176rpx;flex:0 0 176rpx;border-radius:20rpx}.product-copy{flex:1;min-width:0}.product-price{display:block;margin-top:12rpx;color:#cf3f2f;font-size:32rpx;font-weight:650}.payment-ad-slot{padding:0 0 22rpx;overflow:hidden}.payment-ad-image{display:block;width:100%;height:200rpx;margin-bottom:20rpx}.payment-ad-label,.payment-ad-title{margin-left:28rpx;margin-right:28rpx}
+.product-card{display:flex;gap:24rpx;align-items:flex-start}.product-image{width:176rpx;height:176rpx;flex:0 0 176rpx;border-radius:20rpx}.product-copy{flex:1;min-width:0}.product-price{display:block;margin-top:12rpx;color:#c54450;font-size:32rpx;font-weight:650}.payment-ad-slot{padding:0 0 22rpx;overflow:hidden}.payment-ad-image{display:block;width:100%;height:200rpx;margin-bottom:20rpx}.payment-ad-label,.payment-ad-title{margin-left:28rpx;margin-right:28rpx}
 
 /* Read-only catalog: orchard green, quiet editorial gallery. */
-.showcase-label{display:block;color:#45673a;font-size:24rpx;letter-spacing:3rpx;margin-bottom:16rpx}
+.showcase-label{display:block;color:#c54450;font-size:24rpx;letter-spacing:3rpx;margin-bottom:16rpx}
 .showcase-cover,.showcase-gallery image{display:block;width:100%;border-radius:16rpx}
-.showcase-price{display:block;color:#36552d;font-size:44rpx;font-weight:600;margin-bottom:20rpx}
-.showcase-notice{display:block;color:#45673a;border-top:1rpx solid #dbe4d5;margin-top:24rpx;padding-top:20rpx}
+.showcase-price{display:block;color:#34292d;font-size:44rpx;font-weight:600;margin-bottom:20rpx}
+.showcase-notice{display:block;color:#c54450;border-top:1rpx solid #f1d5da;margin-top:24rpx;padding-top:20rpx}
 .showcase-gallery .section-title{display:block;margin-top:20rpx}
-.showcase-source{display:block;font-size:22rpx;color:#65715e;word-break:break-all;margin-top:12rpx}
+.showcase-source{display:block;font-size:22rpx;color:#756068;word-break:break-all;margin-top:12rpx}
 
 page{background:linear-gradient(180deg,#ffe4e8 0,#fff5f6 460rpx)}
