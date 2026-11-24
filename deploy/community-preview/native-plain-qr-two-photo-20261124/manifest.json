@@ -1,0 +1,18 @@
+{
+  "installed_delta": {
+    "scripts/community_fixed_cashier_host.py": "723e8c5271090e4848eb8a8ccc051e675ca30f6060c56241b3503db32eb26735",
+    "scripts/community_native_collection.py": "d87717588e1290f66226f79c1441d5c31308f6fceef78e5fdbbef7f89007eda6",
+    "scripts/community_platform_showcase.py": "2aa8598a6e102aa8f758f57f243dcc5ff415736fde8aa9844f6d0bb15210053e",
+    "scripts/native_workbench_runtime.py": "15443f3b9ab845a7b04e6443af7b24ed8498a82defcd3caf03fc1166c8a98c93"
+  },
+  "base": {
+    "scripts/community_fixed_cashier_host.py": "6e8ec3ccfcd63859f7d58c15c7c46dbeec736dae258744896b837e6b25c513ab",
+    "scripts/community_native_collection.py": "f9529a354826e83b4bcf69f8094766aa50ac64f93c17459ce55370511f49765a",
+    "scripts/community_platform_showcase.py": "308ebd5e9815ccf69857f8216b30e69be46860473a736b8c98eb2acd779f212f",
+    "scripts/native_workbench_runtime.py": "516b01c1e972d02a50aec92424a037cf597b79690e2cccc47ffbd8746264bb39"
+  },
+  "full_runtime_manifest": "57dfbfd2b8886a85cddecd74ec7a6061b9e01e4ea5aea59561069111f126315c",
+  "runtime_baseline_source_stamp": "17ecb128e8e0407e0a99259959babd0fbeea6085",
+  "deployable_as_full_runtime": false,
+  "config_or_data_changed": false
+}

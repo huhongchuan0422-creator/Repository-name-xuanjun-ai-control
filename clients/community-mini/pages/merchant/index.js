@@ -139,12 +139,14 @@ Page({
   const captured=this.collectionBinding();if(!captured)return;
   this.clearCode();const request={...captured};this._codeRequest=request;
   const current=()=>this._codeRequest===request&&request.current();
-  this.setData({codeRequestPending:true,status:'正在读取微信正式收款码'});
+  this.setData({codeRequestPending:true,status:'正在读取本店二维码'});
   let path=null;
   try{
    const r=await request.session.merchant(request.scene,'collection_code',{workspace:request.workspace});
    if(!current())return;
-   if(!r||r.kind!=='RELEASE_MINI_COLLECTION_CODE'||r.scene!==request.scene||r.page!=='pages/checkout/index'||r.payment_completed!==false||
+   const ownQr=r&&r.kind==='SELF_HOSTED_CASHIER_ENTRY_QR'&&r.mime==='image/png'&&r.payable===false&&r.approval_verified===true&&r.payment_product_admitted===false&&typeof r.locator==='string'&&/^fx[0-9a-f]{24}$/.test(r.locator)&&r.fixed_url==='https://uk.wenwenwenyiyiyi.work/community-preview/go/'+r.locator;
+   const miniEntry=r&&r.kind==='RELEASE_MINI_COLLECTION_CODE'&&r.page==='pages/checkout/index';
+   if(!r||!(ownQr||miniEntry)||r.scene!==request.scene||r.payment_completed!==false||
       !['image/png','image/jpeg'].includes(r.mime)||typeof r.content_base64!=='string'||r.content_base64.length<44||r.content_base64.length>1333336||
       r.content_base64.length%4!==0||!/^[A-Za-z0-9+/]+={0,2}$/.test(r.content_base64)||!/^([0-9a-f]{64})$/.test(r.sha256)||
       !(r.mime==='image/png'?r.content_base64.startsWith('iVBORw0KGgo'):r.content_base64.startsWith('/9j/')))throw Error('UNTRUSTED_COLLECTION_CODE');
@@ -152,8 +154,8 @@ Page({
    await new Promise((resolve,reject)=>wx.getFileSystemManager().writeFile({filePath:path,data:r.content_base64,encoding:'base64',success:resolve,fail:reject}));
    if(!current())return;
    this.codeFile=path;this._codeBinding=captured;path=null;
-   this.setData({codePath:this.codeFile,codeReady:true,status:'已取得微信正式收款码'});
-  }catch(e){if(current())this.setData({codePath:'',codeReady:false,status:'暂未取得微信正式收款码'});}
+   this.setData({codePath:this.codeFile,codeReady:true,status:'二维码已就绪；付款能力仍待核实'});
+  }catch(e){if(current())this.setData({codePath:'',codeReady:false,status:'暂未取得本店二维码'});}
   finally{
    if(path)this.deleteCollectionFile(path);
    if(this._codeRequest===request){
