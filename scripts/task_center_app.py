@@ -446,7 +446,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
-                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None):
+                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None):
     from task_delivery_observer import MetadataReader
     if handoff_host is not None:
         from task_center_handoff_host import HandoffHost
@@ -1082,7 +1082,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                             raise ValueError('AUTHENTICATED_ACTOR_REQUIRED')
                         control=ModelControl(control.gateway,
                           control.gateway.tenants.issue(tenant_id,actor),
-                          model_master_key)
+                          model_master_key,gateway_runtime=gateway_runtime)
                     if action in ('PREPARE_RESULT_RECOVERY','REVIEW_RESULT_RECOVERY','ACCEPT_RESULT_RECOVERY','RESULT_RECOVERY_STATUS'):
                         from task_center_mcp_result_recovery import ResultRecoveryMCP
                         names={'PREPARE_RESULT_RECOVERY':'task_prepare_result_recovery','REVIEW_RESULT_RECOVERY':'task_review_result_recovery','ACCEPT_RESULT_RECOVERY':'task_accept_result_recovery','RESULT_RECOVERY_STATUS':'task_result_recovery_status'}
@@ -1175,6 +1175,12 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                         if set(value)!={'task_id'}:raise ValueError('EXACT_DEVELOPMENT_REGISTRATION_ARGUMENTS_REQUIRED')
                         if mcp_development_host is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
                         result=mcp_development_host.register_contract(control,value['task_id'])
+                    elif action=='RECORD_EXISTING_TASK_ADMISSION':
+                        from task_center_admission import record_existing_admission
+                        result=record_existing_admission(control,value)
+                    elif action=='TASK_ADMISSION_STATUS':
+                        from task_center_admission import admission_status
+                        result=admission_status(control,value)
                     elif action=='REGISTER_GRAPH':
                         result=control.gateway.register_graph(control.context,value['graph'])
                     elif action=='CREATE_PROJECT_TASK':
@@ -1517,7 +1523,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     self._mcp_challenge(scope);return
                 service=MCPTaskService(db_path,authority_key,tenant_id,
                   model_master_key,identity['principal_id'],identity['project_id'],
-                  execution_enabled=mcp_model_worker_enabled)
+                  execution_enabled=mcp_model_worker_enabled,gateway_runtime=gateway_runtime)
                 if method=='tools/call' and (value.get('params') or {}).get('name')=='task_submit':
                     import secrets
                     self._mcp_request_ref=secrets.token_hex(16)
@@ -1527,7 +1533,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 result=dispatch_rpc(service,identity,mcp_dispatch_config,value,
                                     mcp_model_worker_enabled,mcp_development_host,
                                     handoff_host.role_contract if handoff_host is not None else None,
-                                    acceptance_host=handoff_host)
+                                    acceptance_host=handoff_host,claim_host=mcp_claim_host)
                 if value.get('id') is None:
                     self._send(202,b'','application/json; charset=utf-8');return
                 self._send(200,_json_bytes(result),
@@ -1618,7 +1624,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
             current=(session['principal_id'] if session is not None else
                      principal_id)
             context=authority.issue(tenant_id,'admin:'+current)
-            return supervisor,ModelControl(gateway,context,model_master_key)
+            return supervisor,ModelControl(gateway,context,model_master_key,gateway_runtime=gateway_runtime)
 
     return TaskCenterHandler
 
@@ -1630,9 +1636,15 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None):
+                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
+    if mcp_claim_host is not None:
+        from task_center_mcp_claim import ClaimHost
+        if not isinstance(mcp_claim_host,ClaimHost) or not mcp_enabled:
+            raise ValueError('TRUSTED_CLAIM_HOST_REQUIRES_MCP')
+        if any(row['tenant_id']!=tenant_id for row in mcp_claim_host.bindings):
+            raise ValueError('CLAIM_HOST_TENANT_MISMATCH')
     if mcp_development_host is not None:
         from task_center_mcp_development import DevelopmentHost
         if not isinstance(mcp_development_host,DevelopmentHost) or not mcp_enabled:
@@ -1659,7 +1671,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
             authority=TestTenantAuthority(authority_key)
             gateway=GatewayKernel(supervisor,authority)
             ModelControl(gateway,authority.issue(tenant_id,
-              'admin:'+principal_id),model_master_key)
+              'admin:'+principal_id),model_master_key,gateway_runtime=gateway_runtime)
             ensure_onboarding_schema(supervisor.db)
             ConnectionManager(gateway,authority.issue(tenant_id,
               'admin:'+principal_id),model_master_key)
@@ -1691,7 +1703,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 identity_provider,session_store,outbound_enabled,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
-                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader,handoff_host,ledger_bridge)
+                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader,handoff_host,ledger_bridge,mcp_claim_host,gateway_runtime)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None
@@ -1712,7 +1724,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
               authority_key,tenant_id,model_master_key,
               adapters=mcp_worker_adapters,
               role_contract=handoff_host.role_contract if handoff_host is not None else None,
-              dispatch_config=mcp_dispatch_config);server.mcp_worker.start()
+              dispatch_config=mcp_dispatch_config,gateway_runtime=gateway_runtime);server.mcp_worker.start()
         return server
     except Exception:
         if server is not None:server.server_close()
@@ -1720,7 +1732,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise
 
 
-def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
+def main(argv=None, gateway_runtime=None, *, mcp_claim_host=None, mcp_development_host=None, execution_provider=None, delivery_ledger_reader=None,
          identity_provider=None, session_store=None, handoff_host=None, ledger_bridge=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
@@ -1861,6 +1873,10 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
             ledger_bridge=HandoffLedgerBridge(configured_host,ledger_bridge.root,ledger_bridge.namespace,ledger_bridge.writer)
         handoff_host=configured_host
     from task_center_mcp_development import load_host as load_development_host
+    if mcp_development_host is None and args.mcp_development_config_file:
+        mcp_development_host=load_development_host(args.mcp_development_config_file,execution_provider=execution_provider)
+    if mcp_claim_host is None and mcp_development_host is not None:
+        mcp_claim_host=getattr(mcp_development_host,'claim_host',None)
     server = make_server(args.db, key, args.tenant, args.principal,
                          args.host, args.port, model_key, admin_token,
                          actor_tokens,codex_transports,identity_provider,
@@ -1870,11 +1886,11 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
                          args.allow_mcp_model_outbound,
                          mcp_dispatch_config=(load_dispatch_config(args.mcp_dispatch_config_file)
                            if args.mcp_dispatch_config_file else None),
-                         mcp_development_host=(load_development_host(args.mcp_development_config_file, execution_provider=execution_provider)
-                           if args.mcp_development_config_file else None),
+                         mcp_development_host=mcp_development_host,
+                         mcp_claim_host=mcp_claim_host,
                          correction_observer_interval=args.correction_observer_interval,
                          delivery_ledger_reader=delivery_ledger_reader,
-                         handoff_host=handoff_host,ledger_bridge=ledger_bridge)
+                         handoff_host=handoff_host,ledger_bridge=ledger_bridge,gateway_runtime=gateway_runtime)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)
@@ -1896,7 +1912,8 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
                'mcp': ('ENABLED' if args.enable_mcp else 'DISABLED'),
                'mcp_model_outbound': ('ENABLED_ZERO_SPEND_GATES' if
                   args.allow_mcp_model_outbound else 'DISABLED'),
-               'production_status': 'NOT_IMPLEMENTED'}
+               'production_status': 'NOT_IMPLEMENTED',
+               'gateway_runtime':('HOST_INJECTED' if gateway_runtime is not None else 'NOT_CONNECTED')}
     print(json.dumps(receipt, ensure_ascii=False, sort_keys=True), flush=True)
     previous_term = signal.getsignal(signal.SIGTERM)
     signal.signal(signal.SIGTERM,

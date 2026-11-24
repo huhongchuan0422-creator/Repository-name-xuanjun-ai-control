@@ -11,6 +11,7 @@ import json
 import math
 import os
 import re
+import secrets
 import sqlite3
 import time
 
@@ -25,6 +26,21 @@ SUPERVISOR_APPLICATION_ID = 0x58534A31
 SUPERVISOR_SCHEMA_VERSION = 3
 AUTHORITY_STATES = frozenset(('NONE', 'VALID', 'REVOKING', 'REVOKED',
                               UNKNOWN))
+class DevelopmentIdentityVerifier(object):
+    """Sealed production boundary; arbitrary callables are never accepted."""
+    production_trusted = False
+    test_only = False
+    def verify(self, owner_grant, developer_credential, task_id, contract_sha256):
+        raise NotImplementedError
+
+class TestOnlyDevelopmentIdentityVerifier(DevelopmentIdentityVerifier):
+    test_only = True
+    def __init__(self, implementation):
+        if os.environ.get('XUANJUN_TEST_ONLY_IDENTITY') != '1':
+            raise ValueError('TEST_ONLY_IDENTITY_ENV_REQUIRED')
+        self._implementation = implementation
+    def verify(self, *args):
+        return self._implementation(*args)
 V2_TASK_COLUMNS = (
     'task_id', 'parent_task_id', 'stage', 'writer_scope', 'state', 'owner',
     'entry', 'run_id', 'session_id', 'attempt_id', 'checkpoint_sha256',
@@ -112,9 +128,13 @@ class Supervisor(object):
         finally:
             db.close()
 
-    def __init__(self, path, clock=None):
+    def __init__(self, path, clock=None, development_identity_verifier=None):
         self.path = path
         self.clock = clock or time.time
+        if (development_identity_verifier is not None
+                and not isinstance(development_identity_verifier, DevelopmentIdentityVerifier)):
+            raise ValueError('CONTROLLED_IDENTITY_VERIFIER_REQUIRED')
+        self.development_identity_verifier = development_identity_verifier
         # Read-only immutable preflight prevents an old WAL-mode v1/v2 ledger
         # from creating wal/shm/journal sidecars merely because normal runtime
         # attempted to open it.
@@ -124,6 +144,17 @@ class Supervisor(object):
         try:
             self.db.execute('PRAGMA foreign_keys=ON')
             self._schema()
+            self.db.execute('''CREATE TABLE IF NOT EXISTS authority_runtime_profile(
+              singleton INTEGER PRIMARY KEY CHECK(singleton=1),profile TEXT NOT NULL)''')
+            profile = ('FORMAL' if development_identity_verifier is not None
+                       and development_identity_verifier.production_trusted
+                       else 'TEST_ONLY')
+            self.db.execute('INSERT OR IGNORE INTO authority_runtime_profile VALUES(1,?)',
+                            (profile,))
+            stored = self.db.execute('SELECT profile FROM authority_runtime_profile WHERE singleton=1').fetchone()[0]
+            if stored != profile and development_identity_verifier is not None:
+                raise ValueError('AUTHORITY_RUNTIME_PROFILE_MISMATCH')
+            self.db.commit()
             self.db.execute('PRAGMA journal_mode=WAL')
         except Exception:
             self.db.close()
@@ -733,6 +764,8 @@ class Supervisor(object):
                 'files': {path: file_manifest[path]
                           for path in sorted(file_manifest)},
             }
+            if receipt.get('execution_required') is True:
+                candidate['execution_required']=True
             if local:
                 candidate['source_operation_id']=receipt['source_operation_id']
                 candidate['source_kind']='LOCAL_ONLY_CONFIRMED_OPERATION'
@@ -774,6 +807,9 @@ class Supervisor(object):
     def _require_development_execution_ready(self,candidate):
         if not (candidate.get('source_kind') == 'LOCAL_ONLY_CONFIRMED_OPERATION'
                 or 'source_operation_id' in candidate):
+            if candidate.get('execution_required') is True or 'source_comment_id' in candidate:
+                from native_development_executor import require_execution
+                require_execution(self,candidate)
             return
         from producer_http_contract import REFERENCE_SHA256,REPOSITORY,ALLOWED_FILE
         task_id=candidate.get('task_id');attempt=candidate.get('attempt_id')
@@ -1361,6 +1397,36 @@ class Supervisor(object):
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('SINGLE_WRITER_CAS_FAILED')
             return self._authority_ticket(self._task(task_id))
+
+    def claim_development_writer(self, task_id, entry, caller,
+                                 lock_provider_id, resource_keys, valid_until,
+                                 owner_grant, developer_credential, admission_check=None):
+        """Allocate first-attempt and lease identities inside the writer CAS."""
+        contract = self.development_contract(task_id)
+        task = self._task(task_id)
+        verifier = self.development_identity_verifier
+        if verifier is None:
+            raise ValueError('AUTHENTICATED_DEVELOPMENT_IDENTITY_REQUIRED')
+        contract_sha = hashlib.sha256(canonical(contract).encode('utf-8')).hexdigest()
+        if not (verifier.production_trusted or (verifier.test_only and
+                os.environ.get('XUANJUN_TEST_ONLY_IDENTITY') == '1')):
+            raise ValueError('TRUSTED_IDENTITY_VERIFIER_REQUIRED')
+        identity = verifier.verify(owner_grant, developer_credential, task_id,
+                                   contract_sha)
+        required = {'task_id', 'contract_sha256', 'owner', 'developer'}
+        if (not isinstance(identity, dict) or set(identity) != required
+                or identity['task_id'] != task_id
+                or identity['contract_sha256'] != contract_sha
+                or identity['owner'] != {'issuer': 'owner-auth',
+                                         'subject': task['owner']}
+                or identity['developer'] != contract['developer']
+                or contract['entry'] != entry):
+            raise ValueError('CANONICAL_DEVELOPMENT_CONTRACT_MISMATCH')
+        attempt_id = 'attempt-' + secrets.token_hex(16)
+        lease_id = 'lease-' + secrets.token_hex(16)
+        return self.claim_writer(task_id, attempt_id, task['owner'], entry, caller,
+                                 lease_id, lock_provider_id, resource_keys,
+                                 valid_until, admission_check=(lambda db:admission_check()) if admission_check is not None else None)
 
     def _validate_writer_locked(self, ticket, caller, lock_provider_id):
         now = self.clock()

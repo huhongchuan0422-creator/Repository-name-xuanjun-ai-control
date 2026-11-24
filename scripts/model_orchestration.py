@@ -26,6 +26,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from reusable_task_gateway import _text, _sha
 from task_supervisor import UNKNOWN, canonical
+from model_fallback import init_schema as gateway_schema, mark_request, run_controlled
 from connection_management import (ConnectionManager,
                                    project_openai_channel_preference)
 
@@ -353,7 +354,7 @@ def _host_lifecycle_transaction(method):
 
 
 class ModelControl(object):
-    def __init__(self, gateway, context, master_key, clock=None):
+    def __init__(self, gateway, context, master_key, clock=None, gateway_runtime=None):
         self.gateway = gateway
         self.db = gateway.db
         self.context = context
@@ -362,6 +363,10 @@ class ModelControl(object):
         self.fernet = Fernet(master_key)
         self.clock = clock or time.time
         self._schema()
+        self.gateway_runtime=gateway_runtime if gateway_runtime is not None else getattr(gateway,'native_model_runtime',None)
+        if self.gateway_runtime is not None:gateway.native_model_runtime=self.gateway_runtime
+        gateway_schema(self.db)
+        self.db.commit()
 
     def _schema(self):
         statements = (
@@ -1194,7 +1199,11 @@ class ModelControl(object):
                       max_output_tokens=None,connection_id=None,now=None,
                       expected_attempt_id=None,expected_assignment_binding=None,
                       expected_project_id=None,expected_intake_guard=None,
-                      registered_mcp_audit=None):
+                      registered_mcp_audit=None,dispatch_mode=None):
+        if dispatch_mode is None:
+            dispatch_mode='gateway-native' if self.gateway_runtime is not None else 'direct'
+        if dispatch_mode not in ('direct','gateway-native'):
+            raise ValueError('INVALID_DISPATCH_MODE')
         now=self.clock() if now is None else now
         self.gateway.assert_task_context(self.context,task_id)
         if self.db.execute('''SELECT 1 FROM sqlite_master WHERE type='table' AND
@@ -1282,6 +1291,10 @@ class ModelControl(object):
         existing=self.db.execute('''SELECT * FROM model_requests
           WHERE tenant_id=? AND idempotency_key=?''',(self.tenant_id,idempotency_key)).fetchone()
         if existing:
+            prior_mode=self.db.execute('SELECT 1 FROM model_gateway_dispatch WHERE tenant_id=? AND request_id=?',
+                (self.tenant_id,existing['request_id'])).fetchone()
+            if bool(prior_mode)!=(dispatch_mode=='gateway-native'):
+                raise ValueError('IDEMPOTENCY_DISPATCH_CONFLICT')
             actual=(existing['task_id'],existing['attempt_id'],existing['role_id'],
               existing['provider_id'],existing['model_id'],existing['payload_sha256'])
             expected=(task_id,task['attempt_id'],role_id,
@@ -1348,10 +1361,15 @@ class ModelControl(object):
                     fresh_provider['config_version']!=provider['config_version'] or
                     fresh_provider['base_url']!=provider['base_url']):
                 raise ValueError('PROVIDER_CHANGED_BEFORE_QUEUE_COMMIT')
-            (_credential,credential_version,credential_generation,
-             credential_fingerprint)=(
-              self._binding_credential(assignment['provider_id'],connection_id,
-                fresh_provider['base_url'],now))
+            if dispatch_mode=='gateway-native':
+                if connection_id is not None:raise ValueError('GATEWAY_CONNECTION_CREDENTIAL_FORBIDDEN')
+                _credential=None;credential_version=None
+                credential_generation=0;credential_fingerprint='GATEWAY_NATIVE_NO_TC_SECRET'
+            else:
+                (_credential,credential_version,credential_generation,
+                 credential_fingerprint)=(
+                  self._binding_credential(assignment['provider_id'],connection_id,
+                    fresh_provider['base_url'],now))
             if connection_id and credential_version!=connection_version:
                 raise ValueError('CONNECTION_CHANGED_BEFORE_QUEUE_COMMIT')
             if expected_assignment_binding is not None:
@@ -1409,6 +1427,8 @@ class ModelControl(object):
                     raise ValueError('MCP_REGISTERED_GUARD_REQUIRED')
                 self._audit(self._principal(),'MCP_REGISTERED_QUEUE',request_id,
                   registered_mcp_audit,now)
+            if dispatch_mode=='gateway-native':
+                mark_request(self.db,self.tenant_id,request_id)
             self.db.commit()
         except Exception:
             self.db.rollback();raise
@@ -2748,8 +2768,11 @@ class ModelScheduler(object):
             for incomplete in missing:self._hold_mcp_request(incomplete,'MCP_WORKER_CONTEXT_MISSING',now)
         candidates=list(self.db.execute('''WITH eligible AS (SELECT r.*,
           ROW_NUMBER() OVER (PARTITION BY r.provider_id ORDER BY
-          r.created_at,r.request_id) AS provider_rank FROM model_requests r WHERE
-          r.tenant_id=? AND r.state IN ('QUEUED','RETRY_WAIT') AND
+          CASE WHEN r.state IN ('RUNNING','UNKNOWN') THEN r.next_attempt_at
+          ELSE r.created_at END,r.created_at,r.request_id) AS provider_rank FROM model_requests r WHERE
+          r.tenant_id=? AND (r.state IN ('QUEUED','RETRY_WAIT') OR
+          (r.state IN ('RUNNING','UNKNOWN') AND EXISTS (SELECT 1 FROM
+          model_gateway_dispatch gd WHERE gd.tenant_id=r.tenant_id AND gd.request_id=r.request_id))) AND
           r.next_attempt_at<=?) SELECT r.*,b.provider_config_version,
           b.connection_id,b.connection_config_version,b.credential_fingerprint,
           b.credential_generation,b.expected_input_tokens,
@@ -2770,11 +2793,27 @@ class ModelScheduler(object):
           AND a.attempt_id=r.attempt_id AND a.role_id=r.role_id JOIN
           role_templates rt ON rt.tenant_id=a.tenant_id AND rt.role_id=a.role_id
           AND rt.version=a.role_version
-          ORDER BY r.provider_rank,r.created_at,r.request_id''',
+          ORDER BY r.provider_rank,CASE WHEN r.state IN ('RUNNING','UNKNOWN')
+          THEN r.next_attempt_at ELSE r.created_at END,r.created_at,r.request_id''',
           (self.control.tenant_id,now)))
         if not candidates:return {'state':'HOLD','reason':'MCP_WORKER_CONTEXT_MISSING'} if missing else {'state':'IDLE'}
         row=None;reservation=None;reserved_secret=None;last_limit=None
+        reconciliation=None
         for candidate in candidates:
+            controlled=self.db.execute('SELECT 1 FROM model_gateway_dispatch WHERE tenant_id=? AND request_id=?',
+                (candidate['tenant_id'],candidate['request_id'])).fetchone() is not None
+            # Query original effects even after authority/config changes; never execute.
+            if controlled and candidate['state'] in ('RUNNING','UNKNOWN'):
+                # At most one read-only reconciliation per tick; keep scanning
+                # so pending effects cannot monopolize native or direct dispatch.
+                if reconciliation is None:
+                    reconciliation=run_controlled(self,candidate,now)
+                    with self.db:
+                        self.db.execute('''UPDATE model_requests SET next_attempt_at=?
+                          WHERE tenant_id=? AND request_id=? AND attempts=?
+                          AND state IN ('RUNNING','UNKNOWN')''',(now,
+                          candidate['tenant_id'],candidate['request_id'],candidate['attempts']))
+                continue
             mcp_table=self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mcp_task_bindings'").fetchone()
             source_bad=False;source_kind=None
             if candidate['source_metadata_json'] is not None or candidate['source_metadata_mac'] is not None:
@@ -2792,7 +2831,7 @@ class ModelScheduler(object):
             legacy_ambiguous=(candidate['source_metadata_json'] is None and
               (candidate['connection_id'] is not None or candidate['role_id']=='mcp-text-executor' or
                bool(self.db.execute("SELECT 1 FROM model_audit WHERE tenant_id=? AND ((action='MCP_REGISTERED_QUEUE' AND target_id=?) OR (action='ROLE_CONTRACT_PLANNED' AND target_id=?))",(candidate['tenant_id'],candidate['request_id'],candidate['task_id'])).fetchone())))
-            is_mcp=bool(self.admission is not None or source_bad or legacy_ambiguous or source_kind=='MCP_REGISTERED_V1' or candidate['role_id']=='mcp-text-executor' or (mcp_table and self.db.execute("SELECT 1 FROM mcp_task_bindings WHERE tenant_id=? AND request_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone()) or self.db.execute("SELECT 1 FROM model_audit WHERE tenant_id=? AND action='MCP_REGISTERED_QUEUE' AND target_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone())
+            is_mcp=bool(source_bad or legacy_ambiguous or source_kind=='MCP_REGISTERED_V1' or candidate['role_id']=='mcp-text-executor' or (mcp_table and self.db.execute("SELECT 1 FROM mcp_task_bindings WHERE tenant_id=? AND request_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone()) or self.db.execute("SELECT 1 FROM model_audit WHERE tenant_id=? AND action='MCP_REGISTERED_QUEUE' AND target_id=?",(candidate['tenant_id'],candidate['request_id'])).fetchone())
             task=self.control.gateway.supervisor._task(candidate['task_id'])
             fatal='MCP_REQUEST_SOURCE_INTEGRITY_HOLD' if source_bad or legacy_ambiguous else None
             if (candidate['cancel_requested'] or task['attempt_id']!=candidate['attempt_id'] or
@@ -2867,6 +2906,14 @@ class ModelScheduler(object):
                       ('QUEUED','RETRY_WAIT')''',(fatal,now,candidate['tenant_id'],
                       candidate['request_id']));self.db.commit()
                 continue
+            if controlled:
+                if is_mcp:
+                    try:
+                        if self.admission is None:raise ValueError('MCP_WORKER_TRUSTED_PLAN_REQUIRED')
+                        self.admission.check(self.db,candidate,now)
+                    except ValueError as exc:
+                        self._hold_mcp_request(candidate,str(exc),now);continue
+                return run_controlled(self,candidate,now)
             try:
                 self.db.execute('BEGIN IMMEDIATE')
                 fresh=self.db.execute('''SELECT state,cancel_requested FROM
@@ -2924,6 +2971,7 @@ class ModelScheduler(object):
                           candidate['tenant_id'],candidate['request_id']));self.db.commit()
                 continue
         if row is None:
+            if reconciliation is not None:return reconciliation
             return {'state':last_limit if last_limit=='CIRCUIT_OPEN' else
                     ('HOLD' if last_limit not in (None,'LOCAL_RPM_LIMIT',
                     'LOCAL_TPM_LIMIT','LOCAL_CONCURRENCY_LIMIT',

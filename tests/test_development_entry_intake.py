@@ -268,3 +268,71 @@ class CanonicalBindingTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class HostDestinationTests(unittest.TestCase):
+    def scoped_event(self):
+        value, event = fixture('DOTS')
+        value['task_id'] = 'existing-development-task'
+        event['issue']['number'] = 27
+        event['comment']['body'] = '<!-- XJ_DEV_ENTRY '+json.dumps(value)+' -->'
+        return event
+
+    def test_host_scope_accepts_receipt_without_authority(self):
+        result = validate_event(self.scoped_event(), REPO, 'owner',
+            {'task_id':'existing-development-task','pull_request_number':27})
+        self.assertEqual(result['task_id'], 'existing-development-task')
+        self.assertEqual(result['authority_effect'], 'NONE')
+        self.assertEqual(result['native_identity'], 'CLAIMED_NOT_VERIFIED')
+
+    def test_comment_cannot_select_destination(self):
+        with self.assertRaises(ValueError):
+            validate_event(self.scoped_event(), REPO, 'owner')
+
+    def test_host_scope_rejects_wrong_task_pr_or_actor(self):
+        for mutation in ('task', 'pr', 'actor'):
+            event = self.scoped_event()
+            destination = {'task_id':'existing-development-task','pull_request_number':27}
+            if mutation == 'task': destination['task_id'] = 'another-task'
+            if mutation == 'pr': event['issue']['number'] = 28
+            if mutation == 'actor': event['sender']['login'] = 'intruder'
+            with self.assertRaises(ValueError):
+                validate_event(event, REPO, 'owner', destination)
+
+    def test_invalid_host_scopes_fail_closed(self):
+        for destination in ({}, {'task_id':'x','pull_request_number':True},
+                {'task_id':'x','pull_request_number':0},
+                {'task_id':'x','pull_request_number':27,'allow_any':True},
+                {'task_id':'','pull_request_number':27}):
+            with self.assertRaises(ValueError):
+                validate_event(self.scoped_event(), REPO, 'owner', destination)
+
+    def test_receipt_still_requires_registered_contract(self):
+        result = validate_event(self.scoped_event(), REPO, 'owner',
+            {'task_id':'existing-development-task','pull_request_number':27})
+        supervisor = mock.Mock()
+        supervisor._task.side_effect = ValueError('UNKNOWN_TASK')
+        with self.assertRaises(ValueError):
+            bind_validated_receipt(supervisor, result, {'src/f.py':b'pass'})
+        supervisor.bind_development_candidate.assert_not_called()
+
+    def test_handler_posts_only_to_host_bound_pr(self):
+        event = self.scoped_event()
+        class Response:
+            status = 201
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, 'event.json')
+            with open(path, 'w') as stream: json.dump(event, stream)
+            env = {'GITHUB_EVENT_PATH':path, 'GITHUB_REPOSITORY':REPO,
+                   'GITHUB_TOKEN':'fixture-token'}
+            with mock.patch.dict(os.environ, env), mock.patch(
+                    'development_entry_intake.syntax_receipt', return_value=None), mock.patch(
+                    'development_entry_intake.bind_from_controlled_environment',
+                    return_value={'state':'HOLD_CANONICAL_SOURCE_INPUT_UNAVAILABLE'}), mock.patch(
+                    'development_entry_intake.urllib.request.urlopen',
+                    return_value=Response()) as post:
+                main({'task_id':'existing-development-task','pull_request_number':27})
+            self.assertEqual(post.call_args[0][0].full_url,
+                'https://api.github.com/repos/owner/control/issues/27/comments')
+            self.assertEqual(post.call_count, 1)

@@ -13,7 +13,7 @@ from secure_file_input import read_owned_secret_file
 from task_center_mcp import (RemoteTaskCenterMCP, RegisteredTaskDispatchMCP,
                              _registered_dispatch_tools)
 
-WRITE_TOOLS = frozenset(('task_submit','task_assign_role','task_dispatch',
+WRITE_TOOLS = frozenset(('task_claim','task_submit','task_assign_role','task_dispatch',
                          'task_cancel_dispatch','task_submit_candidate','task_review_candidate','task_accept_candidate','task_development_apply','task_development_review','task_development_finalize','task_prepare_result_recovery','task_review_result_recovery','task_accept_result_recovery'))
 DISPATCH_TOOLS = frozenset(x['name'] for x in _registered_dispatch_tools())
 
@@ -89,7 +89,7 @@ def roles_for(config, identity):
     return None
 
 
-def dispatch_rpc(service, identity, config, value, worker_enabled, development_host=None, role_contract=None, acceptance_host=None):
+def dispatch_rpc(service, identity, config, value, worker_enabled, development_host=None, role_contract=None, acceptance_host=None,claim_host=None):
     """After existing OAuth verification only; binding is per authenticated token."""
     roles=roles_for(config,identity)
     completion=next((row for row in config.get('completion_bindings',[]) if config['enabled'] and
@@ -134,6 +134,8 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         result=RemoteTaskCenterMCP(service).rpc(value)
         if roles:
             result['result']['tools'].extend(_registered_dispatch_tools())
+        if claim_host is not None:
+            result['result']['tools'].extend(claim_host.visible(identity))
         if development_host is not None:
             result['result']['tools'].extend(development_host.visible(identity))
         if recovery:result['result']['tools'].extend(recovery_tools(recovery))
@@ -147,7 +149,7 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
         contract=json.loads(result['result']['content'][0]['text'])
         listing=dispatch_rpc(service,identity,config,
                              {'method':'tools/list','id':value.get('id')},
-                             worker_enabled,development_host,role_contract)
+                             worker_enabled,development_host,role_contract,acceptance_host,claim_host)
         visible=[tool['name'] for tool in listing['result']['tools']]
         # Classification only: development's own rpc treats every action
         # except these two readbacks as task:submit. Do not alter WRITE_TOOLS,
@@ -161,8 +163,16 @@ def dispatch_rpc(service, identity, config, value, worker_enabled, development_h
             'visible_tools':visible,
             'task_submit_is_separate_test_only_entry': 'task_submit' in visible,
             'visibility_is_not_authorization_or_execution_readiness':True}
+        if claim_host is not None:
+            visible_claim=claim_host.visible(identity)
+            contract['canonical_claim']={'host_bound':bool(visible_claim),'tools':visible_claim,
+                'admission_source':'EXISTING_CANONICAL_POLICY_AND_SIGNED_REGISTRATION',
+                'claim_is_execution':False,'identity_is_authenticated_not_inferred':True}
         result['result']['content'][0]['text']=json.dumps(contract,ensure_ascii=False,sort_keys=True)
         return result
+    if method=='tools/call' and name in ('task_claim','task_claim_status'):
+        if claim_host is None:raise ValueError('TRUSTED_CLAIM_HOST_UNAVAILABLE')
+        return claim_host.rpc(service,identity,value)
     if method=='tools/call' and name in RECOVERY_ACTIONS:
         if recovery is None:raise ValueError('RECOVERY_HOST_BINDING_REQUIRED')
         required='task:read' if name=='task_result_recovery_status' else 'task:submit'
