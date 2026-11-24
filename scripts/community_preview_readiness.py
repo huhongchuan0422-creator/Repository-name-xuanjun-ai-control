@@ -2,7 +2,7 @@
 
 This proves connectivity only, not real login, merchant admission or acceptance.
 """
-import json, os, re, time
+import hashlib, json, os, re, time
 from pathlib import Path
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
@@ -44,6 +44,7 @@ def check(open_url=None, profile=None, product_identity=None):
         if product_identity and product_identity['fixed_product']:
             report['control_source_sha']=product_identity['control_source_sha']
         report.update(target,frontend_source_sha=head,compatibility='UNVERIFIED')
+        snapshot=None
         expected_backend=head
         compatibility='EXACT_SOURCE_MATCH'
         if product_identity and product_identity.get('fixed_product'):
@@ -71,8 +72,9 @@ def check(open_url=None, profile=None, product_identity=None):
             report['http_status']=response.status
             if response.status!=200 or response.geturl()!=url:return report
             if response.headers.get_content_type()!='application/json':return report
-            raw=response.read(4097)
-            if len(raw)>4096:return report
+            budget=65536 if product_identity and product_identity.get('snapshot_binding') else 4096
+            raw=response.read(budget+1)
+            if len(raw)>budget:return report
             value=json.loads(raw)
             if (type(value) is not dict or value.get('status')!='READY'
                     or value.get('scope')!='PROCESS_AND_DATABASE_CONNECTIVITY'
@@ -82,10 +84,21 @@ def check(open_url=None, profile=None, product_identity=None):
             backend=value.get('runtime_source_sha')
             report['backend_source_sha']=backend if type(backend) is str and re.fullmatch('[0-9a-f]{40}',backend) else None
             now=int(time.time());observed=value.get('observed_at')
-            if (report['backend_source_sha']!=expected_backend or value.get('version_source')!='IMAGE_BUILD_STAMP'
+            version=value.get('version_source')
+            if version=='NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS':
+                # Exact installed native coverage only; never treat baseline as overlay revision.
+                contract=json.loads((Path(__file__).resolve().parents[1]/'deploy/community-preview/native-snapshot-version.json').read_text())
+                pins=value.get('startup_source_pins')
+                if not snapshot or head!=contract['frontend_manifest_sha256'] or snapshot['archive_sha256']!=contract['frontend_archive_sha256'] or expected_backend!=contract['runtime_source_sha']:return report
+                if value.get('source_coverage')!=contract['source_coverage'] or value.get('startup_source_manifest_sha256')!=contract['startup_source_manifest_sha256']:return report
+                if type(pins) is not dict or not pins or any(type(k) is not str or type(v) is not str or not re.fullmatch('[0-9a-f]{64}',v) for k,v in pins.items()):return report
+                if hashlib.sha256(json.dumps(pins,sort_keys=True,separators=(',',':')).encode()).hexdigest()!=contract['startup_source_manifest_sha256']:return report
+                report.update(source_coverage=value['source_coverage'],startup_source_manifest_sha256=value['startup_source_manifest_sha256'],startup_source_pins=pins)
+            elif version!='IMAGE_BUILD_STAMP':return report
+            if (report['backend_source_sha']!=expected_backend
                     or type(observed) is not int or observed>now+30 or now-observed>600):return report
             report.update(observed_at=now,backend_observed_at=observed,
-                          backend_version_source='IMAGE_BUILD_STAMP',compatibility=compatibility)
+                          backend_version_source=version,compatibility=compatibility)
             report['status']='BACKEND_HEALTH_VERIFIED'
     except Exception:
         # Never print remote content, exception text or credentials.
