@@ -56,11 +56,12 @@ def main(argv=None, *, identity_backend=None,evidence=None,gateway_runtime=None,
     parser.add_argument('--handoff-runtime-config-file',required=True)
     launch,app_argv=parser.parse_known_args(sys.argv[1:] if argv is None else argv)
     config=load_config(launch.handoff_runtime_config_file)
+    if config['enabled']:
+        identity=HostIdentityProvider(config['tenant_id'],identity_backend)
     from task_center_app import main as app_main
     passthrough=dict(mcp_claim_host=mcp_claim_host,mcp_development_host=mcp_development_host,execution_provider=execution_provider)
     if not config['enabled']:
         return app_main(app_argv,gateway_runtime,**passthrough)
-    identity=HostIdentityProvider(config['tenant_id'],identity_backend)
     selectors=argparse.ArgumentParser(add_help=False)
     selectors.add_argument('--db',required=True);selectors.add_argument('--tenant',required=True)
     selectors.add_argument('--mcp-dispatch-config-file');selectors.add_argument('--test-identity-file')
