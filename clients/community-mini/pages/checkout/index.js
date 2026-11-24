@@ -34,7 +34,7 @@ Page({
       if(r.platform_showcase===true){
         const item=r.showcase_item;
         if(!item||item.display_only!==true||item.available!==false||typeof item.name!=='string'||typeof item.description!=='string'||!Number.isSafeInteger(item.unit_minor)||item.unit_minor<1||typeof item.image_data!=='string')throw Error('展示商品资料返回未确认');
-        if(item.gallery!==undefined&&(!Array.isArray(item.gallery)||item.gallery.length!==4||item.gallery.some(image=>!image||typeof image.image_data!=='string'||typeof image.credit!=='string'||typeof image.label!=='string')))throw Error('展示商品图片返回未确认');
+        if(item.gallery!==undefined&&(!Array.isArray(item.gallery)||![2,4].includes(item.gallery.length)||item.gallery.some(image=>!image||typeof image.image_data!=='string'||typeof image.credit!=='string'||typeof image.label!=='string')))throw Error('展示商品图片返回未确认');
         this.setData({selectedRecommendation:{...r,showcase_item:{...item,price_yuan:yuanAmount(item.unit_minor),quantity_label:Number.isSafeInteger(item.quantity)&&item.quantity>=0?String(item.quantity):'待同步'}},detailState:'READY'});
       }else this.setData({selectedRecommendation:r,detailState:'READY',demoPhotoFailed:false});
     }catch(e){if(this.customerReadDenied(request,e))return;if(this.customerReadCurrent(request)&&this._detailRequest===request){if(id.startsWith('demo_'))this.clearDemoProjection('展示商家暂不可用');this.setData({detailState:'FAILED',directoryError:e.message});}}
