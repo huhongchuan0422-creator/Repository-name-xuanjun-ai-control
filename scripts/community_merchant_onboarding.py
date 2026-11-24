@@ -5,7 +5,6 @@ An applicant needs an existing verified account, not a fictitious signed project
 """
 from scripts.community_admin_route_gate import community_route, community_project, resolve_admin_workspace, has_admin_templates
 import base64
-from scripts import community_submission_diagnostic as submission_diagnostic
 import hashlib
 import json
 import secrets
@@ -24,11 +23,9 @@ MATERIALS={
     'interior_photo':'门店经营场所照片', 'cashier_photo':'收银台照（选填补充）', 'bank_card':'银行卡照片', 'settlement_proof':'结算账户证明',
     'operator_authorization':'经办人授权书', 'operator_identity':'经办人证件正面',
     'industry_permit':'行业经营许可（按经营类目）',
-    **{'industry_permit_'+str(i):'行业资质材料'+str(i) for i in range(2,6)},
     'mini_program_screenshot':'小程序商品或服务页面截图（微信进件按场景提供）',
     'operator_identity_back':'经办人证件反面',
     **{'ubo_'+str(i)+'_'+side:'受益人'+str(i)+('证件正面' if side=='front' else '证件反面') for i in range(1,5) for side in ('front','back')}}
-INDUSTRY_MATERIAL_KINDS=('industry_permit',)+tuple('industry_permit_'+str(i) for i in range(2,6))
 BASE=('business_license','identity_front','identity_back')
 STORE_SCENE='SALES_SCENES_STORE'
 MINI_SCENE='SALES_SCENES_MINI_PROGRAM'
@@ -158,7 +155,7 @@ def _failure_diagnostic(error,commit_attempted,rollback,object_write):
 
 
 class MerchantOnboarding:
-    def __init__(self,center,reviewers,*,reapply_authority=None):
+    def __init__(self,center,reviewers):
         if type(center) is not Center or type(reviewers) is not dict or (not reviewers and not has_admin_templates(center,'/merchant/onboarding')):
             raise ValueError('EXISTING_CENTER_AND_PROTECTED_REVIEWERS_REQUIRED')
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!=\
@@ -168,7 +165,6 @@ class MerchantOnboarding:
             raise ValueError('ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED')
         if center.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         self.center=center;self.reviewers=dict(reviewers)
-        self.reapply_authority=reapply_authority
         self.operations=None
         self.wechat_applyment=None
         self.provider_actions=None
@@ -190,7 +186,9 @@ class MerchantOnboarding:
     def _decode(self,value,aad):return json.loads(self.center.decrypt(base64.b64decode(value,validate=True),aad))
     def _reviewer(self,uid):
         template=resolve_admin_workspace(self.center,{},'__community_onboarding__',uid)
-        project=template['project'] if template is not None and template['role']=='PLATFORM_REVIEWER' else self.reviewers.get(uid)
+        from scripts.community_onboarding_reader import reader_template
+        reader=reader_template(self.center,uid)
+        project=reader['project'] if reader is not None else template['project'] if template is not None and template['role']=='PLATFORM_REVIEWER' else self.reviewers.get(uid)
         if project is None:raise PermissionError('PLATFORM_REVIEWER_REQUIRED')
         community_project(self.center,uid,project,('REVIEWER',))
     def _load(self,application,uid,review=False):
@@ -205,9 +203,6 @@ class MerchantOnboarding:
         # success flag or a different merchant's provider result. No PII copies.
         if self.wechat_applyment is not None:
             record=self.wechat_applyment._read(application)
-            if meta.get('business_generation') and record is not None:
-                if record.get('provider_sp_mchid') not in (None,meta.get('business_provider_ref')):
-                    raise PermissionError('CURRENT_GENERATION_PROVIDER_MISMATCH')
             scenes=profile_scenes((record or {}).get('profile',{}))
             if scenes is not None:meta['sales_scenes_type']=checked_scenes(scenes)
             profile=(record or {}).get('profile')
@@ -220,6 +215,27 @@ class MerchantOnboarding:
         if data['reviewer_note']:
             data['reviewer_note']=self._decode(data['reviewer_note'],'onboarding-note:'+application)['note']
         return owner,meta,data
+    def local_presubmission_editable(self, application, owner, data):
+        # Only the Mini applicant candidate opts in; the provider must prove it
+        # is the same original application with strict pre-submission evidence.
+        if data['status'] not in ('SUBMITTED','IN_REVIEW','DRAFT','CORRECTION_REQUIRED'):
+            return False
+        if self.wechat_applyment is None:return False
+        return self.wechat_applyment.local_presubmission_editable(application,owner,
+            local_queue=data['status'] in ('SUBMITTED','IN_REVIEW'))
+
+    def resume_local_draft_for_write(self, application, owner, data, revision):
+        if data['status'] not in ('SUBMITTED','IN_REVIEW'):return
+        c=self.center
+        if not c.db.in_transaction or data['revision']!=revision or not self.local_presubmission_editable(application,owner,data):
+            raise ValueError('STATE_OR_REVISION_CONFLICT')
+        # Consume inside the *legitimate existing* write transaction. No read
+        # mutation, extra actor/role, extra workflow event, or revision reset.
+        changed=c.db.execute("UPDATE onboarding SET status='DRAFT' WHERE tenant=? AND application=? AND revision=? AND status=?",
+            (owner,application,revision,data['status'])).rowcount
+        if changed!=1:raise ValueError('STATE_OR_REVISION_CONFLICT')
+        c.audit(application,owner,'LOCAL_PRE_SUBMISSION_DRAFT_RESUMED',data['status']+':'+str(revision))
+
     def _meta(self,application,owner,meta):
         self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_ONBOARDING',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",
             (application,owner,application,self._encode(meta,'onboarding-meta:'+application)))
@@ -255,36 +271,16 @@ class MerchantOnboarding:
         opening=self._decode(payload,'community-opening:'+key+':'+application)
         if opening.get('state')!='OPENED' or opening.get('scope')!=scope:raise PermissionError('MERCHANT_SPLIT_OPENING_REQUIRED')
         return self.split_admission_for_application(application)
-    def _required(self,meta,application=None):
+    def _required(self,meta):
         base=tuple(k for k in BASE if k!='identity_back' or meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT')
         # Old records without a declaration retain conservative offline requirements.
         # New UI always submits its selected scenes; no history is rewritten.
         scenes=checked_scenes(meta.get('sales_scenes_type',[STORE_SCENE]))
-        live=False
-        if application and self.wechat_applyment is not None:
-            from scripts.community_wechat_applyment import mini_program_is_live
-            live=mini_program_is_live(self.wechat_applyment._read(application))
-        scene_materials=(('storefront_photo','interior_photo') if STORE_SCENE in scenes else ())+(('mini_program_screenshot',) if MINI_SCENE in scenes and not live else ())
+        scene_materials=(('storefront_photo','interior_photo') if STORE_SCENE in scenes else ())+(('mini_program_screenshot',) if MINI_SCENE in scenes else ())
         operator=() if not meta['delegated'] else ('operator_identity',)+(('operator_identity_back',) if meta.get('operator_identity_type','IDENTIFICATION_TYPE_IDCARD')!='IDENTIFICATION_TYPE_OVERSEA_PASSPORT' else ())
-        selected=set()
-        if application and self.wechat_applyment is not None:
-            record=self.wechat_applyment._read(application) or {}
-            values=record.get('profile',{}).get('settlement_info',{}).get('qualifications',[])
-            selected={b['kind'] for b in record.get('industry_qualification_bindings',[]) if b.get('media_id') in values}
-        industry=tuple(k for k in INDUSTRY_MATERIAL_KINDS if k in selected or k=='industry_permit' and meta['category']=='FOOD')
-        return base+scene_materials+operator+industry
-    def _check_materials(self,application,meta):
-        kinds=list(self._required(meta,application))
-        # Optional means it may be absent, never that a supplied screenshot
-        # bypasses the original object binding, scan and integrity checks.
-        if self.wechat_applyment is not None:
-            record=self.wechat_applyment._read(application) or {}
-            profile=record.get('profile',{})
-            sales=profile.get('business_info',{}).get('sales_info',{})
-            mini=sales.get('mini_program_info',{})
-            if (MINI_SCENE in sales.get('sales_scenes_type',[]) and type(mini) is dict
-                    and 'mini_program_pics' in mini and 'mini_program_screenshot' not in kinds):
-                kinds.append('mini_program_screenshot')
+        return base+scene_materials+operator+(('industry_permit',) if meta['category']=='FOOD' else ())
+    def _check_materials(self,application,meta,*,_owner_direct_referenced=None):
+        kinds=self._required(meta) if _owner_direct_referenced is None else sorted(_owner_direct_referenced)
         for kind in kinds:
             material=meta['materials'].get(kind)
             if not material or (material['expires_at'] is not None and material['expires_at']<=self.center.now()):
@@ -295,26 +291,35 @@ class MerchantOnboarding:
             raw=self.center.decrypt(private_path(self.center.objects/material['object_id']).read_bytes(),
                 'object:'+application+':'+material['object_id'])
             if hashlib.sha256(raw).hexdigest()!=material['sha256']:raise PermissionError('PRIVATE_MATERIAL_INTEGRITY')
-    def _view(self,application,meta,data):
+    def _view(self,application,meta,data,*,mini_applicant=False):
         from scripts.community_merchant_opening import opening_state
         from scripts.community_wechat_applyment import provider_workflow_view
         owner=self.center.db.execute("SELECT user_id FROM links WHERE channel='COMMUNITY_ONBOARDING' AND subject_idx=? AND project=?",(application,application)).fetchone()[0]
         workspaces=[] if self.operations is None else [name for name,g in self.operations.grants.items()
             if g['user_id']==owner and g['onboarding_required']]
         data=dict(data,fields={k:v for k,v in data['fields'].items() if k!='license_ref'})
-        wechat_record=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
+        if mini_applicant and self.local_presubmission_editable(application,owner,data):
+            data['local_presubmission_editable']=True
+        wechat_record=self.wechat_applyment.display_record(application,self.wechat_applyment._read(application)) if self.wechat_applyment is not None else None
         if wechat_record is not None:data['fields']=shared_application_fields(wechat_record.get('profile',{}),data['fields'])
-        return dict(data,application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
-            delegated=meta['delegated'],declarations=meta.get('declarations'),sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta,application)),
+        from scripts.community_donation_settings import choice_settings
+        donation=choice_settings(meta)
+        native=None
+        adapter=getattr(self,'native_workbench_adapter',None)
+        if mini_applicant and adapter is not None:
+            try:native=adapter.registry.get_application(application,owner)
+            except (PermissionError,ValueError):pass
+        return dict(data,donation_settings=({k:donation[k] for k in ('maximum_bps','default_bps','version')} if donation else None),application=application,entity_type=meta['entity_type'],identity_type=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'),category=meta['category'],
+            delegated=meta['delegated'],declarations=meta.get('declarations'),sales_scenes_type=meta.get('sales_scenes_type',[STORE_SCENE]),required_materials=list(self._required(meta)),
             redemption_percent=meta.get('redemption_percent',0),approved_redemption_percent=meta.get('approved_redemption_percent'),
             split_participation=meta.get('split_participation',False),requested_split_bps=meta.get('requested_split_bps',0),
             provider_max_split_bps=self._split_policy(meta,owner),effective_split_bps=meta.get('effective_split_bps',0),
             materials={k:{'uploaded':True,'expires_at':v['expires_at'],
                 'review':meta.get('reviews',{}).get(k,{}).get('decision','PENDING'),
                 'review_note':meta.get('reviews',{}).get(k,{}).get('note','')} for k,v in meta['materials'].items()},
-            opening_state=opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED',
-            opening_workspaces=workspaces,
-            application_result=(wechat_record.get('provider_state') if wechat_record.get('provider_state') not in (None,'NOT_SUBMITTED','NOT_VERIFIED') else 'PROVIDER_ACCEPTED' if wechat_record.get('state')=='SUBMITTED_TO_PROVIDER' else 'SUBMISSION_UNKNOWN' if wechat_record.get('state')=='SUBMISSION_UNKNOWN' else 'DRAFT') if wechat_record and wechat_record.get('applicant_direct_submission') else None,
+            opening_state='OPENED' if native else (opening_state(self,application) if data['status']=='APPROVED' else 'NOT_APPROVED'),
+            opening_workspaces=[native['workspace']] if native else workspaces,
+            **({'opening_scene':native['scene'],'opening_workspace':native['workspace']} if native else {}),
             wechat_submerchant_state=wechat_record.get('provider_state','NOT_VERIFIED') if wechat_record else 'NOT_VERIFIED',
             wechat_provider_workflow=provider_workflow_view(wechat_record),payment_enabled=False)
     def _material_preview(self,session,csrf,uid,params):
@@ -355,26 +360,28 @@ class MerchantOnboarding:
                 'content_base64':base64.b64encode(raw).decode(),'cache':'PRIVATE_TEMPORARY_ONLY'}
 
     @community_route('/merchant/onboarding')
-    def dispatch(self,session,csrf,body,*,source_origin=None,_mini_submission=False):
+    def dispatch(self,session,csrf,body,*,source_origin=None,_mini_submission=False,_mini_reauthorize=None):
         if type(_mini_submission) is not bool:raise ValueError("INVALID_INTERNAL_MINI_SUBMISSION")
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:
             raise ValueError('INVALID_ONBOARDING_REQUEST')
         op,params=body['operation'],body['params'];c=self.center
+        def mini_owner_scope(meta):
+            return _mini_submission and (source_origin is None or meta.get('ocr_origin')==source_origin)
+        def mini_edit_actor():
+            actor=_mini_reauthorize()
+            return actor if mini_owner_scope(self._load(params['application'],actor)[1]) else None
         if op=='catalog' and params=={}:return self.catalog()
         if type(op) is str and op.startswith('wechat_'):
-            if op not in ('wechat_read','wechat_review_read','wechat_status') and params.get('application'):
-                uid=c.session(session,csrf)
-                try:_,meta,_=self._load(params['application'],uid)
-                except PermissionError:_,meta,_=self._load(params['application'],uid,True)
-                if 'test_reapply_cursor' in meta:raise PermissionError('HISTORICAL_GENERATION_READ_ONLY')
-                if meta.get('business_generation') and self.wechat_applyment is not None and self.wechat_applyment.reader._mchid!=meta.get('business_provider_ref'):
-                    raise PermissionError('CURRENT_GENERATION_PROVIDER_MISMATCH')
             if self.wechat_applyment is None:raise PermissionError('OFFICIAL_APPLYMENT_NOT_CONFIGURED')
-            return self.wechat_applyment.dispatch(session,csrf,body)
+            return self.wechat_applyment.dispatch(session,csrf,body,
+                _owner_submit=_mini_reauthorize if _mini_submission and op=='wechat_submit_review' else None,
+                _mini_edit=mini_edit_actor if _mini_submission and callable(_mini_reauthorize) and op in ('wechat_save','wechat_cashier_link','wechat_media_status','wechat_read','wechat_media') else None)
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         uid=c.session(session,csrf)
-        schemas={'reapply_preview':{'application','expected_version','idempotency_key'},
-                 'reapply_release':{'application','expected_version','idempotency_key'},'material_preview':{'application','revision','kind'},'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
+        if op=='donation_defaults' and params=={}:
+            from scripts.community_donation_settings import customer_defaults
+            return customer_defaults(self,{'ocr_origin':source_origin} if source_origin is not None else {},uid)
+        schemas={'material_preview':{'application','revision','kind'},'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
                  'upload':{'application','revision','kind','content_base64','expires_at'},
                  'remove_material':{'application','revision','kind','expected_wechat_version'},
                  'submit':{'application','revision'},'withdraw':{'application','revision'},'review_list':set(),
@@ -384,14 +391,25 @@ class MerchantOnboarding:
                  'review_material':{'application','revision','kind','decision','note'},
                  'open_workbench':{'application','revision','workspace'},
                  'download':{'application','kind'}}
+        overlap=None
+        if op=='upload' and 'intent_key' in params:
+            import re
+            overlap=getattr(self,'_license_upload_overlap',None)
+            ocr_kind={'business_license':'business_license','identity_front':'id_front',
+                      'identity_back':'id_back','bank_card':'bank_card'}.get(params.get('kind')) if type(params.get('kind')) is str else None
+            original_input=getattr(overlap,'original_input',False)
+            if (_mini_submission is not True or not ocr_kind or
+                    (not original_input and ocr_kind!='business_license') or
+                    type(params['intent_key']) is not str or re.fullmatch('[A-Za-z0-9_-]{16,128}',params['intent_key']) is None):
+                raise ValueError('INVALID_LICENSE_UPLOAD_INTENT')
+            if overlap is None:raise PermissionError('LICENSE_UPLOAD_OVERLAP_NOT_CONFIGURED')
+            schemas['upload']=schemas['upload']|{'intent_key'}
+        overlap_ticket=None
         listing=type(op) is str and op in ('mine','review_list')
         if (type(op) is not str or op not in schemas or
                 (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type','declarations','redemption_percent','split_participation','requested_split_bps'}) if op=='save' else set(params)!=schemas[op]))):
             raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
-        if op in ('reapply_preview','reapply_release'):
-            from scripts.community_onboarding_reapply import dispatch
-            return dispatch(self,session,csrf,op,params)
         if op=='material_preview':
             try:return self._material_preview(session,csrf,uid,params)
             except MaterialPreviewUnavailable as error:return {'status':'UNAVAILABLE','reason':str(error)}
@@ -413,13 +431,12 @@ class MerchantOnboarding:
             if status!='ALL':query+=' AND o.status=?';args.append(status)
             rows=c.db.execute(query+' ORDER BY l.subject_idx LIMIT 51',args).fetchall()
             page=rows[:50]
-            result={'applications':[self._view(row[0],*self._load(row[0],uid,op=='review_list')[1:]) for row in page],
-                    'next_cursor':page[-1][0] if len(rows)>50 else None}
-            if op=='mine':
-                from scripts.community_onboarding_reapply import current
-                cursor_state=current(self,uid)
-                if cursor_state is not None:result['current_cursor']=cursor_state
-            return result
+            from scripts.community_onboarding_reader import project_result
+            def view_one(row):
+                _,meta,data=self._load(row[0],uid,op=='review_list')
+                return self._view(row[0],meta,data,mini_applicant=op=='mine' and mini_owner_scope(meta))
+            return project_result(self.center,uid,{'applications':[view_one(row) for row in page],
+                    'next_cursor':page[-1][0] if len(rows)>50 else None})
         if op in ('notices','notice_read'):
             from scripts.community_onboarding_notices import dispatch
             return dispatch(self,session,csrf,op,params)
@@ -428,7 +445,8 @@ class MerchantOnboarding:
             return read(self,session,csrf,params['application'],params['after_revision'],op=='review_history')
         if op in ('read','review_read'):
             _,meta,data=self._load(params['application'],uid,op=='review_read')
-            return self._view(params['application'],meta,data)
+            from scripts.community_onboarding_reader import project_result
+            return project_result(self.center,uid,self._view(params['application'],meta,data,mini_applicant=op=='read' and mini_owner_scope(meta)))
         application=params['application']
         if op=='save' and application is None:
             application='ma_'+secrets.token_hex(16);owner=uid
@@ -444,6 +462,8 @@ class MerchantOnboarding:
                 from scripts.community_merchant_contract import scope
                 scope(source_origin['scope'])
                 meta['ocr_origin']=json.loads(canonical(source_origin))
+            from scripts.community_donation_settings import apply_choice
+            apply_choice(self,meta,owner,params,new=True)
             data=None
         else:owner,meta,data=self._load(application,uid,op in ('review','review_material') or op=='download' and uid in self.reviewers)
         if op=='download':
@@ -462,11 +482,13 @@ class MerchantOnboarding:
         try:
             # Reload under the original DB write lock for stale-version safety.
             if data is not None:owner,meta,data=self._load(application,uid,op in ('review','review_material'))
-            if data is not None and 'test_reapply_cursor' in meta:raise PermissionError('HISTORICAL_GENERATION_READ_ONLY')
-            if op=='save' and data is None:
-                from scripts.community_onboarding_reapply import attach_new
-                attach_new(self,owner,application,meta)
             if op=='withdraw' and c.session(session,csrf)!=uid:raise PermissionError('CURRENT_APPLICANT_SESSION_REQUIRED')
+            if (op in ('save','upload','remove_material') and data is not None and mini_owner_scope(meta)
+                    and data['status'] in ('SUBMITTED','IN_REVIEW')):
+                if c.session(session,csrf)!=uid or not callable(_mini_reauthorize) or _mini_reauthorize()!=uid:
+                    raise PermissionError('CURRENT_APPLICANT_SESSION_REQUIRED')
+                self.resume_local_draft_for_write(application,uid,data,params['revision'])
+                data=dict(data,status='DRAFT')
             c.limit('merchant-onboarding:'+uid,60,3600)
             if op=='save':
                 if params['entity_type'] not in ('ENTERPRISE','SOLE_PROPRIETOR') or params['category'] not in ('GENERAL','FOOD') or type(params['delegated']) is not bool:
@@ -502,6 +524,8 @@ class MerchantOnboarding:
                     if participates and provider_max is not None and requested>provider_max:
                         raise ValueError('SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM')
                     meta.update(split_participation=participates,requested_split_bps=requested,effective_split_bps=0)
+                    from scripts.community_donation_settings import apply_choice
+                    apply_choice(self,meta,owner,params)
                 meta.update(entity_type=params['entity_type'],category=params['category'],delegated=params['delegated'])
                 meta['reviews']={}
                 revision=workflow.save_draft(c.db,uid,application,uid,dict(fields,license_ref='PRIVATE_ONBOARDING_MATERIALS'),params['revision'],
@@ -511,10 +535,9 @@ class MerchantOnboarding:
                 if data['status'] not in ('DRAFT','CORRECTION_REQUIRED') or data['revision']!=params['revision']:raise ValueError('STATE_OR_REVISION_CONFLICT')
                 kind=params['kind'];expires=params['expires_at']
                 if type(kind) is not str or kind not in MATERIALS or expires is not None and (type(expires) is not int or expires<=c.now()):raise ValueError('INVALID_MATERIAL')
-                if kind in INDUSTRY_MATERIAL_KINDS and self.wechat_applyment is not None:
-                    self.wechat_applyment.clear_industry_material(application,owner,meta,kind)
                 if kind=='cashier_photo' and self.wechat_applyment is not None:
-                    self.wechat_applyment.clear_cashier_media(application,owner)
+                    self.wechat_applyment.clear_cashier_media(application,owner,
+                        _mini_presubmission=mini_owner_scope(meta) and self.local_presubmission_editable(application,owner,data))
                 value=params['content_base64']
                 if type(value) is not str or len(value)>6_666_668:raise ValueError('FILE_LIMIT')
                 raw=base64.b64decode(value,validate=True)
@@ -524,6 +547,7 @@ class MerchantOnboarding:
                 if kind=='bank_card' and mime not in ('image/png','image/jpeg'):raise ValueError('BANK_CARD_IMAGE_REQUIRED')
                 safe_text(raw.decode('latin1'),5_000_000)
                 if c.scanner is None:raise RuntimeError('EXISTING_SCANNER_REQUIRED')
+                original=raw if overlap is not None and original_input else None
                 if hasattr(c.scanner,'sanitize'):
                     raw=c.scanner.sanitize(raw)
                     mime='image/jpeg'
@@ -531,6 +555,19 @@ class MerchantOnboarding:
                 count,size=c.db.execute('SELECT count(*),coalesce(sum(size),0) FROM objects WHERE project=?',(application,)).fetchone()
                 if count>=100 or size+len(raw)>50_000_000 or shutil.disk_usage(c.root).free<max(50_000_000,3*len(raw)):raise RuntimeError('MATERIAL_STORAGE_LIMIT')
                 oid='o_'+secrets.token_hex(16);version='v_'+secrets.token_hex(16)
+                if overlap is not None:
+                    # Only canonical bytes after normal validation and scanner.
+                    # The installed coordinator must reserve the durable intent
+                    # before starting its one bounded worker; no owner-DB reads
+                    # from that worker and never invoke independent OCR submit.
+                    provider=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
+                    expected_provider_version=provider['version'] if provider is not None else (0 if self.wechat_applyment is not None else None)
+                    expected_sha=hashlib.sha256(raw).hexdigest()
+                    overlap_ticket=overlap.start(c=c,owner=uid,application=application,
+                        revision=data['revision']+1,provider_version=expected_provider_version,attachment=oid,mime=mime,
+                        canonical=raw,intent_key=params['intent_key'],origin=source_origin,session=session,
+                        **({'document_type':ocr_kind,'original':original} if original_input else {}))
+                    if overlap_ticket is None:raise PermissionError('LICENSE_UPLOAD_INTENT_NOT_RESERVED')
                 encrypted=c.encrypt(raw,'object:'+application+':'+oid)
                 object_write='ATTEMPTED'
                 secure_write(c.objects/oid,encrypted)
@@ -554,7 +591,8 @@ class MerchantOnboarding:
                     record=self.wechat_applyment._read(application)
                     version=record['version'] if record else 0
                     if type(params['expected_wechat_version']) is not int or params['expected_wechat_version']!=version:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
-                    self.wechat_applyment.clear_cashier_media(application,owner)
+                    self.wechat_applyment.clear_cashier_media(application,owner,
+                        _mini_presubmission=mini_owner_scope(meta) and self.local_presubmission_editable(application,owner,data))
                 elif type(params['expected_wechat_version']) is not int or params['expected_wechat_version']!=0:
                     raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
                 if 'cashier_photo' not in meta['materials']:raise ValueError('MATERIAL_NOT_FOUND')
@@ -583,17 +621,17 @@ class MerchantOnboarding:
                         raise ValueError('SPLIT_RATIO_EXCEEDS_WECHAT_APPROVED_MAXIMUM')
                     # Unknown configuration may reach internal review; the original
                     # APPROVE check below still requires a verified configured cap.
-                    submission_diagnostic.mark('DECLARATIONS')
                     require_confirmed_declarations(meta,(self.wechat_applyment._read(application) or {}).get('profile') if self.wechat_applyment is not None else None)
                 action='SUBMIT' if op=='submit' else 'WITHDRAW' if op=='withdraw' else params['action']
                 if op=='review' and (action not in ('BEGIN_REVIEW','CORRECTION','REJECT','REOPEN','APPROVE') or owner==uid):raise PermissionError('INDEPENDENT_REVIEW_REQUIRED')
                 if action in ('SUBMIT','APPROVE'):
-                    submission_diagnostic.mark('MATERIALS')
+                    from scripts.community_donation_settings import apply_choice
+                    apply_choice(self,meta,owner,{})
                     self._check_materials(application,meta)
                 if action=='APPROVE':
                     account=c.db.execute('SELECT verified FROM accounts WHERE id=?',(owner,)).fetchone()
                     if account is None or account[0]!=1:raise PermissionError('VERIFIED_APPLICANT_REQUIRED')
-                    for kind in self._required(meta,application):
+                    for kind in self._required(meta):
                         review=meta.get('reviews',{}).get(kind,{})
                         if review.get('decision')!='ACCEPTED' or review.get('sha256')!=meta['materials'][kind]['sha256']:
                             raise ValueError('MATERIAL_REVIEW_REQUIRED:'+kind)
@@ -643,6 +681,11 @@ class MerchantOnboarding:
                 rollback='COMPLETED' if was_active and not c.db.in_transaction else 'UNCONFIRMED'
             except BaseException:
                 pass
+            if overlap_ticket is not None:
+                # An uncertain commit cannot publish the speculative result.
+                # The coordinator must reconcile using its durable receipt.
+                try:overlap.abort(overlap_ticket)
+                except Exception:pass
             _failure_diagnostic(error,commit_attempted,rollback,object_write)
             raise
         _,meta,data=self._load(application,uid,op in ('review','review_material'))
@@ -651,4 +694,23 @@ class MerchantOnboarding:
             if len(targets)==1:
                 from scripts.community_merchant_opening import open_workbench
                 open_workbench(self,self.operations,uid,application,targets[0],data['revision'])
-        return self._view(application,meta,data)
+        view=self._view(application,meta,data)
+        if overlap_ticket is not None:
+            try:
+                current=meta['materials'].get(params['kind'])
+                provider=self.wechat_applyment._read(application) if self.wechat_applyment is not None else None
+                provider_version=provider['version'] if provider is not None else (0 if self.wechat_applyment is not None else None)
+                if (not current or current['object_id']!=oid or current['sha256']!=expected_sha
+                        or data['revision']!=revision or provider_version!=expected_provider_version
+                        or c.session(session,csrf)!=uid or owner!=uid):
+                    raise PermissionError('LICENSE_UPLOAD_BINDING_CHANGED')
+                envelope=overlap.commit(overlap_ticket,c=c,owner=uid,application=application,revision=revision,
+                    provider_version=provider_version,attachment=oid,sha256=expected_sha)
+                view['upload_ocr']=envelope if envelope is not None else {'status':'unknown'}
+            except Exception:
+                # Attachment commit succeeded. Adoption/readback failure is NOT
+                # an upload failure. Never leak or re-run speculative inference.
+                try:overlap.abort(overlap_ticket)
+                except Exception:pass
+                view['upload_ocr']={'status':'unknown'}
+        return view

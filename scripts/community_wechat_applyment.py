@@ -10,49 +10,16 @@ import hashlib
 import json
 import re
 import secrets
+import syslog
+import threading
+
+# Serialize current same-material sends, not historical attempts.
+_MINI_ACTIVE_MEDIA_LOCKS=tuple(threading.Lock() for _ in range(64))
 from io import BytesIO
 from cryptography.hazmat.primitives import hashes,serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from scripts.pr122_customer_core import canonical,private_path
 from scripts.community_provider_transport import request
-
-# Explicit owner-approved service-provider default; never inferred from runtime identity.
-DEFAULT_MINI_PROGRAM_APPID = 'wx1d5f8873eaea5392'
-
-def mini_program_snapshot_appids(mini):
-    """Resolve only IDs actually recorded in an attestation; never invent a default."""
-    mini=mini if type(mini) is dict else {}
-    def value(key):
-        raw=mini.get(key)
-        return raw.strip() if type(raw) is str else ''
-    merchant=value('mini_program_sub_appid')
-    provider=value('mini_program_appid')
-    return {'mini_program_sub_appid':merchant} if merchant else ({'mini_program_appid':provider} if provider else {})
-
-def mini_program_appids(profile):
-    business=profile.get('business_info',{}) if type(profile) is dict else {}
-    sales=business.get('sales_info',{}) if type(business) is dict else {}
-    mini=sales.get('mini_program_info',{}) if type(sales) is dict else {}
-    return mini_program_snapshot_appids(mini) or {'mini_program_appid':DEFAULT_MINI_PROGRAM_APPID}
-
-def with_mini_program_default(profile):
-    """Copy the draft and add only the authorized fallback for a selected mini scene."""
-    result=json.loads(canonical(profile))
-    business=result.get('business_info',{}) if type(result) is dict else {}
-    sales=business.get('sales_info',{}) if type(business) is dict else {}
-    scenes=sales.get('sales_scenes_type',[]) if type(sales) is dict else []
-    if type(scenes) is list and 'SALES_SCENES_MINI_PROGRAM' in scenes:
-        mini=sales.setdefault('mini_program_info',{})
-        if type(mini) is dict and not any(type(mini.get(k)) is str and mini[k].strip() for k in ('mini_program_appid','mini_program_sub_appid')):
-            mini['mini_program_appid']=DEFAULT_MINI_PROGRAM_APPID
-    return result
-
-
-def mini_program_is_live(record):
-    return (type(record) is dict and record.get('mini_program_live') is True
-            and bool(mini_program_appids(record.get('profile')))
-            and mini_program_snapshot_appids(record.get('mini_program_live_appids'))==mini_program_appids(record.get('profile')))
-
 
 def provider_submission_profile(profile):
     # Only the outgoing copy is projected. Stored history and other scene data
@@ -61,22 +28,28 @@ def provider_submission_profile(profile):
     sales=result.get('business_info',{}).get('sales_info',{})
     scenes=sales.get('sales_scenes_type',[])
     if 'SALES_SCENES_MINI_PROGRAM' not in scenes:sales.pop('mini_program_info',None)
-    else:
-        mini=sales.setdefault('mini_program_info',{})
-        if type(mini) is dict:
-            ids=mini_program_appids(result)
-            mini.pop('mini_program_appid',None);mini.pop('mini_program_sub_appid',None)
-            mini.update(ids)
     if 'SALES_SCENES_STORE' not in scenes:sales.pop('biz_store_info',None)
+    # Official enum spelling, not a change of industry, rate or saved profile.
+    # The existing catalog extracted spaces around HTML-separated slash tokens.
+    # Exact legacy tuple only; no blanket whitespace normalization.
+    settlement=result.get('settlement_info',{})
+    if (result.get('subject_info',{}).get('subject_type')=='SUBJECT_TYPE_INDIVIDUAL'
+            and settlement.get('settlement_id')=='746'
+            and settlement.get('qualification_type')=='门户论坛 / 网络广告及推广 / 软件开发 / 其他互联网服务'):
+        settlement['qualification_type']='门户论坛/网络广告及推广/软件开发/其他互联网服务'
+    # Signed personal-bank catalog: canonical account_bank; saved details stay intact.
+    bank=result.get('bank_account_info',{})
+    if bank.get('bank_account_type')=='BANK_ACCOUNT_TYPE_PERSONAL' and bank.get('account_bank')=='中国邮政储蓄银行':
+        bank['account_bank']='邮政储蓄银行'
+    # Verified personal-bank catalog says no branch is required for this bank.
+    if bank.get('bank_account_type')=='BANK_ACCOUNT_TYPE_PERSONAL' and bank.get('account_bank')=='邮政储蓄银行':
+        bank.pop('bank_name',None)
+        bank.pop('bank_branch_id',None)
     return result
 
 
 class WechatMediaUnavailable(PermissionError):
     """Explicitly disabled provider capability, never an authentication result."""
-
-
-class WechatMediaPending(PermissionError):
-    """A durable provider attempt lacks a verified receipt; never blindly resend."""
 
 
 SENSITIVE={'contact_name','contact_id_number','mobile_phone','contact_email','id_card_name','id_card_number','id_card_address','id_doc_name','id_doc_number','id_doc_address','account_name','account_number','ubo_id_doc_name','ubo_id_doc_number','ubo_id_doc_address','ubo_address'}
@@ -99,16 +72,49 @@ def provider_workflow(state):
     return PROVIDER_WORKFLOW.get(state,'EXCEPTION')
 
 
+def submission_evidence_class(record):
+    """Display grouping only, never authorizes or schedules a provider request."""
+    if record is None:return 'DRAFT'
+    if type(record) is not dict:return 'UNVERIFIED'
+    code=record.get('business_code');aid=record.get('applyment_id')
+    receipts=record.get('submission_receipts',[])
+    if type(receipts)is not list:return 'UNVERIFIED'
+    receipts=list(receipts);recovery=record.get('submission_recovery_receipt')
+    if recovery is not None:
+        if type(recovery)is not dict:return 'UNVERIFIED'
+        receipts.append(recovery)
+    valid_identity=(type(code)is str and re.fullmatch('[A-Za-z0-9_-]{1,64}',code)
+        and type(aid)is str and re.fullmatch('[1-9][0-9]{0,18}',aid) and int(aid)<2**63)
+    if (record.get('state')!='SUBMISSION_UNKNOWN' and valid_identity
+        and type(record.get('provider_sp_mchid'))is str and bool(record['provider_sp_mchid'])
+        and any(type(x)is dict and x.get('business_code')==code and x.get('applyment_id')==aid
+            and type(x.get('signed_at'))is int and x['signed_at']>=0 and re.fullmatch('[a-f0-9]{64}',str(x.get('signature_sha256',''))) for x in receipts)):
+        return 'SUBMITTED'
+    # Only a strict original local draft with zero submission/history traces is
+    # hidden by default. Partial/unknown/history evidence stays visible to review.
+    trace_keys={'business_code','applyment_id','replacement_submission','consumed_rejections','correction_receipt','parameter_rejection','parameter_rejection_history','explicit_retry_sequence'}
+    traced=any((key in trace_keys or key.startswith('submission_') or key.startswith('provider_'))
+        and key not in ('provider_state','provider_sync_error','provider_sync_error_at') and value not in (None,'',[],{}) for key,value in record.items())
+    if record.get('state')=='DRAFT' and record.get('provider_state') in (None,'NOT_SUBMITTED') and not receipts and not traced:
+        return 'DRAFT'
+    return 'UNVERIFIED'
+
+
 def provider_workflow_view(record):
     state=record.get('provider_state','NOT_SUBMITTED') if type(record) is dict else 'NOT_SUBMITTED'
     bucket=provider_workflow(state)
-    return dict(state=state,bucket=bucket,completed=bucket=='COMPLETED',
+    evidence=submission_evidence_class(record)
+    confirmed=record if evidence=='SUBMITTED' else {}
+    observed_at=confirmed.get('provider_observed_at')
+    observed_at=observed_at if type(observed_at) is int and 0<observed_at<10000000000 else None
+    return dict(state=state,bucket=bucket,submission_class=evidence,completed=bucket=='COMPLETED',
+                applyment_id=confirmed.get('applyment_id'),observed_at=observed_at,
         sign_action_available=(bucket=='PENDING_CONFIRMATION'
             and type(record) is dict
             and type(record.get('provider_sign_url')) is str
             and type(record.get('provider_sign_url_proof')) is dict),
-        sync_error=record.get('provider_sync_error') if type(record) is dict else None,
-        sync_error_at=record.get('provider_sync_error_at') if type(record) is dict else None)
+        sync_error=(record.get('owner_recovery_error') or record.get('provider_sync_error')) if type(record) is dict else None,
+        sync_error_at=(record.get('owner_recovery_error_at') if record.get('owner_recovery_error') else record.get('provider_sync_error_at')) if type(record) is dict else None)
 
 
 def provider_applyment_id(data):
@@ -127,8 +133,15 @@ def official_signing_url(value):
             or any(ord(c)<33 or ord(c)>126 for c in value) or '\\' in value):
         raise ValueError('INVALID_OFFICIAL_SIGNING_URL')
     parsed=urlsplit(value)
-    if (parsed.scheme!='https' or parsed.netloc!='pay.weixin.qq.com'
-            or parsed.path!='/public/apply4ec_sign/s' or not parsed.query or parsed.fragment):
+    # The documented payment URL is an example, not the sole signing route.
+    # A verified same-application response also returns the official MP binding
+    # link. Keep exact origins, never a suffix/wildcard or arbitrary redirect.
+    official_route=(parsed.netloc=='pay.weixin.qq.com'
+        and parsed.path=='/public/apply4ec_sign/s') or (
+        parsed.netloc=='mp.weixin.qq.com' and parsed.path.startswith('/')
+        and not parsed.path.startswith('//'))
+    if (parsed.scheme!='https' or not official_route
+            or not parsed.query or parsed.fragment):
         raise ValueError('INVALID_OFFICIAL_SIGNING_URL')
     return value
 
@@ -212,38 +225,266 @@ class WechatApplyment:
         if type(onboarding) is not MerchantOnboarding or not isinstance(reader,PartnerOrderReader) or type(submission_enabled) is not bool:raise ValueError('ORIGINAL_ONBOARDING_AND_PROVIDER_REQUIRED')
         self.onboarding,self.center,self.reader=onboarding,onboarding.center,reader
         self.enabled=submission_enabled
+        self.observer=None
     def _read(self,application):
         row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=? AND project=? AND active=1",(application,application)).fetchone()
         return None if row is None else json.loads(self.center.decrypt(row[0],'wechat-applyment:'+application))
+    def local_presubmission_editable(self,application,owner,*,local_queue):
+        # Read exact original links (including revoked rows): absence presented by
+        # _read alone would otherwise treat revoked evidence as never submitted.
+        db=self.center.db
+        row=db.execute("""SELECT user_id,active FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT'
+            AND subject_idx=? AND project=?""",(application,application)).fetchone()
+        if row is None:
+            if not local_queue:return False
+        else:
+            if row['user_id']!=owner or row['active']!=1:return False
+            record=self._read(application)
+            if type(record) is not dict:return False
+            state=record.get('state')
+            internal=state in ('PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED')
+            if not local_queue and not internal:return False
+            if state not in ('DRAFT','CORRECTION') and not internal:return False
+            if type(record.get('version')) is not int or record['version']<1:return False
+            # Internal review stages are local only. Normalize solely to classify
+            # submission evidence; no provider row or associated history mutation.
+            if (record.get('owner_submit_confirmation') not in (None,{})
+                    or submission_evidence_class(dict(record,state='DRAFT'))!='DRAFT'):
+                return False
+        # Original submit reserves the attempt, provider record and audit in one
+        # transaction. Also fail closed on same-application evidence if a
+        # previously written provider record is missing or no longer readable.
+        if db.execute("""SELECT 1 FROM links WHERE project=? AND
+                channel IN ('COMMUNITY_WECHAT_OBSERVATION','COMMUNITY_WECHAT_PROVIDER_ERROR') LIMIT 1""",
+                (application,)).fetchone() is not None:return False
+        return db.execute("""SELECT 1 FROM audit WHERE project=? AND event IN
+            ('WECHAT_APPLYMENT_SUBMISSION_ATTEMPT','WECHAT_APPLYMENT_SUBMITTED','WECHAT_APPLYMENT_QUERIED') LIMIT 1""",
+            (application,)).fetchone() is None
+
     def _save(self,application,owner,record):
         self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_WECHAT_APPLYMENT',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",(application,owner,application,self.center.encrypt(canonical(record),'wechat-applyment:'+application)))
+    def _mini_feedback_read(self, record, owner, application, revision):
+        if type(record) is not dict or record.get('state')!='CORRECTION' or record.get('applyment_id') or record.get('submission_receipts') or record.get('submission_recovery_receipt'):
+            return None
+        proof=record.get('owner_submit_confirmation'); mark=record.get('parameter_rejection')
+        if type(proof) is not dict or type(mark) is not dict or proof.get('owner')!=owner or proof.get('application')!=application or type(revision) is not int or type(proof.get('platform_revision')) is not int or proof['platform_revision']!=revision:
+            return None
+        v=mark.get('profile_version'); seq=mark.get('retry_sequence'); token=mark.get('intent_token'); code=mark.get('business_code'); sha=mark.get('response_sha256')
+        if type(v) is not int or type(record.get('version')) is not int or record['version']!=v+1 or proof.get('version')!=v or type(seq) is not int or seq!=record.get('explicit_retry_sequence',0) or type(code) is not str or code!=record.get('business_code'):
+            return None
+        if type(token) is not str or not re.fullmatch('[0-9a-f]{32}', token) or token!=proof.get('intent_token') or token!=record.get('submission_intent_token') or type(sha) is not str or not re.fullmatch('[0-9a-f]{64}',sha):
+            return None
+        try:
+            c=self.center
+            row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_PROVIDER_ERROR' AND subject_idx=? AND user_id=? AND project=? AND active=1", (application,owner,application)).fetchone()
+            if row is None:return None
+            raw=c.decrypt(row[0],'wechat-provider-error:'+application)
+            if len(raw)>32768:return None
+            receipt=json.loads(raw)
+            if type(receipt) is not dict or any(receipt.get(k)!=mark.get(k) for k in ('business_code','profile_version','retry_sequence','intent_token')):return None
+            err=receipt.get('provider_error')
+            if type(err) is not dict or err.get('signature_verified') is not True or err.get('http_status')!=400 or err.get('code')!='PARAM_ERROR' or err.get('response_sha256')!=sha:return None
+            answer=dict(source='VERIFIED_WECHAT',application=application,application_revision=revision,version=v+1,code='PARAM_ERROR')
+            text=err.get('message')
+            # Owner-only text. Exclude control characters and embedded data-bearing details.
+            if type(text) is str and 0<len(text)<=256 and re.fullmatch(r'[㐀-鿿，。；：！？（）“”、《》　 ]+',text):answer['message']=text
+            detail=err.get('detail')
+            if type(detail) is dict:
+                f=detail.get('field')
+                if type(f) is str:
+                    f=f.lstrip('/').replace('/','.')
+                    if len(f)<=160 and re.fullmatch(r'(contact_info|subject_info|business_info|settlement_info|bank_account_info|addition_info)(\.[a-z][a-z0-9_]*)+', f):answer['field']=f
+            return answer
+        except Exception:
+            return None
+
+    def _retain_verified_provider_error(self,error,application,owner,code,version,*,retry_sequence=None,intent_token=None):
+        # Preserve the original exception; only exact-call signed parameter rejection is correctable.
+        saved=False
+        try:
+            detail=submission_diagnostic.take_verified_error_receipt(error)
+            if detail is None:return
+            diagnostic=submission_diagnostic.snapshot('FAILED') or {}
+            receipt=dict(business_code=code,profile_version=version,at=self.center.now(),
+                correlation_id=diagnostic.get('correlation_id'),provider_error=detail,
+                retry_sequence=retry_sequence,intent_token=intent_token)
+            encrypted=self.center.encrypt(canonical(receipt),'wechat-provider-error:'+application)
+            with self.center.tx():
+                self.center.db.execute("INSERT INTO links VALUES('COMMUNITY_WECHAT_PROVIDER_ERROR',?,?,?,?,1) ON CONFLICT(channel,subject_idx,project) DO UPDATE SET payload=excluded.payload",
+                    (application,owner,application,encrypted))
+                current=self._read(application)
+                platform_row=self.center.db.execute('SELECT status,revision FROM onboarding WHERE tenant=? AND application=?',(owner,application)).fetchone()
+                if (platform_row and (platform_row[0] in ('SUBMITTED','IN_REVIEW','APPROVED') or (platform_row[0]=='DRAFT' and self._owner_intent_matches(current,application,owner) and type(platform_row[1]) is int and type(current['owner_submit_confirmation'].get('platform_revision')) is int and current['owner_submit_confirmation']['platform_revision']==platform_row[1]))
+                        and detail.get('http_status')==400 and detail.get('code')=='PARAM_ERROR'
+                        and detail.get('signature_verified') is True
+                        and type(intent_token) is str and re.fullmatch('[0-9a-f]{32}',intent_token)
+                        and original_submission_intent(current,code,version)
+                        and current.get('submission_intent_token')==intent_token
+                        and current.get('explicit_retry_sequence',0)==retry_sequence
+                        and not current.get('applyment_id') and not current.get('submission_receipts')
+                        and not current.get('submission_recovery_receipt')):
+                    current.update(state='CORRECTION',version=version+1,
+                        parameter_rejection=dict(business_code=code,profile_version=version,
+                            retry_sequence=retry_sequence,intent_token=intent_token,
+                            response_sha256=detail['response_sha256']))
+                    self._save(application,owner,current)
+                    self.center.audit(application,owner,'WECHAT_PARAMETER_REJECTED',detail['response_sha256'])
+            saved=True
+        except Exception:
+            pass
+        finally:
+            cached=getattr(error,'_community_error_diagnostic',None)
+            if type(cached) is dict:cached['provider_error_receipt_saved']=saved
+
+
+    def apply_current_ocr_review(self, session, csrf, application, *, revision, version, docs,
+                                 receipt, verify):
+        """Owner-only host compound save through the existing Center transaction."""
+        from scripts import community_onboarding_offline as workflow
+        from scripts.community_ocr_draft import MATERIAL, resolve_confirmed
+        from scripts.pr122_customer_core import safe_text
+        c=self.center
+        if c.db.in_transaction or not callable(verify) or type(receipt) is not tuple or len(receipt)!=2:
+            raise ValueError('CURRENT_OCR_REVIEW_INTERNAL_REQUIRED')
+        if any(type(k) is not str or not re.fullmatch('[0-9a-f]{64}',k) for k in receipt):
+            raise ValueError('CURRENT_OCR_REVIEW_RECEIPT_INVALID')
+        if type(revision) is not int or revision<1 or type(version) is not int or version<0:
+            raise ValueError('EXPLICIT_DUAL_VERSIONS_REQUIRED')
+        paths={
+            'business_license':{'company_name':('business_license_info','merchant_name'),
+                'credit_code':('business_license_info','license_number'),
+                'legal_representative':('business_license_info','legal_person'),
+                'registered_address':('business_license_info','license_address')},
+            'id_front':{'id_name':('identity_info','id_card_info','id_card_name'),
+                'id_number':('identity_info','id_card_info','id_card_number'),
+                'registered_address':('identity_info','id_card_info','id_card_address')},
+            'id_back':{'valid_from':('identity_info','id_card_info','card_period_begin'),
+                       'valid_to':('identity_info','id_card_info','card_period_end'),
+                       'issuing_authority':None},
+            'bank_card':{'account_number':('bank_account_info','account_number'),'account_bank':('bank_account_info','account_bank')}}
+        if type(docs) is not dict or not docs or not set(docs)<=set(paths):
+            raise ValueError('CURRENT_OCR_REVIEW_DOCUMENTS_INVALID')
+        for kind,fields in docs.items():
+            if type(fields) is not dict or not fields or not set(fields)<=set(paths[kind]):
+                raise ValueError('CURRENT_OCR_REVIEW_FIELDS_INVALID')
+            for value in fields.values():
+                if type(value) is not str or not value.strip():raise ValueError('CURRENT_OCR_REVIEW_VALUE_INVALID')
+                safe_text(value,512)
+        event='SHARED_OCR_CURRENT_REVIEW_SAVED'
+        key,checksum=receipt
+        with c.tx():
+            uid=c.session(session,csrf);owner,meta,platform=self.onboarding._load(application,uid)
+            if uid!=owner or self.onboarding.wechat_applyment is not self:
+                raise PermissionError('ORIGINAL_SHARED_DRAFT_REQUIRED')
+            provider_row=c.db.execute("SELECT user_id,active FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT' AND subject_idx=? AND project=?",(application,application)).fetchone()
+            if provider_row is not None and (provider_row['user_id']!=owner or provider_row['active']!=1):
+                raise PermissionError('SHARED_DRAFT_OWNER_REVOKED')
+            seen=c.db.execute('SELECT object_id FROM audit WHERE project=? AND actor=? AND event=? AND object_id LIKE ?',
+                (application,owner,event,key+':%')).fetchall()
+            if seen:
+                if len(seen)!=1 or seen[0]['object_id']!=key+':'+checksum:raise PermissionError('OCR_REVIEW_IDEMPOTENCY_CONFLICT')
+                return {'saved':True}
+            record=self._read(application)
+            if platform['revision']!=revision or (record['version'] if record is not None else 0)!=version:
+                raise PermissionError('SHARED_DRAFT_DUAL_VERSION_CONFLICT')
+            local_edit=self.onboarding.local_presubmission_editable(application,owner,platform)
+            if not local_edit and (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED') or
+                record is not None and record['state'] not in ('DRAFT','CORRECTION')):
+                raise PermissionError('SHARED_DRAFT_EDIT_STATE_DENIED')
+            verify(meta)
+            result=json.loads(json.dumps(record)) if record is not None else {'provider_state':'NOT_SUBMITTED','profile':{}}
+            profile=result['profile'];subject=profile.setdefault('subject_info',{})
+            if type(subject) is not dict:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+            old_drafts=result.get('ocr_drafts',{});drafts=old_drafts
+            # This is not an ordinary full-profile save. Only fields accepted
+            # from this OCR review may project, via the original narrow mapping.
+            current_fields=dict(platform['fields'])
+            platform_ocr_paths={'company_name':'legal_name','registered_address':'address'}
+            for kind,fields in docs.items():
+                if kind in ('id_front','id_back') and (type(subject.get('identity_info')) is not dict or
+                    subject['identity_info'].get('id_doc_type')!='IDENTIFICATION_TYPE_IDCARD'):
+                    raise ValueError('ORIGINAL_IDCARD_TYPE_SELECTION_REQUIRED')
+                for field,value in fields.items():
+                    keys=paths[kind][field]
+                    if keys is None:continue
+                    current=profile if kind=='bank_card' else subject
+                    for part in keys[:-1]:
+                        current=current.setdefault(part,{})
+                        if type(current) is not dict:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+                    existing=current.get(keys[-1],'')
+                    if type(existing) is not str:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+                    if (existing.strip() if kind=='bank_card' else existing):continue
+                    platform_key=platform_ocr_paths.get(field) if kind=='business_license' else None
+                    original=current_fields.get(platform_key) if platform_key is not None else None
+                    if original and original!=value:continue
+                    current[keys[-1]]=value
+                    if platform_key is not None and not original:
+                        current_fields[platform_key]=value
+                drafts=resolve_confirmed(drafts,kind,meta['materials'].get(MATERIAL.get(kind,kind),{}),fields)
+            # Keep the original Mini legal-contact and store reuse only
+            # for a reviewed value, never from conflicting manual evidence.
+            identity=docs.get('id_front',{})
+            contact=profile.get('contact_info')
+            if identity.get('id_name') and type(contact) is dict and contact.get('contact_type')=='LEGAL':
+                retained=subject['identity_info'].get('id_card_info',{}).get('id_card_name')
+                existing_contact=contact.get('contact_name','')
+                if retained==identity['id_name'] and type(existing_contact) is str and not existing_contact.strip():
+                    contact['contact_name']=identity['id_name']
+            license_fields=docs.get('business_license',{})
+            business=profile.get('business_info')
+            sales=business.get('sales_info') if type(business) is dict else None
+            if license_fields and type(sales) is dict and type(sales.get('sales_scenes_type')) is list and 'SALES_SCENES_STORE' in sales['sales_scenes_type']:
+                lic=subject.get('business_license_info',{})
+                for field,source,target in (('company_name','merchant_name','biz_store_name'),('registered_address','license_address','biz_store_address')):
+                    value=license_fields.get(field)
+                    if not value or lic.get(source)!=value:continue
+                    store=sales.setdefault('biz_store_info',{})
+                    if type(store) is not dict:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+                    existing_store=store.get(target,'')
+                    if type(existing_store) is str and not existing_store.strip():store[target]=value
+            if 'ocr_drafts' in result or drafts!=old_drafts:result['ocr_drafts']=drafts
+            if len(canonical(profile))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
+            if profile==(record or {}).get('profile',{}) and drafts==old_drafts and current_fields==platform['fields']:
+                c.audit(application,owner,event,key+':'+checksum)
+                return {'saved':True}
+            if local_edit:self.onboarding.resume_local_draft_for_write(application,owner,platform,revision)
+            if current_fields!=platform['fields']:
+                workflow.save_draft(c.db,owner,application,uid,dict(current_fields,license_ref='PRIVATE_ONBOARDING_MATERIALS'),revision,
+                    encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
+            if meta.get('reviews'):
+                meta['reviews']={};self.onboarding._meta(application,owner,meta)
+            result.update(version=version+1,state='DRAFT')
+            self._save(application,owner,result)
+            c.audit(application,owner,event,key+':'+checksum)
+            return {'saved':True}
+
     def fill_confirmed_license_draft(self, session, csrf, application, *,
                                      expected_application_revision, expected_wechat_version,
-                                     confirmed_fields, source_check=None):
+                                     confirmed_fields, source_check=None, _mini_applicant=False):
         return self._fill_confirmed_document_draft(session,csrf,application,document_type='business_license',
             expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
-            confirmed_fields=confirmed_fields,source_check=source_check)
+            confirmed_fields=confirmed_fields,source_check=source_check,_mini_applicant=_mini_applicant)
 
     def fill_confirmed_identity_draft(self, session, csrf, application, *,
                                      expected_application_revision, expected_wechat_version,
-                                     confirmed_fields, source_check=None):
+                                     confirmed_fields, source_check=None, _mini_applicant=False):
         return self._fill_confirmed_document_draft(session,csrf,application,document_type='id_front',
             expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
-            confirmed_fields=confirmed_fields,source_check=source_check)
+            confirmed_fields=confirmed_fields,source_check=source_check,_mini_applicant=_mini_applicant)
 
     def fill_confirmed_identity_back_draft(self, session, csrf, application, *,
                                      expected_application_revision, expected_wechat_version,
-                                     confirmed_fields, source_check=None):
+                                     confirmed_fields, source_check=None, _mini_applicant=False):
         return self._fill_confirmed_document_draft(session,csrf,application,document_type='id_back',
             expected_application_revision=expected_application_revision,expected_wechat_version=expected_wechat_version,
-            confirmed_fields=confirmed_fields,source_check=source_check)
+            confirmed_fields=confirmed_fields,source_check=source_check,_mini_applicant=_mini_applicant)
 
     def fill_confirmed_bank_card_draft(self, session, csrf, application, **kwargs):
         return self._fill_confirmed_document_draft(session,csrf,application,document_type='bank_card',**kwargs)
 
     def _fill_confirmed_document_draft(self, session, csrf, application, *,document_type,
                                      expected_application_revision, expected_wechat_version,
-                                     confirmed_fields, source_check=None, recovery_receipt=None, recovery_replay_check=None):
+                                     confirmed_fields, source_check=None, _mini_applicant=False):
         """Host-only empty-field fill, original Center transaction + two CAS.
 
         Caller must supply both versions from an independently bound human
@@ -264,26 +505,12 @@ class WechatApplyment:
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         if document_type not in ('business_license','id_front','id_back','bank_card'):raise ValueError('CONFIRMED_DOCUMENT_TYPE_REQUIRED')
         allowed={'business_license':{'company_name','registered_address'},'id_front':{'id_name','id_number','registered_address'},'id_back':{'valid_from','valid_to'},'bank_card':{'account_number','account_bank'}}[document_type]
-        if recovery_receipt is not None and document_type=='business_license':
-            allowed=allowed|{'credit_code','legal_representative'}
         if (type(confirmed_fields) is not dict or not confirmed_fields
                 or not set(confirmed_fields)<=allowed):
             raise ValueError('CONFIRMED_LICENSE_FIELDS_ONLY')
         for value in confirmed_fields.values():
             if type(value) is not str or not value.strip():raise ValueError('CONFIRMED_LICENSE_STRING_REQUIRED')
             safe_text(value,512)
-        if recovery_receipt is not None:
-            if (type(recovery_receipt) is not dict or set(recovery_receipt)!={'id','payload_hash'}
-                    or any(type(v) is not str or not re.fullmatch('[a-f0-9]{64}',v) for v in recovery_receipt.values())
-                    or not callable(recovery_replay_check)):
-                raise ValueError('OCR_RECOVERY_RECEIPT_INVALID')
-        def retain_receipt(owner, outcome):
-            if recovery_receipt is not None:
-                key=recovery_receipt['id']
-                payload=dict(payload_hash=recovery_receipt['payload_hash'],outcome=outcome)
-                c.db.execute("INSERT INTO links VALUES('COMMUNITY_OCR_RECOVERY_WRITEBACK',?,?,?,?,1)",
-                    (key,owner,application,c.encrypt(canonical(payload),'ocr-recovery-writeback:'+key)))
-            return outcome
         with c.tx():  # Original BEGIN IMMEDIATE; owns both writes and audit.
             uid=c.session(session,csrf)
             owner,meta,platform=self.onboarding._load(application,uid)
@@ -294,24 +521,12 @@ class WechatApplyment:
                 return self._read(application)
             record=provider();version=record['version'] if record is not None else 0
             if type(version) is not int or version<(1 if record is not None else 0):raise ValueError('PROVIDER_VERSION_INVALID')
-            if recovery_receipt is not None:
-                key=recovery_receipt['id']
-                prior=c.db.execute("SELECT user_id,active,payload FROM links WHERE channel='COMMUNITY_OCR_RECOVERY_WRITEBACK' AND subject_idx=? AND project=?",(key,application)).fetchone()
-                if prior is not None:
-                    if prior['user_id']!=owner or prior['active']!=1:raise PermissionError('OCR_RECOVERY_RECEIPT_OWNER_CHANGED')
-                    saved=json.loads(c.decrypt(prior['payload'],'ocr-recovery-writeback:'+key))
-                    if saved.get('payload_hash')!=recovery_receipt['payload_hash']:raise ValueError('OCR_RECOVERY_IDEMPOTENCY_CONFLICT')
-                    outcome=saved['outcome']
-                    if (platform['revision']!=outcome['application_revision'] or version!=outcome['wechat_version']
-                            or platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
-                            or record is not None and record.get('state') not in ('DRAFT','CORRECTION')):
-                        raise ValueError('SHARED_DRAFT_DUAL_VERSION_CONFLICT')
-                    recovery_replay_check(platform['revision'],version)
-                    return outcome
             if platform['revision']!=expected_application_revision or version!=expected_wechat_version:
                 raise ValueError('SHARED_DRAFT_DUAL_VERSION_CONFLICT')
-            if (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
-                    or record is not None and record.get('state') not in ('DRAFT','CORRECTION')):
+            local_edit=(_mini_applicant is True and source_check is not None
+                and self.onboarding.local_presubmission_editable(application,owner,platform))
+            if (not local_edit and (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
+                    or record is not None and record.get('state') not in ('DRAFT','CORRECTION'))):
                 raise PermissionError('SHARED_DRAFT_EDIT_STATE_DENIED')
             fields=dict(platform['fields'])
             if any(type(fields.get(k)) is not str for k in ('legal_name','address')):
@@ -331,44 +546,22 @@ class WechatApplyment:
                     # Provider names project into platform views. A different manual
                     # value on either side prevents filling the other side with a
                     # conflicting suggestion (even without changing its raw column).
-                    if any((value.strip() if recovery_receipt is not None else value) and value!=name for value in (fields['legal_name'],existing)):
+                    if any(value and value!=name for value in (fields['legal_name'],existing)):
                         skipped.append('company_name')
                     else:
                         changed=False
-                        if not (fields['legal_name'].strip() if recovery_receipt is not None else fields['legal_name']):fields['legal_name']=name;changed=True
-                        if not (existing.strip() if recovery_receipt is not None else existing):
+                        if not fields['legal_name']:fields['legal_name']=name;changed=True
+                        if not existing:
                             profile.setdefault('subject_info',{}).setdefault('business_license_info',{})['merchant_name']=name
                             changed=True
                         if changed:applied.append('company_name')
-                if recovery_receipt is not None:
-                    for key,target in (('credit_code','license_number'),('legal_representative','legal_person')):
-                        if key not in confirmed_fields:continue
-                        existing=license_info.get(target,'')
-                        if type(existing) is not str:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
-                        if existing.strip():skipped.append(key)
-                        else:
-                            profile.setdefault('subject_info',{}).setdefault('business_license_info',{})[target]=confirmed_fields[key]
-                            applied.append(key)
                 address=confirmed_fields.get('registered_address')
                 if address is not None:
-                    if recovery_receipt is not None:
-                        existing=license_info.get('license_address','')
-                        if type(existing) is not str:raise ValueError('SHARED_LICENSE_PROFILE_INVALID')
-                        if any(v.strip() and v!=address for v in (fields['address'],existing)):
-                            skipped.append('registered_address')
-                        else:
-                            changed=False
-                            if not fields['address'].strip():fields['address']=address;changed=True
-                            if not existing.strip():
-                                profile.setdefault('subject_info',{}).setdefault('business_license_info',{})['license_address']=address;changed=True
-                            if changed:applied.append('registered_address')
-                    elif fields['address']:skipped.append('registered_address')
+                    if fields['address']:skipped.append('registered_address')
                     else:fields['address']=address;applied.append('registered_address')
             elif document_type=='bank_card':
                 bank=profile.get('bank_account_info',{})
                 if type(bank) is not dict:raise ValueError('ORIGINAL_BANK_PROFILE_REQUIRED')
-                # Only human-confirmed printed fields; never infer ownership,
-                # account type, branch, or bank verification from OCR.
                 for key in ('account_number','account_bank'):
                     if key not in confirmed_fields:continue
                     existing=bank.get(key,'')
@@ -390,22 +583,25 @@ class WechatApplyment:
                     if key not in confirmed_fields:continue
                     existing=card.get(target,'')
                     if type(existing) is not str:raise ValueError('ORIGINAL_IDCARD_PROFILE_REQUIRED')
-                    if (existing.strip() if recovery_receipt is not None else existing):skipped.append(key)
+                    if existing:skipped.append(key)
                     else:card[target]=confirmed_fields[key];applied.append(key)
                 if applied:identity['id_card_info']=card
-            from scripts.community_ocr_draft import resolve_confirmed, MATERIAL
-            old_drafts=result.get('ocr_drafts',{})
-            cleared_drafts=resolve_confirmed(old_drafts,document_type,meta['materials'].get(MATERIAL.get(document_type,document_type),{}),confirmed_fields)
-            draft_changed=cleared_drafts!=old_drafts
-            if draft_changed:result['ocr_drafts']=cleared_drafts
+            draft_changed=False
+            if 'ocr_drafts' in result:
+                from scripts.community_ocr_draft import resolve_confirmed, MATERIAL
+                old_drafts=result['ocr_drafts']
+                updated=resolve_confirmed(old_drafts,document_type,meta['materials'].get(MATERIAL.get(document_type,document_type),{}),confirmed_fields)
+                draft_changed=updated!=old_drafts
+                if draft_changed:result['ocr_drafts']=updated
             if not applied and not draft_changed:
                 if source_check is not None:source_check(platform['revision'],version)
-                return retain_receipt(owner,dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped))
+                return dict(written=False,application_revision=platform['revision'],wechat_version=version,applied=[],skipped=skipped)
             if len(canonical(profile))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
             # Recheck after decoding/validation and immediately before first write.
             if (c.session(session,csrf)!=uid or self.onboarding._load(application,uid)[2]!=platform
                     or provider()!=record):raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
             if source_check is not None:source_check(platform['revision'],version)
+            if local_edit:self.onboarding.resume_local_draft_for_write(application,owner,platform,expected_application_revision)
             revision=workflow.save_draft(c.db,owner,application,uid,fields,expected_application_revision,
                 encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
             meta['reviews']={};self.onboarding._meta(application,owner,meta)
@@ -413,13 +609,13 @@ class WechatApplyment:
                 raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
             result.update(version=version+1,state='DRAFT')
             self._save(application,owner,result)
-            c.audit(application,uid,'SHARED_LICENSE_CONFIRMED_FILL' if document_type=='business_license' else 'SHARED_BANK_CARD_CONFIRMED_FILL' if document_type=='bank_card' else 'SHARED_IDCARD_CONFIRMED_FILL',str(revision)+':'+str(result['version']))
+            c.audit(application,uid,'SHARED_LICENSE_CONFIRMED_FILL' if document_type=='business_license' else 'SHARED_IDCARD_CONFIRMED_FILL',str(revision)+':'+str(result['version']))
             _,latest_meta,latest=self.onboarding._load(application,uid)
             if (c.session(session,csrf)!=uid or latest['revision']!=revision or latest['status']!='DRAFT'
                     or latest['fields']!=fields or latest_meta.get('reviews')!={}
                     or provider()!=result):raise PermissionError('SHARED_DRAFT_SOURCE_CHANGED')
             if source_check is not None:source_check(revision,result['version'])
-            return retain_receipt(owner,dict(written=True,application_revision=revision,wechat_version=result['version'],applied=applied,skipped=skipped))
+            return dict(written=True,application_revision=revision,wechat_version=result['version'],applied=applied,skipped=skipped)
 
     def _provider_domain(self,record,*,submission=False):
         merchant=self.reader._mchid
@@ -460,8 +656,7 @@ class WechatApplyment:
                 or domain in (None,merchant) and applyment_id in ids)
             if collision and (row['subject_idx']!=application or other_code!=code):
                 raise ValueError('PROVIDER_APPLYMENT_OWNERSHIP_CONFLICT')
-    def _validate(self,profile,entity,*,mini_program_live=False):
-        profile=with_mini_program_default(profile)
+    def _validate(self,profile,entity):
         required={'contact_info','subject_info','business_info','settlement_info','bank_account_info'}
         if type(profile) is not dict or not required.issubset(profile) or set(profile)-required-{'addition_info'} or any(type(profile[k]) is not dict for k in profile):raise ValueError('OFFICIAL_APPLYMENT_SECTIONS_REQUIRED')
         if len(canonical(profile))>100000:raise ValueError('APPLYMENT_PROFILE_TOO_LARGE')
@@ -495,7 +690,7 @@ class WechatApplyment:
             if type(mini) is not dict or not (mini.get('mini_program_appid') or mini.get('mini_program_sub_appid')):missing.append('business_info.sales_info.mini_program_info.appid')
         if missing:raise ValueError('MISSING_OFFICIAL_FIELDS:'+','.join(missing))
         from scripts.community_applyment_conditions import validate
-        validate(profile,entity,self.center.now(),mini_program_live=mini_program_live)
+        validate(profile,entity,self.center.now())
         # Current official industry/bank catalogs and provider review remain authoritative.
     def _encrypt(self,value,key=None):
         if type(value) is dict:return {k:self._encrypt(v,k) for k,v in value.items()}
@@ -505,105 +700,49 @@ class WechatApplyment:
             public=serialization.load_pem_public_key(self.reader._public)
             return base64.b64encode(public.encrypt(value.encode(),padding.OAEP(mgf=padding.MGF1(hashes.SHA1()),algorithm=hashes.SHA1(),label=None))).decode()
         return value
-    def industry_media_receipts(self, application, meta):
-        """Only current, scanned same-application industry slots and signed receipts."""
-        from scripts.community_merchant_onboarding import INDUSTRY_MATERIAL_KINDS
-        admitted={}
-        rows=self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND project=? AND active=1",(application,)).fetchall()
-        for key,payload in rows:
-            value=json.loads(self.center.decrypt(payload,'wechat-media:'+key))
-            kind=value.get('kind')
-            if kind not in INDUSTRY_MATERIAL_KINDS:continue
-            material=meta['materials'].get(kind)
-            if not material or material['sha256']!=value.get('sha256') or material['expires_at'] is not None and material['expires_at']<=self.center.now():continue
-            expected=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
-            if key!=expected or type(value.get('provider_response_sha256')) is not str or not re.fullmatch('[0-9a-f]{64}',value['provider_response_sha256']):continue
-            row=self.center.db.execute('SELECT project,sha,scan FROM objects WHERE id=?',(material['object_id'],)).fetchone()
-            if row is None or tuple(row)!=(application,material['sha256'],'CLEAN'):continue
-            raw=self.center.decrypt(private_path(self.center.objects/material['object_id']).read_bytes(),'object:'+application+':'+material['object_id'])
-            if hashlib.sha256(raw).hexdigest()!=material['sha256']:raise PermissionError('PRIVATE_INDUSTRY_MATERIAL_INTEGRITY')
-            media=value.get('media_id')
-            if type(media) is not str or not 1<=len(media)<=1024:continue
-            if media in admitted and admitted[media]['kind']!=kind:raise PermissionError('AMBIGUOUS_INDUSTRY_MEDIA_BINDING')
-            admitted[media]=dict(kind=kind,sha256=material['sha256'],media_id=media)
-        return admitted
+    def _owner_direct_wire_profile(self, profile):
+        sections={'contact_info','subject_info','business_info','settlement_info','bank_account_info','addition_info'}
+        if type(profile) is not dict or set(profile)-sections or any(type(value) is not dict for value in profile.values()):
+            raise ValueError('INVALID_OFFICIAL_PROFILE_TRANSPORT_SHAPE')
+        if len(canonical(profile))>100000:
+            raise ValueError('APPLYMENT_PROFILE_TOO_LARGE')
 
-    def validate_industry_materials(self, profile, application, meta):
-        settlement=profile.get('settlement_info',{})
-        values=settlement.get('qualifications')
-        if values is None:
-            if meta['category']=='FOOD':raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
-            return []
-        from scripts.community_applyment_conditions import images
-        images(values,'settlement_info.qualifications')  # Original official max 5.
-        receipts=self.industry_media_receipts(application,meta)
-        if len(set(values))!=len(values) or any(v not in receipts for v in values):raise PermissionError('CURRENT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
-        bindings=[receipts[v] for v in values]
-        if len({v['kind'] for v in bindings})!=len(bindings):raise PermissionError('DUPLICATE_INDUSTRY_SLOT')
-        return bindings
+        absent=object()
+        def clean(value,key=''):
+            media=key.endswith(('_copy','_copy_back','_pic','_pics')) or key in ('id_card_national','qualifications','business_authorization_letter','legal_person_commitment','addition_pics','activities_additions','web_authorisation')
+            if key in SENSITIVE:
+                if value is None or value=='':
+                    return absent
+                if type(value) is not str:
+                    raise ValueError('INVALID_SENSITIVE_OFFICIAL_FIELD')
+                return value
+            if media and (value is None or value==''):
+                return absent
+            if type(value) is dict:
+                if media:
+                    raise PermissionError('CURRENT_ORIGINAL_APPLICATION_MEDIA_REQUIRED')
+                return {name:entry for name,v in value.items() if (entry:=clean(v,name)) is not absent}
+            if type(value) is list:
+                return [entry for item in value if (entry:=clean(item,key)) is not absent]
+            if media and type(value) is not str:
+                raise PermissionError('CURRENT_ORIGINAL_APPLICATION_MEDIA_REQUIRED')
+            return value
 
-    def industry_review_plan(self, profile, application, meta):
-        from scripts.community_industry_rules import validate_selection
-        bindings=self.validate_industry_materials(profile,application,meta)
-        plan=validate_selection(profile,meta['entity_type'],meta['category'],bindings)
-        # Bind applicable subject/category as well as owner profile. A platform
-        # workflow-only revision is not a content change.
-        plan['profile_sha256']=hashlib.sha256(canonical(dict(profile=profile,entity_type=meta['entity_type'],category=meta['category']))).hexdigest()
-        return plan
+        # The original scene projection still owns provider data minimization.
+        outgoing=provider_submission_profile(clean(profile))
+        self.cashier_values(outgoing)
+        return outgoing
 
-    def check_industry_review(self, record, application, owner, meta, platform):
-        from scripts.community_industry_rules import validate_review_evidence
-        plan=self.industry_review_plan(record['profile'],application,meta)
-        if plan['requires_explicit_review']:
-            reviewer=record.get('reviewer')
-            if type(reviewer) is not str or reviewer==owner:
-                raise PermissionError('CURRENT_INDEPENDENT_INDUSTRY_REVIEW_REQUIRED')
-            # Stored actor is not an authority token. Recheck original protected
-            # reviewer/project access; no new role or permission is introduced.
-            self.onboarding._load(application,reviewer,True)
-            evidence=record.get('industry_review_evidence')
-            reviewed_revision=evidence.get('application_revision') if type(evidence) is dict else None
-            if type(reviewed_revision) is not int or reviewed_revision>platform['revision'] or reviewed_revision<0:
-                raise PermissionError('CURRENT_INDEPENDENT_INDUSTRY_REVIEW_REQUIRED')
-            # Approval/status progression may increase the platform revision.
-            # Exact rule, subject/category, profile and selected media hashes
-            # still must match the independently reviewed content.
-            validate_review_evidence(plan,evidence,
-                application=application,application_revision=reviewed_revision,
-                profile_version=record['version'],owner_id=owner,authorized_reviewer_id=reviewer)
-        return plan
-
-    def clear_industry_material(self, application, owner, meta, kind):
-        """Called inside original upload transaction; only remove replaced slot."""
-        record=self._read(application)
-        if record is None:return
-        values=record.get('profile',{}).get('settlement_info',{}).get('qualifications')
-        if not values:return
-        # Retire this slot's prior receipt even when expired; it is not being
-        # admitted for new use. Otherwise replacing an expired selected file
-        # would strand its old media ID in qualifications forever.
-        removed=set();material=meta['materials'].get(kind)
-        if material:
-            key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
-            row=self.center.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND project=? AND active=1",(key,application)).fetchone()
-            if row:
-                receipt=json.loads(self.center.decrypt(row[0],'wechat-media:'+key))
-                if receipt.get('kind')==kind and receipt.get('sha256')==material['sha256']:removed.add(receipt['media_id'])
-        if not removed.intersection(values):return
-        if record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('INDUSTRY_REVIEW_SNAPSHOT_IMMUTABLE')
-        result=json.loads(canonical(record));remaining=[v for v in values if v not in removed]
-        if remaining:result['profile']['settlement_info']['qualifications']=remaining
-        else:result['profile']['settlement_info'].pop('qualifications',None)
-        result['industry_qualification_bindings']=[r for r in result.get('industry_qualification_bindings',[]) if r['kind']!=kind]
-        result['version']+=1;result['state']='DRAFT';self._save(application,owner,result)
-
-    def _validate_media(self,profile,application,meta):
+    def _validate_media(self,profile,application,meta,*,_owner_direct_integrity=False):
         rows=self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND project=? AND active=1",(application,)).fetchall()
         admitted=set()
+        by_media_id={}; referenced_kinds=set()
         for key,payload in rows:
             value=json.loads(self.center.decrypt(payload,'wechat-media:'+key))
             current=meta['materials'].get(value['kind'])
-            if current and current['sha256']==value['sha256'] and (current['expires_at'] is None or current['expires_at']>self.center.now()):admitted.add(value['media_id'])
+            if current and current['sha256']==value['sha256'] and (current['expires_at'] is None or current['expires_at']>self.center.now()):
+                admitted.add(value['media_id'])
+                if _owner_direct_integrity:by_media_id.setdefault(value['media_id'],set()).add(value['kind'])
         def walk(value,key=''):
             if type(value) is dict:
                 for k,v in value.items():walk(v,k)
@@ -611,37 +750,163 @@ class WechatApplyment:
                 for v in value:walk(v,key)
             elif type(value) is str and (key.endswith(('_copy','_copy_back','_pic','_pics')) or key in ('id_card_national','qualifications','business_authorization_letter','legal_person_commitment','addition_pics','activities_additions','web_authorisation')):
                 if value not in admitted:raise PermissionError('CURRENT_ORIGINAL_APPLICATION_MEDIA_REQUIRED')
+                if _owner_direct_integrity:referenced_kinds.update(by_media_id[value])
         walk(profile)
+        if _owner_direct_integrity:self.onboarding._check_materials(application,meta,_owner_direct_referenced=referenced_kinds)
 
-    def dispatch(self,session,csrf,body):
+    def status_dispatch(self,session,csrf,body,*,expected_project=None):
+        # Separate owner-only entry; never invokes administrative route decorator.
+        if (type(body)is not dict or set(body)!={'operation','params'}
+                or body['operation'] not in ('wechat_status','wechat_owner_sign_qr')
+                or type(body['params'])is not dict):
+            raise ValueError('EXACT_OWNER_STATUS_REQUEST_REQUIRED')
+        args=body['params']; action=body['operation']
+        original=(action=='wechat_owner_sign_qr' and set(args)=={'application','qr_format'} and args['qr_format']=='WECHAT_OFFICIAL')
+        if not original and set(args)!={'application'}:raise ValueError('EXACT_OWNER_STATUS_REQUEST_REQUIRED')
+        if type(csrf)is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
+        if self.observer is None:raise PermissionError('BOUND_OBSERVER_NOT_CONFIGURED')
+        if original:
+            return _original_sign_image(self.observer,session,csrf,args['application'],expected_project)
+        return self.observer.read(session,csrf,body['params']['application'],body['operation']=='wechat_owner_sign_qr',expected_project=expected_project)
+
+    def display_record(self,application,record):
+        result=self.observer.display_record(application,record) if self.observer is not None else record
+        # Sealed host restore proof is never an HTTP response or client capability.
+        if type(result)is dict and 'restore_provenance' in result:
+            result=dict(result);result.pop('restore_provenance')
+        return result
+
+    def _commit_provider_query(self,application,owner,record,merchant,result,uid,reauthorize,*,owner_recovery=False,audit_actor=None):
+        # Same verified query commit for original reviewer, explicit owner retry,
+        # and the original host's narrowly bound automatic owner-intent recovery.
+        c=self.center;data,digest,verified=result
+        verified=signed_response_context(verified)
+        if data.get('business_code')!=record['business_code'] or type(data.get('applyment_state')) is not str:raise ValueError('PROVIDER_APPLYMENT_BINDING_MISMATCH')
+        applyment_id=provider_applyment_id(data)
+        recovered_generation=(record['state']=='SUBMISSION_UNKNOWN'
+            and record.get('replacement_submission',False)
+            and record.get('applyment_id') is not None
+            and applyment_id not in known_applyment_ids(record))
+        if record.get('applyment_id') not in (None,applyment_id):
+            if not recovered_generation:raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
+        allowed=('APPLYMENT_STATE_EDITTING','APPLYMENT_STATE_AUDITING','APPLYMENT_STATE_REJECTED','APPLYMENT_STATE_TO_BE_CONFIRMED','APPLYMENT_STATE_TO_BE_SIGNED','APPLYMENT_STATE_SIGNING','APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
+        if data['applyment_state'] not in allowed:raise ValueError('UNKNOWN_PROVIDER_APPLICATION_STATE')
+        with c.tx():
+            if reauthorize()!=uid:raise PermissionError('CURRENT_ORIGINAL_QUERY_OWNER_REQUIRED')
+            current=self._read(application)
+            if current!=record:raise ValueError('APPLYMENT_CHANGED')
+            if (current.get('provider_state') in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
+                    and current['provider_state']!=data['applyment_state']):
+                raise ValueError('TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT')
+            # Same business_code (and often the same applyment_id) survives
+            # correction. A pre-submission signed rejection is not evidence
+            # about the new revision, even inside the signature time window.
+            boundary=submission_boundary(current)
+            prior=current.get('provider_query_signed_at')
+            if ((verified['signed_at']<=boundary)
+                    or (prior is not None and verified['signed_at']<prior)
+                    or (prior==verified['signed_at'] and current.get('provider_state')!=data['applyment_state'])
+                    or verified['signature_sha256'] in consumed_rejection_signatures(current)):
+                raise ValueError('STALE_PROVIDER_APPLYMENT_RESPONSE')
+            current.update(applyment_id=applyment_id,provider_state=data['applyment_state'],provider_response_sha256=digest,provider_observed_at=c.now())
+            current['provider_applyment_history']=sorted(known_applyment_ids(record)|{applyment_id})
+            current.update(provider_query_signed_at=verified['signed_at'],
+                provider_query_signature_sha256=verified['signature_sha256'])
+            current['provider_query_signatures']=sorted(
+                set(current.get('provider_query_signatures',[]))|{verified['signature_sha256']})
+            if recovered_generation or (owner_recovery and record['state']=='SUBMISSION_UNKNOWN' and not record.get('replacement_submission',False) and record.get('applyment_id') is None):
+                # A previously unseen provider identity, explicitly returned
+                # for this business_code, distinguishes the new application.
+                # Same-ID status changes alone cannot recover an unknown POST.
+                current.update(state='SUBMITTED_TO_PROVIDER',submission_recovery_receipt=dict(
+                    business_code=record['business_code'],applyment_id=applyment_id,
+                    response_sha256=digest,**verified))
+            if data.get('sub_mchid') is not None:
+                if type(data['sub_mchid']) is not str or not re.fullmatch('[0-9]{6,32}',data['sub_mchid']):raise ValueError('INVALID_PROVIDER_SUBMERCHANT')
+                if current.get('provider_sub_mchid') not in (None,data['sub_mchid']):
+                    raise ValueError('IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT')
+                current['provider_sub_mchid']=data['sub_mchid']
+            current.pop('provider_sign_url',None)
+            current.pop('provider_sign_url_proof',None)
+            if data.get('sign_url') is not None and data['applyment_state'] not in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED'):
+                current['provider_sign_url']=official_signing_url(data['sign_url'])
+                current['provider_sign_url_proof']=dict(applyment_id=applyment_id,**verified)
+            current['audit_detail']=data.get('audit_detail',[])
+            # Official 4012697168: a rejected application is corrected using
+            # the SAME business_code. Only a current signed query opens this
+            # path. A timed-out replacement may still expose the preceding
+            # rejection, so that observation cannot authorize another POST.
+            submitted_with_boundary=(current['state']=='SUBMITTED_TO_PROVIDER'
+                and (not current.get('replacement_submission',False)
+                     or submission_boundary(current)>=0))
+            if (data['applyment_state']=='APPLYMENT_STATE_REJECTED'
+                    and (submitted_with_boundary
+                         or current['state']=='SUBMISSION_UNKNOWN'
+                         and not current.get('replacement_submission',False))):
+                current.update(state='CORRECTION',version=current['version']+1,
+                    correction_receipt=dict(business_code=record['business_code'],
+                        applyment_id=applyment_id,
+                        signature_sha256=verified['signature_sha256'],signed_at=verified['signed_at'],
+                        response_sha256=digest,observed_at=c.now()))
+            self._check_response_owner(application,record['business_code'],merchant,applyment_id,verified)
+            current['provider_sp_mchid']=merchant
+            current.pop('owner_recovery_error',None);current.pop('owner_recovery_error_at',None)
+            self._save(application,owner,current);c.audit(application,audit_actor or uid,'WECHAT_APPLYMENT_QUERIED',digest)
+        return current
+
+    @staticmethod
+    def _owner_intent_matches(record,application,owner):
+        if type(record)is not dict or record.get('state')!='SUBMISSION_UNKNOWN':return False
+        proof=record.get('owner_submit_confirmation')
+        return (type(proof)is dict and proof.get('owner')==owner and proof.get('application')==application
+            and proof.get('version')==record.get('version') and type(proof.get('confirmed_at'))is int
+            and type(record.get('submission_intent_token'))is str and bool(record['submission_intent_token'])
+            and proof.get('intent_token')==record['submission_intent_token'])
+
+    @staticmethod
+    def _draft_reply(record, *, owner_materials=None):
+        if type(record) is not dict or 'ocr_drafts' not in record:return record
+        output=dict(record)
+        drafts=output.pop('ocr_drafts')
+        if owner_materials is not None:
+            from scripts.community_ocr_draft import current_drafts
+            output['ocr_drafts']=current_drafts(drafts,owner_materials)
+        return output
+
+    def dispatch(self,session,csrf,body,*,_owner_submit=None,_owner_query=None,_mini_edit=None):
         if type(body) is not dict or set(body)!={'operation','params'} or type(body['params']) is not dict:raise ValueError('INVALID_WECHAT_APPLYMENT_REQUEST')
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         c=self.center;uid=c.session(session,csrf);op,p=body['operation'],body['params']
-        fields={'wechat_qualifications_select':{'application','expected_version','application_revision','kind','media_id','selected'},'wechat_read':{'application'},'wechat_review_read':{'application'},'wechat_save':{'application','expected_version','profile'},
-            'wechat_apply':{'application','expected_version'},'wechat_status':{'application'},'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
-            'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
-        allowed=fields.get(op) if type(op) is str else None
-        if allowed is None or set(p)!=allowed and not (op=='wechat_apply' and set(p)==allowed|{'application_revision'}) and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}) and not (op=='wechat_save' and allowed<=set(p)<=allowed|{'ocr_drafts','application_revision','mini_program_live'} and ('ocr_drafts' in p)==('application_revision' in p)):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
-        applicant_action=op in ('wechat_apply','wechat_status')
-        reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr')
+        fields={'wechat_read':{'application'},'wechat_review_read':{'application'},'wechat_save':{'application','expected_version','profile'},
+            'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
+            'wechat_media':{'application','kind'},'wechat_media_status':{'application','kind','expected_source_sha256'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
+        if _owner_submit is not None and op=='wechat_submit_review':fields['wechat_submit_review']=fields['wechat_submit_review']|{'application_revision'}
+        private_fields={'ocr_drafts','application_revision'}
+        if (type(op) is not str or op not in fields or (set(p)!=fields[op] and not (op=='wechat_media' and set(p) in ({'application','kind','expected_source_sha256','application_revision','owner_confirmed_material_send'},{'application','kind','application_revision','owner_confirmed_material_send'}) and callable(_mini_edit)))
+                and not (op=='wechat_save' and _mini_edit is not None and set(p)==fields[op]|private_fields)):
+            raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
+        if _owner_submit is not None and (not callable(_owner_submit) or op!='wechat_submit_review'):
+            raise PermissionError('EXACT_MINI_OWNER_SUBMISSION_REQUIRED')
+        if _owner_query is not None and (not callable(_owner_query) or op!='wechat_query' or _owner_submit is not None):
+            raise PermissionError('EXACT_OWNER_RECOVERY_QUERY_REQUIRED')
+        if _mini_edit is not None and (not callable(_mini_edit) or op not in ('wechat_save','wechat_cashier_link','wechat_media_status','wechat_read','wechat_media')):
+            raise PermissionError('EXACT_MINI_DRAFT_EDIT_REQUIRED')
+        reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr') and _owner_query is None
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
         application=p['application']
-        if op=='wechat_apply' and 'application_revision' in p:
-            if type(p['application_revision']) is not int or p['application_revision']!=platform['revision']:
-                raise ValueError('MINI_SUBMIT_VERSION_CONFLICT')
-        if applicant_action:
-            if uid!=owner:raise PermissionError('ORIGINAL_APPLICANT_REQUIRED')
-            op='wechat_execute' if op=='wechat_apply' else 'wechat_query'
+        if _owner_submit is not None and (type(p['application_revision']) is not int or p['application_revision']!=platform['revision']):
+            raise ValueError('CONFIRMED_APPLICATION_REVISION_CHANGED')
         if platform['status']=='WITHDRAWN' and op not in ('wechat_read','wechat_review_read','wechat_query'):
             raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
         with c.tx():c.limit('wechat-applyment:'+uid,20,60)
-        if op=='wechat_media':
-            submission_diagnostic.mark('OCR_CONFIRMATION')
-            from scripts.community_ocr_draft import current_pending
-            if current_pending((self._read(application) or {}).get('ocr_drafts'),meta['materials']):raise ValueError('OCR_DRAFT_CONFIRMATION_REQUIRED')
-            return self.media(uid,owner,application,meta,p['kind'],lambda:c.session(session,csrf))
+        if op=='wechat_media_status':
+            if not callable(_mini_edit):
+                raise PermissionError('EXACT_MINI_OWNER_MEDIA_STATUS_REQUIRED')
+            return self._mini_owner_media_status(uid,owner,application,p,_mini_edit)
+        if op=='wechat_media':return self.media(uid,owner,application,meta,p['kind'],lambda:c.session(session,csrf),_mini_actor=_mini_edit,_start=p if set(p) in ({'application','kind','expected_source_sha256','application_revision','owner_confirmed_material_send'},{'application','kind','application_revision','owner_confirmed_material_send'}) else None)
         record=self._read(application)
         if op=='wechat_sign_qr':
+            record=self.display_record(application,record)
             proof=record.get('provider_sign_url_proof') if type(record) is dict else None
             if (record is None or record.get('provider_state') not in ('APPLYMENT_STATE_TO_BE_CONFIRMED','APPLYMENT_STATE_TO_BE_SIGNED')
                     or type(record.get('provider_sign_url')) is not str or type(proof) is not dict
@@ -654,141 +919,57 @@ class WechatApplyment:
             image=qrcode.make(record['provider_sign_url'],image_factory=SvgPathImage,box_size=8,border=4);output=BytesIO();image.save(output)
             svg=output.getvalue();return dict(application=application,applyment_id=record.get('applyment_id'),url_sha256=hashlib.sha256(record['provider_sign_url'].encode()).hexdigest(),svg_data='data:image/svg+xml;base64,'+base64.b64encode(svg).decode())
         if op in ('wechat_read','wechat_review_read'):
-            result=json.loads(canonical(record or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')))
-            if 'mini_program_live' in result:result['mini_program_live']=mini_program_is_live(record)
-            from scripts.community_ocr_draft import current_drafts
-            if 'ocr_drafts' in result:result['ocr_drafts']=current_drafts(result['ocr_drafts'],meta['materials'])
-            if op=='wechat_review_read':
-                try:
-                    plan=self.industry_review_plan((record or {}).get('profile',{}),application,meta)
-                    result['industry_review']=dict(status='READY',plan=plan,application_revision=platform['revision'])
-                except (ValueError,PermissionError):
-                    # Incomplete drafts remain readable; never invent a valid plan.
-                    result['industry_review']=dict(status='INCOMPLETE',error_code='INDUSTRY_SELECTION_OR_CURRENT_MATERIALS_INCOMPLETE',application_revision=platform['revision'])
-            return result
+            result=self.display_record(application,record) or dict(version=0,state='DRAFT',provider_state='NOT_SUBMITTED')
+            if op=='wechat_read' and callable(_mini_edit) and uid==owner and _mini_edit()==uid:
+                feedback=self._mini_feedback_read(record,owner,application,platform['revision'])
+                if feedback is not None and result.get('version')==feedback['version']:
+                    result=dict(result,provider_feedback=feedback)
+            return self._draft_reply(result,owner_materials=meta['materials'] if op=='wechat_read' else None)
         if op=='wechat_query':
-            submission_diagnostic.mark('PROVIDER_QUERY')
             if record is None or not record.get('business_code'):raise ValueError('PROVIDER_APPLICATION_NOT_SUBMITTED')
+            if _owner_query is not None:
+                if _owner_query()!=uid or owner!=uid or not self._owner_intent_matches(record,application,owner):
+                    raise PermissionError('ORIGINAL_OWNER_SUBMISSION_INTENT_REQUIRED')
             merchant=self._provider_domain(record)
             data,digest,verified=request(self.reader,'GET','/v3/applyment4sub/applyment/business_code/'+record['business_code'],include_verification=True)
-            verified=signed_response_context(verified)
-            if data.get('business_code')!=record['business_code'] or type(data.get('applyment_state')) is not str:raise ValueError('PROVIDER_APPLYMENT_BINDING_MISMATCH')
-            applyment_id=provider_applyment_id(data)
-            recovered_initial=(applicant_action and record['state']=='SUBMISSION_UNKNOWN'
-                and not record.get('replacement_submission',False) and record.get('applyment_id') is None)
-            recovered_generation=(record['state']=='SUBMISSION_UNKNOWN'
-                and record.get('replacement_submission',False)
-                and record.get('applyment_id') is not None
-                and applyment_id not in known_applyment_ids(record))
-            if record.get('applyment_id') not in (None,applyment_id):
-                if not recovered_generation:raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
-            allowed=('APPLYMENT_STATE_EDITTING','APPLYMENT_STATE_AUDITING','APPLYMENT_STATE_REJECTED','APPLYMENT_STATE_TO_BE_CONFIRMED','APPLYMENT_STATE_TO_BE_SIGNED','APPLYMENT_STATE_SIGNING','APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
-            if data['applyment_state'] not in allowed:raise ValueError('UNKNOWN_PROVIDER_APPLICATION_STATE')
-            with c.tx():
-                if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
-                _,_,live_platform=self.onboarding._load(application,uid,reviewer)
-                current=self._read(application)
-                if current!=record:raise ValueError('APPLYMENT_CHANGED')
-                if (current.get('provider_state') in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED')
-                        and current['provider_state']!=data['applyment_state']):
-                    raise ValueError('TERMINAL_PROVIDER_APPLYMENT_STATE_CONFLICT')
-                # Same business_code (and often the same applyment_id) survives
-                # correction. A pre-submission signed rejection is not evidence
-                # about the new revision, even inside the signature time window.
-                boundary=submission_boundary(current)
-                prior=current.get('provider_query_signed_at')
-                if ((verified['signed_at']<=boundary)
-                        or (prior is not None and verified['signed_at']<prior)
-                        or (prior==verified['signed_at'] and current.get('provider_state')!=data['applyment_state'])
-                        or verified['signature_sha256'] in consumed_rejection_signatures(current)):
-                    raise ValueError('STALE_PROVIDER_APPLYMENT_RESPONSE')
-                current.update(applyment_id=applyment_id,provider_state=data['applyment_state'],provider_response_sha256=digest,provider_observed_at=c.now())
-                current['provider_applyment_history']=sorted(known_applyment_ids(record)|{applyment_id})
-                current.update(provider_query_signed_at=verified['signed_at'],
-                    provider_query_signature_sha256=verified['signature_sha256'])
-                current['provider_query_signatures']=sorted(
-                    set(current.get('provider_query_signatures',[]))|{verified['signature_sha256']})
-                if recovered_generation or recovered_initial:
-                    # A previously unseen provider identity, explicitly returned
-                    # for this business_code, distinguishes the new application.
-                    # Same-ID status changes alone cannot recover an unknown POST.
-                    current.update(state='SUBMITTED_TO_PROVIDER',submission_recovery_receipt=dict(
-                        business_code=record['business_code'],applyment_id=applyment_id,
-                        response_sha256=digest,**verified))
-                if data.get('sub_mchid') is not None:
-                    if type(data['sub_mchid']) is not str or not re.fullmatch('[0-9]{6,32}',data['sub_mchid']):raise ValueError('INVALID_PROVIDER_SUBMERCHANT')
-                    if current.get('provider_sub_mchid') not in (None,data['sub_mchid']):
-                        raise ValueError('IMMUTABLE_PROVIDER_SUBMERCHANT_CONFLICT')
-                    current['provider_sub_mchid']=data['sub_mchid']
-                current.pop('provider_sign_url',None)
-                current.pop('provider_sign_url_proof',None)
-                if data.get('sign_url') is not None and data['applyment_state'] not in ('APPLYMENT_STATE_FINISHED','APPLYMENT_STATE_CANCELED'):
-                    current['provider_sign_url']=official_signing_url(data['sign_url'])
-                    current['provider_sign_url_proof']=dict(applyment_id=applyment_id,**verified)
-                current['audit_detail']=data.get('audit_detail',[])
-                # Official 4012697168: a rejected application is corrected using
-                # the SAME business_code. Only a current signed query opens this
-                # path. A timed-out replacement may still expose the preceding
-                # rejection, so that observation cannot authorize another POST.
-                submitted_with_boundary=(current['state']=='SUBMITTED_TO_PROVIDER'
-                    and (not current.get('replacement_submission',False)
-                         or submission_boundary(current)>=0))
-                if (data['applyment_state']=='APPLYMENT_STATE_REJECTED'
-                        and (submitted_with_boundary
-                             or current['state']=='SUBMISSION_UNKNOWN'
-                             and not current.get('replacement_submission',False))):
-                    current.update(state='CORRECTION',version=current['version']+1,
-                        correction_receipt=dict(business_code=record['business_code'],
-                            applyment_id=applyment_id,
-                            signature_sha256=verified['signature_sha256'],signed_at=verified['signed_at'],
-                            response_sha256=digest,observed_at=c.now()))
-                if (current.get('applicant_direct_submission') and current['state']=='CORRECTION'
-                        and live_platform['status'] in ('SUBMITTED','IN_REVIEW')):
-                    from scripts import community_onboarding_offline as workflow
-                    revision=live_platform['revision']+1
-                    c.db.execute("UPDATE onboarding SET status='CORRECTION_REQUIRED',revision=? WHERE tenant=? AND application=?",(revision,owner,application))
-                    workflow._append(c.db,owner,application,revision,uid,'WECHAT_OFFICIAL_CORRECTION',{'response_sha256':digest})
-                self._check_response_owner(application,record['business_code'],merchant,applyment_id,verified)
-                current['provider_sp_mchid']=merchant
-                self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_QUERIED',digest)
-            return current
-        submission_diagnostic.mark('VERSION')
+            def authorize_query():
+                if c.session(session,csrf)!=uid or (_owner_query is not None and _owner_query()!=uid):raise PermissionError('CURRENT_ORIGINAL_QUERY_OWNER_REQUIRED')
+                self.onboarding._load(application,uid,_owner_query is None)
+                return uid
+            current=self._commit_provider_query(application,owner,record,merchant,(data,digest,verified),uid,authorize_query,owner_recovery=_owner_query is not None)
+            return self._draft_reply(current)
         version=record['version'] if record else 0
         if type(p['expected_version']) is not int or p['expected_version']!=version:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
-        if op=='wechat_execute':
-            submission_diagnostic.mark('OCR_CONFIRMATION')
-            from scripts.community_ocr_draft import current_pending
-            if current_pending((record or {}).get('ocr_drafts'),meta['materials']):raise ValueError('OCR_DRAFT_CONFIRMATION_REQUIRED')
-            submission_diagnostic.mark('SUBMISSION_GATE')
+        if _owner_submit is not None and record is not None and record.get('state')=='SUBMISSION_UNKNOWN':
+            return self.dispatch(session,csrf,{'operation':'wechat_query','params':{'application':application}},_owner_query=_owner_submit)
+        if op=='wechat_execute' or _owner_submit is not None:
             if not self.enabled:raise PermissionError('REAL_MERCHANT_SUBMISSION_GATE_CLOSED')
-            if applicant_action:
-                from scripts.community_merchant_onboarding import require_confirmed_declarations
-                submission_diagnostic.mark('DECLARATIONS')
-                require_confirmed_declarations(meta,(record or {}).get('profile'))
-                if record is None or record['state'] not in ('DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED'):raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
-            elif record is None or record['state']!='INTERNAL_APPROVED' or platform['status']!='APPROVED':raise PermissionError('SEPARATE_INTERNAL_AND_PLATFORM_APPROVAL_REQUIRED')
-            submission_diagnostic.mark('PROVIDER_BINDING')
+            if _owner_submit is None:
+                if record is None or record['state']!='INTERNAL_APPROVED' or platform['status']!='APPROVED':raise PermissionError('SEPARATE_INTERNAL_AND_PLATFORM_APPROVAL_REQUIRED')
+            else:
+                if _owner_submit()!=uid or owner!=uid:raise PermissionError('CURRENT_ORIGINAL_APPLICANT_REQUIRED')
+                if record is None or record['state'] not in ('DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED'):
+                    raise PermissionError('CURRENT_OWNER_SUBMISSION_VERSION_REQUIRED')
             merchant=self._provider_domain(record,submission=True)
-            submission_diagnostic.mark('MATERIALS')
-            self.onboarding._check_materials(application,meta)
-            submission_diagnostic.mark('PROFILE')
-            self._validate(record['profile'],meta['entity_type'],mini_program_live=mini_program_is_live(record))
-            submission_diagnostic.mark('IDENTITY')
-            if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
-            if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
-            submission_diagnostic.mark('INDUSTRY')
-            if applicant_action:self.industry_review_plan(record['profile'],application,meta)
-            else:self.check_industry_review(record,application,owner,meta,platform)
-            submission_diagnostic.mark('MEDIA')
-            self._validate_media(provider_submission_profile(record['profile']),application,meta)
-            if applicant_action and platform['status'] in ('DRAFT','CORRECTION_REQUIRED'):
-                # Freeze this submitted snapshot through the original owner action.
-                # This is not platform approval and grants no operational access.
-                self.onboarding.dispatch(session,csrf,{'operation':'submit','params':{'application':application,'revision':platform['revision']}})
-                owner,meta,platform=self.onboarding._load(application,uid)
+            if _owner_submit is None:
+                self.onboarding._check_materials(application,meta)
+                self._validate(record['profile'],meta['entity_type'])
+                if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
+                if meta['category']=='FOOD' and not record['profile']['settlement_info'].get('qualifications'):raise ValueError('FOOD_QUALIFICATIONS_REQUIRED_BY_EXISTING_CATEGORY')
+                self._validate_media(record['profile'],application,meta)
+            else:
+                outgoing=self._owner_direct_wire_profile(record['profile'])
+                self._validate_media(outgoing,application,meta,_owner_direct_integrity=True)
             code=record.get('business_code') or 'ap'+hashlib.sha256(canonical([merchant,application,version])).hexdigest()[:30]
             correction=record.get('correction_receipt')
-            if record.get('business_code') and (record.get('provider_state')!='APPLYMENT_STATE_REJECTED'
+            parameter=record.get('parameter_rejection')
+            parameter_retry=(type(parameter) is dict and parameter.get('business_code')==code
+                and type(parameter.get('profile_version')) is int and parameter['profile_version']<version
+                and parameter.get('intent_token')==record.get('submission_intent_token')
+                and parameter.get('retry_sequence')==record.get('explicit_retry_sequence',0)
+                and not record.get('applyment_id') and not record.get('submission_receipts')
+                and not record.get('submission_recovery_receipt'))
+            if not parameter_retry and record.get('business_code') and (record.get('provider_state')!='APPLYMENT_STATE_REJECTED'
                     or type(correction) is not dict
                     or correction.get('business_code')!=code
                     or correction.get('applyment_id')!=record.get('applyment_id')
@@ -799,28 +980,42 @@ class WechatApplyment:
                 raise PermissionError('SIGNED_PROVIDER_REJECTION_REQUIRED')
             # Initial legacy attempts keep their original key; corrected revisions
             # have their own consumed intent, retaining the original provider ID.
-            attempt=code if not correction else code+':revision:'+str(version)
-            submission_diagnostic.mark('ENCRYPTION')
-            payload=dict(self._encrypt(provider_submission_profile(record['profile'])),business_code=code)
-            submission_diagnostic.mark('INTENT_TRANSACTION')
+            attempt=code if not (correction or parameter_retry) else code+':revision:'+str(version)
+            retry_sequence=record.get('explicit_retry_sequence',0)
+            intent_token=secrets.token_hex(16)
+            payload=dict(self._encrypt(provider_submission_profile(record['profile']) if _owner_submit is None else outgoing),business_code=code)
             with c.tx():
-                if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
-                current_owner,current_meta,current_platform=self.onboarding._load(application,uid,reviewer)
+                if c.session(session,csrf)!=uid or (_owner_submit is not None and _owner_submit()!=uid):raise PermissionError('CURRENT_ORIGINAL_SUBMITTER_REQUIRED')
+                current_owner,current_meta,current_platform=self.onboarding._load(application,uid,_owner_submit is None)
                 if (current_owner,current_meta,current_platform)!=(owner,meta,platform):raise ValueError('WECHAT_APPLYMENT_CHANGED')
                 current=self._read(application)
                 if current!=record:raise ValueError('WECHAT_APPLYMENT_CHANGED')
                 if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_APPLYMENT_ATTEMPT' AND event_id=?",(attempt,)).fetchone():raise PermissionError('QUERY_EXISTING_APPLICATION_ONLY')
                 c.db.execute("INSERT INTO events VALUES('WECHAT_APPLYMENT_ATTEMPT',?,?)",(attempt,c.now()))
-                current.update(state='SUBMISSION_UNKNOWN',business_code=code,
+                current.update(state='SUBMISSION_UNKNOWN',business_code=code,submission_intent_token=intent_token,
                     replacement_submission=bool(correction),submission_started_at=c.now(),provider_sp_mchid=merchant)
+                if _owner_submit is not None:
+                    current['owner_submit_confirmation']=dict(owner=uid,application=application,
+                        version=version,platform_revision=platform['revision'],confirmed_at=c.now(),intent_token=intent_token,
+                        project=getattr(self.observer,'expected_project',None),
+                        account_epoch=c.db.execute('SELECT epoch FROM accounts WHERE id=?',(uid,)).fetchone()[0])
                 if correction:
                     current['consumed_rejections']=[*current.get('consumed_rejections',[]),
                         dict(correction,submission_version=version)]
-                if applicant_action:current['applicant_direct_submission']=True
+                if parameter_retry:current['parameter_rejection_history']=[*current.get('parameter_rejection_history',[]),parameter]
+                current.pop('parameter_rejection',None)
                 current.pop('correction_receipt',None);self._save(application,owner,current)
                 c.audit(application,uid,'WECHAT_APPLYMENT_SUBMISSION_ATTEMPT',code)
-            submission_diagnostic.mark('PROVIDER_POST')
-            data,digest,verified=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload,include_verification=True)
+            try:
+                data,digest,verified=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload,include_verification=True)
+            except Exception as error:
+                self._retain_verified_provider_error(error,application,owner,code,version,retry_sequence=retry_sequence,intent_token=intent_token)
+                if _owner_submit is not None and not isinstance(error,PermissionError) and self._owner_intent_matches(self._read(application),application,owner):
+                    # One bounded read-only recovery, never a second POST. If it
+                    # is still unknown, retain the original error and durable intent.
+                    try:return self.dispatch(session,csrf,{'operation':'wechat_query','params':{'application':application}},_owner_query=_owner_submit)
+                    except Exception:pass
+                raise
             verified=signed_response_context(verified)
             # The submit response contains only applyment_id. A signed GET
             # response or error is not a submission ACK, even though it may also
@@ -835,10 +1030,9 @@ class WechatApplyment:
                 raise ValueError('STALE_PROVIDER_APPLYMENT_SUBMISSION_RESPONSE')
             if applyment_id!=record.get('applyment_id') and applyment_id in known_applyment_ids(record):
                 raise ValueError('PROVIDER_APPLYMENT_ID_MISMATCH')
-            submission_diagnostic.mark('RECEIPT_TRANSACTION')
             with c.tx():
-                if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_REVIEWER_SESSION_REQUIRED')
-                self.onboarding._load(application,uid,reviewer)
+                if c.session(session,csrf)!=uid or (_owner_submit is not None and _owner_submit()!=uid):raise PermissionError('CURRENT_ORIGINAL_SUBMITTER_REQUIRED')
+                self.onboarding._load(application,uid,_owner_submit is None)
                 current=self._read(application)
                 if not original_submission_intent(current,code,version):
                     raise ValueError('APPLYMENT_SUBMISSION_RACE_QUERY_EXISTING_ONLY')
@@ -855,69 +1049,19 @@ class WechatApplyment:
                     dict(business_code=code,applyment_id=applyment_id,response_sha256=digest,
                          submission_version=version,**verified)]
                 self._save(application,owner,current);c.audit(application,uid,'WECHAT_APPLYMENT_SUBMITTED',code)
-            return current
+            return self._draft_reply(current)
         with c.tx():
             if c.session(session,csrf)!=uid:raise PermissionError('CURRENT_APPLYMENT_SESSION_REQUIRED')
-            if self.onboarding._load(application,uid,reviewer)[2]['status']=='WITHDRAWN':
+            latest_platform=self.onboarding._load(application,uid,reviewer)[2]
+            if latest_platform['status']=='WITHDRAWN':
                 raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
             if self._read(application)!=record:raise ValueError('WECHAT_APPLYMENT_VERSION_CONFLICT')
-            if op in ('wechat_review','wechat_submit_review') and self.onboarding._load(application,uid,reviewer)!=(owner,meta,platform):raise ValueError('WECHAT_APPLYMENT_CHANGED')
-            if op=='wechat_qualifications_select':
-                from scripts.community_merchant_onboarding import INDUSTRY_MATERIAL_KINDS
-                _,meta,current_platform=self.onboarding._load(application,uid)
-                if uid!=owner or current_platform['status'] not in ('DRAFT','CORRECTION_REQUIRED') or record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('OWNER_INDUSTRY_DRAFT_REQUIRED')
-                if type(p['application_revision']) is not int or p['application_revision']!=current_platform['revision']:raise ValueError('INDUSTRY_APPLICATION_REVISION_CONFLICT')
-                if type(p['kind']) is not str or p['kind'] not in INDUSTRY_MATERIAL_KINDS or type(p['selected']) is not bool:raise ValueError('INVALID_INDUSTRY_SELECTION')
-                receipts=self.industry_media_receipts(application,meta)
-                values=record.get('profile',{}).get('settlement_info',{}).get('qualifications',[])
-                if type(values) is not list:raise PermissionError('CURRENT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
-                # Removing a known retained slot is not admitting expired media.
-                # Bind the removal to the protected server record, never client SHA.
-                if not p['selected']:
-                    if p['media_id'] is not None:raise ValueError('DESELECT_WITHOUT_MEDIA_REQUIRED')
-                    removed={b['media_id'] for b in record.get('industry_qualification_bindings',[])
-                             if b.get('kind')==p['kind']}
-                    if 'industry_qualification_bindings' not in record:
-                        # Legacy single-slot profiles predate persisted bindings.
-                        # A protected historical receipt may prove removal only;
-                        # it is never added to the current admission set.
-                        material=meta['materials'].get(p['kind'])
-                        if material:
-                            key=hashlib.sha256(canonical([self.reader._mchid,application,p['kind'],material['sha256']])).hexdigest()
-                            row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND project=?",(key,application)).fetchone()
-                            if row:
-                                historical=json.loads(c.decrypt(row[0],'wechat-media:'+key))
-                                media=historical.get('media_id')
-                                if (historical.get('kind')==p['kind'] and historical.get('sha256')==material['sha256']
-                                        and type(media) is str and media in values
-                                        and type(historical.get('provider_response_sha256')) is str
-                                        and re.fullmatch('[0-9a-f]{64}',historical['provider_response_sha256'])):
-                                    removed.add(media)
-                    values=[v for v in values if v not in removed]
-                available=receipts
-                if not p['selected']:
-                    # Retain other known (possibly expired) selections without
-                    # certifying them. They must still pass review/execute checks.
-                    retained={b['media_id']:b for b in record.get('industry_qualification_bindings',[])
-                              if b.get('kind') in INDUSTRY_MATERIAL_KINDS}
-                    available=dict(retained,**receipts)
-                if any(v not in available for v in values):raise PermissionError('CURRENT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
-                chosen={available[v]['kind']:available[v] for v in values}
-                if p['selected']:
-                    if type(p['media_id']) is not str:raise ValueError('INVALID_INDUSTRY_MEDIA_ID')
-                    receipt=receipts.get(p['media_id'])
-                    if receipt is None or receipt['kind']!=p['kind']:raise PermissionError('EXACT_INDUSTRY_SLOT_RECEIPT_REQUIRED')
-                    chosen[p['kind']]=receipt
-                else:
-                    if p['media_id'] is not None:raise ValueError('DESELECT_WITHOUT_MEDIA_REQUIRED')
-                    chosen.pop(p['kind'],None)
-                bindings=[chosen[k] for k in INDUSTRY_MATERIAL_KINDS if k in chosen]
-                result=json.loads(canonical(record));settlement=result['profile'].setdefault('settlement_info',{})
-                if bindings:settlement['qualifications']=[v['media_id'] for v in bindings]
-                else:settlement.pop('qualifications',None)
-                result.update(industry_qualification_bindings=bindings,version=version+1,state='DRAFT')
-            elif op=='wechat_cashier_link':
-                if platform['status'] not in ('DRAFT','CORRECTION_REQUIRED') or record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('CASHIER_DRAFT_REQUIRED')
+            local_edit=(_mini_edit is not None and latest_platform==platform
+                and self.onboarding.local_presubmission_editable(application,owner,platform) and _mini_edit()==uid)
+            if op=='wechat_cashier_link':
+                if (not local_edit and (platform['status'] not in ('DRAFT','CORRECTION_REQUIRED')
+                        or record is None or record['state'] not in ('DRAFT','CORRECTION'))) or record is None:
+                    raise PermissionError('CASHIER_DRAFT_REQUIRED')
                 material=meta['materials'].get('cashier_photo')
                 media=p['media_id']
                 if (type(media) is not str or not media or not material
@@ -935,23 +1079,24 @@ class WechatApplyment:
                 result['profile'].setdefault('addition_info',{})['business_addition_pics']=values
                 result.update(cashier_media_id=media,version=version+1,state='DRAFT')
             elif op=='wechat_save':
-                if record and record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
+                if record and record['state'] not in ('DRAFT','CORRECTION') and not local_edit:raise PermissionError('PAYMENT_APPLICATION_EDIT_DENIED')
                 if type(p['profile']) is not dict or len(canonical(p['profile']))>100000:raise ValueError('INVALID_OFFICIAL_PROFILE_DRAFT')
-                p=dict(p,profile=with_mini_program_default(p['profile']))
-                from scripts.community_ocr_draft import merge_drafts, MATERIAL, FIELDS
-                updates=None
+                private_drafts=None
                 if 'ocr_drafts' in p:
+                    from scripts.community_ocr_draft import merge_drafts, MATERIAL, FIELDS
                     current_owner,current_meta,current_platform=self.onboarding._load(application,uid)
-                    if (current_owner!=owner or current_meta!=meta or current_platform!=platform
+                    if (_mini_edit() != uid or (current_owner,current_meta,current_platform)!=(owner,meta,platform)
                             or type(p['application_revision']) is not int or p['application_revision']!=platform['revision']):
                         raise ValueError('PRIVATE_OCR_DRAFT_APPLICATION_CHANGED')
-                    if type(p['ocr_drafts']) is not dict or set(p['ocr_drafts'])-set(FIELDS):raise ValueError('INVALID_PRIVATE_OCR_DRAFT')
+                    if type(p['ocr_drafts']) is not dict or set(p['ocr_drafts'])-set(FIELDS):
+                        raise ValueError('INVALID_PRIVATE_OCR_DRAFT')
                     updates={}
                     for kind,draft in p['ocr_drafts'].items():
                         material=meta['materials'].get(MATERIAL.get(kind,kind))
-                        if not material or type(draft) is not dict or set(draft)!={'fields'}:raise ValueError('INVALID_PRIVATE_OCR_DRAFT')
+                        if not material or type(draft) is not dict or set(draft)!={'fields'}:
+                            raise ValueError('INVALID_PRIVATE_OCR_DRAFT')
                         updates[kind]=dict(object_id=material['object_id'],sha256=material['sha256'],fields=draft['fields'])
-                drafts=merge_drafts((record or {}).get('ocr_drafts'),updates,meta['materials'])
+                    private_drafts=merge_drafts((record or {}).get('ocr_drafts'),updates,meta['materials'])
                 values=self.cashier_values(p['profile'])
                 self.check_cashier_binding(application,values,(record or {}).get('cashier_media_id'))
                 from scripts.community_merchant_onboarding import profile_scenes
@@ -964,42 +1109,21 @@ class WechatApplyment:
                     from scripts import community_onboarding_offline as workflow
                     workflow.save_draft(c.db,owner,application,uid,dict(shared,license_ref='PRIVATE_ONBOARDING_MATERIALS'),platform['revision'],
                         encode=lambda value:self.onboarding._encode(value,'onboarding-fields:'+application),manage_transaction=False)
-                result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'],ocr_drafts=drafts)
-                if 'mini_program_live' in p:
-                    if type(p['mini_program_live']) is not bool:raise ValueError('MINI_PROGRAM_LIVE_DECLARATION_REQUIRED')
-                    if p['mini_program_live'] and not mini_program_appids(p['profile']):raise ValueError('MINI_PROGRAM_APPID_REQUIRED_FOR_LIVE_DECLARATION')
-                    result['mini_program_live']=p['mini_program_live']
-                    result['mini_program_live_appids']=mini_program_appids(p['profile']) if p['mini_program_live'] else {}
-                elif not mini_program_is_live(result):
-                    result.pop('mini_program_live',None);result.pop('mini_program_live_appids',None)
+                result=dict(record or {},version=version+1,state='DRAFT',profile=p['profile'])
+                if private_drafts is not None:result['ocr_drafts']=private_drafts
                 if not record:result['provider_state']='NOT_SUBMITTED'
             elif op=='wechat_submit_review':
                 from scripts.community_merchant_onboarding import require_confirmed_declarations
                 require_confirmed_declarations(meta,(record or {}).get('profile'))
                 if record is None or record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('PAYMENT_DRAFT_REQUIRED')
-                self._validate(record['profile'],meta['entity_type'],mini_program_live=mini_program_is_live(record))
-                self.industry_review_plan(record['profile'],application,meta)
+                self._validate(record['profile'],meta['entity_type'])
                 if record['profile']['subject_info']['identity_info']['id_doc_type']!=meta.get('identity_type','IDENTIFICATION_TYPE_IDCARD'):raise ValueError('PLATFORM_IDENTITY_TYPE_MISMATCH')
                 result=dict(record,version=version+1,state='PENDING_INTERNAL_REVIEW')
             else:
                 if uid==owner or record is None or record['state']!='PENDING_INTERNAL_REVIEW' or p['decision'] not in ('INTERNAL_APPROVED','CORRECTION') or type(p['opinion']) is not str or not 1<=len(p['opinion'])<=1000:raise PermissionError('INDEPENDENT_PAYMENT_APPLICATION_REVIEW_REQUIRED')
                 result=dict(record,version=version+1,state=p['decision'],opinion=p['opinion'],reviewer=uid)
-                result.pop('industry_review_evidence',None)
-                if p['decision']=='INTERNAL_APPROVED':
-                    from scripts.community_industry_rules import validate_review_evidence
-                    plan=self.industry_review_plan(record['profile'],application,meta)
-                    if plan['requires_explicit_review']:
-                        evidence=dict(application=application,application_revision=platform['revision'],
-                            profile_version=result['version'],reviewer_id=uid,decision='CONDITIONS_CONFIRMED',
-                            branch_assessments=p.get('industry_branch_assessments'),
-                            **{key:plan[key] for key in ('rule_sha256','materials_sha256','profile_sha256')})
-                        validate_review_evidence(plan,evidence,application=application,
-                            application_revision=platform['revision'],profile_version=result['version'],
-                            owner_id=owner,authorized_reviewer_id=uid)
-                        result['industry_review_evidence']=evidence
-
             self._save(application,owner,result);c.audit(application,uid,'WECHAT_'+op.upper(),str(result['version']))
-        return result
+        return self._draft_reply(result,owner_materials=meta['materials'] if op=='wechat_save' else None)
     @staticmethod
     def cashier_values(profile):
         addition=profile.get('addition_info',{})
@@ -1022,12 +1146,14 @@ class WechatApplyment:
         if (previous is not None and (type(previous) is not str or values.count(previous)!=1)
                 or set(values)&self.cashier_media_ids(application)-({previous} if previous else set())):
             raise ValueError('CASHIER_MEDIA_BINDING_UNKNOWN')
-    def clear_cashier_media(self,application,owner):
+    def clear_cashier_media(self,application,owner,*,_mini_presubmission=False):
         c=self.center
         if not c.db.in_transaction:raise ValueError('ORIGINAL_ONBOARDING_TRANSACTION_REQUIRED')
         record=self._read(application)
         if record is None:return
-        if record['state'] not in ('DRAFT','CORRECTION'):raise PermissionError('CASHIER_DRAFT_REQUIRED')
+        if (record['state'] not in ('DRAFT','CORRECTION')
+                and not (_mini_presubmission is True and self.local_presubmission_editable(application,owner,local_queue=False))):
+            raise PermissionError('CASHIER_DRAFT_REQUIRED')
         result=json.loads(json.dumps(record));values=self.cashier_values(result.get('profile',{}))
         previous=result.get('cashier_media_id');self.check_cashier_binding(application,values,previous)
         if previous:
@@ -1037,7 +1163,75 @@ class WechatApplyment:
             result.pop('cashier_media_id');result['version']+=1
             self._save(application,owner,result)
             c.audit(application,owner,'WECHAT_CASHIER_UNLINKED',str(result['version']))
-    def media(self,uid,owner,application,meta,kind,reauthorize):
+    def _mini_owner_media_status(self, uid, owner, application, p, reauthorize):
+        # Only the original Mini applicant context supplies this reauthorizer.
+        if uid != owner or reauthorize() != uid:
+            raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
+        c = self.center
+        _, meta, platform = self.onboarding._load(application, uid)
+        if platform['status'] == 'WITHDRAWN':
+            raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
+        kind = p['kind']
+        if kind == 'bank_card':
+            raise PermissionError('BANK_CARD_PRIVATE_PREVIEW_ONLY')
+        if not self.enabled:
+            raise WechatMediaUnavailable('REAL_MERCHANT_MEDIA_UPLOAD_GATE_CLOSED')
+        if type(kind) is not str or kind not in meta['materials']:
+            raise ValueError('ORIGINAL_PRIVATE_MATERIAL_REQUIRED')
+        material = meta['materials'][kind]
+        if material['expires_at'] is not None and material['expires_at'] <= c.now():
+            raise ValueError('EXPIRED_PRIVATE_MATERIAL')
+        source = material['sha256']
+        want = p['expected_source_sha256']
+        if (type(source) is not str or len(source) != 64
+            or any(ch not in '0123456789abcdef' for ch in source)
+            or want is not None and (type(want) is not str or source != want)):
+            raise ValueError('MEDIA_RECEIPT_BINDING_MISMATCH')
+        row = c.db.execute('SELECT project,sha,scan,mime FROM objects WHERE id=?',
+                           (material['object_id'],)).fetchone()
+        if row is None or tuple(row[:3]) != (application,source,'CLEAN'):
+            raise PermissionError('SCANNED_ORIGINAL_MATERIAL_REQUIRED')
+        if row[3] not in ('image/jpeg','image/png','application/pdf'):
+            raise ValueError('UNSUPPORTED_PROVIDER_MEDIA')
+        key = hashlib.sha256(canonical([self.reader._mchid,application,kind,source])).hexdigest()
+        result = dict(application=application,kind=kind,source_sha256=source,state='PENDING_OR_UNKNOWN')
+        # An old missing receipt is not proof that no upstream attempt occurred.
+        row = c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' "
+                           "AND subject_idx=? AND project=? AND user_id=? AND active=1",
+                           (key,application,owner)).fetchone()
+        if row is not None:
+            evidence = c.db.execute("SELECT MIN(at) FROM audit WHERE project=? AND actor=? "
+                                    "AND event='WECHAT_MEDIA_UPLOADED' AND object_id=?",
+                                    (application,uid,key)).fetchone()
+            at = evidence[0] if evidence is not None else None
+            now = c.now()
+            if type(at) is int and 0 <= now-at < 29*86400:
+                saved = json.loads(c.decrypt(row[0], 'wechat-media:'+key))
+                media_id = saved.get('media_id')
+                response = saved.get('provider_response_sha256')
+                if (saved.get('kind') != kind or saved.get('sha256') != source
+                    or type(media_id) is not str or not 1 <= len(media_id) <= 1024
+                    or type(response) is not str or len(response)!=64
+                    or any(ch not in '0123456789abcdef' for ch in response)):
+                    raise ValueError('MEDIA_RECEIPT_BINDING_MISMATCH')
+                result.update(state='READY', media_id=media_id)
+        if reauthorize() != uid:
+            raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
+        _, current, platform = self.onboarding._load(application, uid)
+        if platform['status'] == 'WITHDRAWN' or current['materials'].get(kind) != material:
+            raise PermissionError('MEDIA_RECEIPT_BINDING_MISMATCH')
+        result['application_revision']=platform['revision']
+        if (result['state']=='PENDING_OR_UNKNOWN' and row is None and platform['status'] in ('DRAFT','CORRECTION_REQUIRED')
+            and not self._material_attempt_seen(c,application,uid,key)):
+            result['state']='NOT_STARTED'
+        return result
+
+    @staticmethod
+    def _material_attempt_seen(c,application,uid,key):
+        return (c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_MEDIA_ATTEMPT' AND event_id=?",(key,)).fetchone() is not None
+            or c.db.execute("SELECT 1 FROM audit WHERE project=? AND actor=? AND event IN ('WECHAT_MEDIA_UPLOAD_ATTEMPT','WECHAT_MEDIA_UPLOADED') AND object_id=?",(application,uid,key)).fetchone() is not None)
+
+    def media(self,uid,owner,application,meta,kind,reauthorize,*,_mini_actor=None,_start=None):
         if kind=='bank_card':raise PermissionError('BANK_CARD_PRIVATE_PREVIEW_ONLY')
         if not self.enabled:raise WechatMediaUnavailable('REAL_MERCHANT_MEDIA_UPLOAD_GATE_CLOSED')
         if type(kind) is not str or kind not in meta['materials']:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_REQUIRED')
@@ -1053,34 +1247,167 @@ class WechatApplyment:
         boundary='xj'+secrets.token_hex(24)
         body=('--'+boundary+'\r\nContent-Disposition: form-data; name="meta"\r\nContent-Type: application/json\r\n\r\n').encode()+metadata+('\r\n--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="'+filename+'"\r\nContent-Type: '+row[3]+'\r\n\r\n').encode()+raw+('\r\n--'+boundary+'--\r\n').encode()
         if reauthorize()!=uid:raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
-        _,fresh_meta,fresh_platform=self.onboarding._load(application,uid)
-        if fresh_platform['status']=='WITHDRAWN':raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
-        if fresh_meta['materials'].get(kind)!=material:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_CHANGED')
-        key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
-        # The source/session checks above apply to reuse as well as first transmission.
-        with c.tx():
-            row=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND user_id=? AND project=? AND active=1",(key,owner,application)).fetchone()
-            if row is not None:
-                receipt=json.loads(c.decrypt(row['payload'],'wechat-media:'+key))
-                if (receipt.get('kind')!=kind or receipt.get('sha256')!=material['sha256']
-                        or type(receipt.get('media_id')) is not str or not 1<=len(receipt['media_id'])<=1024):
-                    raise ValueError('INVALID_SAVED_PROVIDER_MEDIA_RECEIPT')
-                return dict(media_id=receipt['media_id'],kind=kind,source_sha256=material['sha256'])
-            if c.db.execute("SELECT 1 FROM events WHERE channel='WECHAT_MEDIA_ATTEMPT' AND event_id=?",(key,)).fetchone():
-                raise WechatMediaPending('WECHAT_MEDIA_RESULT_UNKNOWN')
-            c.db.execute("INSERT INTO events VALUES('WECHAT_MEDIA_ATTEMPT',?,?)",(key,c.now()))
-            c.audit(application,uid,'WECHAT_MEDIA_UPLOAD_ATTEMPT',key)
-        try:
-            data,digest=request(self.reader,'POST','/v3/merchant/media/upload',raw=body,content_type='multipart/form-data; boundary='+boundary,signing_body=metadata)
+        if self.onboarding._load(application,uid)[2]['status']=='WITHDRAWN':raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
+        # Once sent, retain the original response evidence even if the applicant
+        # later withdraws locally. Withdrawal never cancels a provider operation.
+        _actor=_mini_actor if callable(_mini_actor) else reauthorize
+        _key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+        _direct=callable(_mini_actor) and _start is not None and 'expected_source_sha256' not in _start
+        with _MINI_ACTIVE_MEDIA_LOCKS[int(_key[:2],16)%len(_MINI_ACTIVE_MEDIA_LOCKS)]:
+            with c.tx():
+                if reauthorize()!=uid or _actor()!=uid or owner!=uid:
+                    raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
+                _owner,_meta,_platform=self.onboarding._load(application,uid)
+                if _owner!=uid or _meta['materials'].get(kind)!=material or _platform['status']=='WITHDRAWN':
+                    raise PermissionError('ORIGINAL_MINI_MEDIA_CONTEXT_CHANGED')
+                if _direct:
+                    if callable(_mini_actor) and (_start is None or _start['owner_confirmed_material_send'] is not True or _start.get('expected_source_sha256',material['sha256'])!=material['sha256'] or type(_start['application_revision']) is not int or _start['application_revision']!=_platform['revision']):
+                        raise ValueError('WECHAT_MEDIA_RESULT_UNKNOWN')
+                    _stored=c.db.execute("SELECT 1 FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND project=? AND user_id=? AND active=1",(_key,application,uid)).fetchone()
+                    if _stored is not None:
+                        _saved=self._mini_owner_media_status(uid,owner,application,dict(kind=kind,expected_source_sha256=material['sha256']),_actor)
+                        if _saved['state']=='READY':return dict(media_id=_saved['media_id'],kind=kind,source_sha256=material['sha256'])
+                    # Historical prepared markers do not gate a new deliberate click.
+                else:
+                    _status=self._mini_owner_media_status(uid,owner,application,dict(kind=kind,expected_source_sha256=material['sha256']),_actor)
+                    if _status['state']=='READY':return dict(media_id=_status['media_id'],kind=kind,source_sha256=material['sha256'])
+                    if callable(_mini_actor) and (_start is None or _start['owner_confirmed_material_send'] is not True or _start['expected_source_sha256']!=material['sha256'] or type(_start['application_revision']) is not int or _start['application_revision']!=_platform['revision'] or _status['state']!='NOT_STARTED'):
+                        raise ValueError('WECHAT_MEDIA_RESULT_UNKNOWN')
+                    if self._material_attempt_seen(c,application,uid,_key) or c.db.execute("SELECT 1 FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND project=? AND user_id=? AND active=1",(_key,application,uid)).fetchone() is not None:
+                        raise ValueError('WECHAT_MEDIA_RESULT_UNKNOWN')
+                _reserved=c.db.execute("INSERT OR IGNORE INTO events VALUES('WECHAT_MEDIA_ATTEMPT',?,?)",(_key,c.now())).rowcount
+                if _reserved!=1 and not _direct:raise ValueError('WECHAT_MEDIA_RESULT_UNKNOWN')
+                c.audit(application,uid,'WECHAT_MEDIA_UPLOAD_ATTEMPT',_key)
+            if reauthorize()!=uid or _actor()!=uid:
+                raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
+            _owner,_meta,_platform=self.onboarding._load(application,uid)
+            if _owner!=uid or _meta['materials'].get(kind)!=material or _platform['status']=='WITHDRAWN' or (callable(_mini_actor) and _platform['revision']!=_start['application_revision']):
+                raise PermissionError('ORIGINAL_MINI_MEDIA_CONTEXT_CHANGED')
+            try:
+                data,digest=request(self.reader,'POST','/v3/merchant/media/upload',raw=body,content_type='multipart/form-data; boundary='+boundary,signing_body=metadata)
+            except Exception as error:
+                try:
+                    cls=type(error).__name__
+                    cls=cls if cls in ('HTTPError','URLError','TimeoutError','ConnectionError','ConnectionResetError','SSLError','ValueError','PermissionError','InvalidSignature','OSError','RuntimeError','TypeError','AttributeError') else 'OtherError'
+                    code=getattr(error,'code',None)
+                    inner=getattr(error,'reason',None) if cls=='URLError' else error
+                    inner_cls=type(inner).__name__
+                    inner_cls=inner_cls if inner_cls in ('gaierror','TimeoutError','SSLError','SSLCertVerificationError','ConnectionRefusedError','ConnectionResetError','ConnectionAbortedError','BrokenPipeError','PermissionError','OSError','NoneType') else 'Other'
+                    eno=getattr(inner,'errno',None)
+                    verify=getattr(inner,'verify_code',None)
+                    detail=' inner='+inner_cls+' errno='+str(eno if type(eno) is int and -4096<=eno<=4096 else 0)+' verify='+str(verify if type(verify) is int and 1<=verify<=1024 else 0)
+                    syslog.syslog(syslog.LOG_WARNING,'XJ_MINI_MEDIA_PROVIDER_FAILURE class='+cls+' http='+str(code if type(code) is int and 100<=code<=599 else 0)+detail)
+                except Exception:pass
+                raise
             if type(data.get('media_id')) is not str or not 1<=len(data['media_id'])<=1024:raise ValueError('INVALID_PROVIDER_MEDIA_ID')
-        except Exception as error:
-            raise WechatMediaPending('WECHAT_MEDIA_RESULT_UNKNOWN') from error
-        # Persist an authentic response even if identity/source changes during the request.
-        # A later call must still pass current source/session checks before reuse.
-        with c.tx():
-            c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_WECHAT_MEDIA',?,?,?,?,1)",(key,owner,application,c.encrypt(canonical(dict(media_id=data['media_id'],kind=kind,sha256=material['sha256'],provider_response_sha256=digest)),'wechat-media:'+key)))
-            c.audit(application,uid,'WECHAT_MEDIA_UPLOADED',key)
-        if reauthorize()!=uid:raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
-        _,current_meta,current_platform=self.onboarding._load(application,uid)
-        if current_meta['materials'].get(kind)!=material:raise ValueError('ORIGINAL_PRIVATE_MATERIAL_CHANGED')
-        return dict(media_id=data['media_id'],kind=kind,source_sha256=material['sha256'])
+            with c.tx():
+                key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+                c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_WECHAT_MEDIA',?,?,?,?,1)",(key,owner,application,c.encrypt(canonical(dict(media_id=data['media_id'],kind=kind,sha256=material['sha256'],provider_response_sha256=digest)),'wechat-media:'+key)))
+                c.audit(application,uid,'WECHAT_MEDIA_UPLOADED',key)
+                # The winning persisted receipt is authoritative under concurrent uploads.
+                saved=c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND subject_idx=? AND project=? AND user_id=? AND active=1",(key,application,owner)).fetchone()
+                if saved is None:raise ValueError('MEDIA_RECEIPT_NOT_AVAILABLE')
+                receipt=json.loads(c.decrypt(saved[0],'wechat-media:'+key))
+                if receipt.get('kind')!=kind or receipt.get('sha256')!=material['sha256']:raise ValueError('MEDIA_RECEIPT_BINDING_MISMATCH')
+            if reauthorize()!=uid:raise PermissionError('ORIGINAL_APPLICANT_SESSION_REQUIRED')
+            self.onboarding._load(application,uid)
+            return dict(media_id=receipt['media_id'],kind=kind,source_sha256=material['sha256'])
+
+
+# Only previously verified exact applicant-bound sign_url; no local QR substitute.
+def _original_sign_image(observer, session, csrf, application, project):
+    out=observer.read(session,csrf,application,False,expected_project=project)
+    if out.get('provider_state')!='APPLYMENT_STATE_TO_BE_SIGNED' or out.get('qr_available') is not True:
+        raise ValueError('VERIFIED_PROVIDER_SIGN_URL_REQUIRED')
+    uid=observer.center.session(session,csrf)
+    def checked():
+        obs=observer.snapshot(application); g=obs['grant']; saved=observer.stored(application)
+        record=saved if observer._matching(saved,obs) else obs['record']; proof=record.get('provider_sign_url_proof')
+        if (not g.get('active') or g.get('owner')!=uid or (project is not None and g.get('project')!=project)
+            or record.get('provider_state')!='APPLYMENT_STATE_TO_BE_SIGNED' or g.get('applyment_id')!=out.get('applyment_id')
+            or type(proof) is not dict or proof.get('applyment_id')!=out.get('applyment_id')
+            or proof.get('signed_at')!=record.get('provider_query_signed_at')
+            or proof.get('signature_sha256')!=record.get('provider_query_signature_sha256')):
+            raise PermissionError('VERIFIED_PROVIDER_SIGN_URL_REQUIRED')
+        return (g,proof,official_signing_url(record.get('provider_sign_url')))
+    saved=checked()
+    try:
+        image=_read_wechat_sign_image(saved[2])
+    except ValueError as e:
+        import syslog
+        detail=e.args[0] if len(e.args)==1 and e.args[0] in ('WX_OFFICIAL_QR_NO_REFERENCE','WX_OFFICIAL_QR_HTTP','WX_OFFICIAL_QR_NO_IMAGE','WX_OFFICIAL_QR_INVALID_IMAGE') else 'WX_OFFICIAL_QR_NO_IMAGE'
+        syslog.syslog(syslog.LOG_WARNING,'XJ_OFFICIAL_SIGN_IMAGE '+detail)
+        raise ValueError(detail) from None
+    if observer.center.session(session,csrf)!=uid or checked()!=saved:
+        raise PermissionError('VERIFIED_PROVIDER_SIGN_URL_REQUIRED')
+    out.update(image)
+    return out
+
+def _read_wechat_sign_image(initial,fetch=None):
+    from io import BytesIO
+    import base64, hashlib, urllib.request as req, urllib.error as err
+    from urllib.parse import urljoin,urlsplit,parse_qsl
+    from html.parser import HTMLParser
+    from PIL import Image
+    import syslog
+    def kind(url):
+        if type(url) is not str or not 1<=len(url)<=2048 or any(ord(c)<33 or ord(c)>126 for c in url) or chr(92) in url or '#' in url: return ''
+        u=urlsplit(url)
+        if u.scheme!='https' or not u.query: return ''
+        if (u.netloc,u.path)==('mp.weixin.qq.com','/cgi-bin/showqrcode'):
+            fields=parse_qsl(u.query,keep_blank_values=True,max_num_fields=2)
+            return 'image' if len(fields)==1 and fields[0][0]=='ticket' and 1<=len(fields[0][1])<=1024 else ''
+        return {('pay.weixin.qq.com','/public/apply4ec_sign/s'):'page',('mp.weixin.qq.com','/showqrcode'):'image'}.get((u.netloc,u.path),'')
+    class NoRedirect(req.HTTPRedirectHandler):
+        def redirect_request(self,*args,**kw): return None
+    def network(url):
+        lim=192000 if kind(url)=='image' else 256000
+        try:
+            op=req.build_opener(req.ProxyHandler({}),NoRedirect())
+            with op.open(req.Request(url,headers={'Accept':'image/png,image/jpeg' if kind(url)=='image' else 'text/html'}),timeout=3) as r:
+                return r.status,r.headers.get_content_type(),r.read(lim+1)
+        except err.HTTPError as e:
+            with e:
+                if e.code in (301,302,303,307,308): return e.code,'',e.headers.get('Location')
+                raise ValueError('WX_OFFICIAL_QR_HTTP') from None
+        except (OSError,err.URLError): raise ValueError('WX_OFFICIAL_QR_HTTP') from None
+    class Img(HTMLParser):
+        def handle_starttag(self,tag,attrs):
+            if tag!='img': return
+            for key,ref in attrs:
+                if key in ('src','data-src') and ref:
+                    target=urljoin(current,ref)
+                    if kind(target)=='image': links.add(target)
+    current=initial; seen=set()
+    for _ in range(4):
+        role=kind(current)
+        if not role or current in seen:
+            if fetch is None:
+                shape=urlsplit(current); net='wxmp' if shape.netloc=='mp.weixin.qq.com' else 'wxpay' if shape.netloc=='pay.weixin.qq.com' else 'other'
+                path={'/cgi-bin/showqrcode':'cgi','/showqrcode':'image','/public/apply4ec_sign/s':'sign_page'}.get(shape.path,'other')
+                syslog.syslog(syslog.LOG_INFO,'XJ_OFFICIAL_SIGN_IMAGE_SHAPE blocked host='+net+' path='+path)
+            break
+        seen.add(current); code,mime,body=(fetch or network)(current)
+        if fetch is None:
+            typ=mime if mime in ('image/png','image/jpeg','image/jpg','image/gif','image/webp','image/x-png','application/octet-stream','text/html','application/json','') else 'other'
+            size=str(len(body)) if type(body) is bytes else '0'
+            syslog.syslog(syslog.LOG_INFO,'XJ_OFFICIAL_SIGN_IMAGE_SHAPE role='+role+' http='+str(code)+' type='+typ+' bytes='+size)
+        if code in (301,302,303,307,308) and type(body) is str:
+            current=urljoin(current,body); continue
+        if code!=200 or type(body) is not bytes: break
+        if role=='page' and mime=='text/html' and len(body)<=256000:
+            links=set(); Img().feed(body.decode('utf-8','replace'))
+            if len(links)!=1: raise ValueError('WX_OFFICIAL_QR_NO_REFERENCE')
+            current,=links; continue
+        if role=='image' and len(body)<=192000:
+            try:
+                with Image.open(BytesIO(body)) as pic:
+                    if pic.format not in ('PNG','JPEG','GIF','WEBP') or pic.width!=pic.height or not 80<=pic.width<=1500 or getattr(pic,'n_frames',1)!=1: break
+                    if pic.format=='PNG': pic.verify()
+                    else:
+                        buf=BytesIO(); pic.convert('RGB').save(buf,format='PNG'); body=buf.getvalue()
+            except (OSError,ValueError): raise ValueError('WX_OFFICIAL_QR_INVALID_IMAGE') from None
+            if len(body)<=192000:
+                return {'qr_source':'WECHAT_OFFICIAL','qr_available':True,'png_data':'data:image/png;base64,'+base64.b64encode(body).decode('ascii'),'url_sha256':hashlib.sha256(initial.encode()).hexdigest()}
+        break
+    raise ValueError('WX_OFFICIAL_QR_NO_IMAGE')

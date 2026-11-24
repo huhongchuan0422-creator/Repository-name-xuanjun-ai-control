@@ -197,6 +197,20 @@ class MiniApplication:
         self.gateway.payments.commerce=self.commerce
         return self.gateway.payments
 
+    def configure_fixed_cashier(self, *, ad_settings=None, payer_authority=None,
+                                qualification=None, freeze_original_split=None):
+        """Protected host opt-in over already configured original services."""
+        if self.server is not None or getattr(self, 'fixed_cashier', None) is not None:
+            raise ValueError('FIXED_CASHIER_ALREADY_CONFIGURED_OR_LISTENING')
+        from scripts.community_fixed_cashier_host import FixedCashierHost
+        payments = getattr(self.gateway, 'payments', None)
+        self.fixed_cashier = FixedCashierHost(center=self.center, commerce=self.commerce,
+            operations=self.operations, identity=self.identity, payments=payments,
+            prepay=getattr(payments, 'prepay', None), https_origin=getattr(self, 'https_origin', None),
+            ad_settings=ad_settings, payer_authority=payer_authority, qualification=qualification,
+            freeze_original_split=freeze_original_split)
+        return self.fixed_cashier
+
     def configure_operations(self,grants,*,consumer_only=False):
         """Host-supplied grants for existing Center users; no client role input."""
         if self.server is not None or self.operations is not None:
@@ -265,7 +279,11 @@ class MiniApplication:
         if (parent.st_gid!=nginx_gid or
                 (nginx_uid!=os.geteuid() and parent.st_mode & 0o050 != 0o050)):
             raise PermissionError('NGINX_SOCKET_DIRECTORY_TRAVERSAL_REQUIRED')
-        handler=make_handler(self.gateway,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,merchant_bills=self.merchant_bills,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
+        fixed_options = {}
+        if getattr(self, 'fixed_cashier', None) is not None:
+            from scripts.community_fixed_cashier_http import make_handler
+            fixed_options['fixed_cashier'] = self.fixed_cashier
+        handler=make_handler(self.gateway,**fixed_options,proxy_origin=https_origin,trusted_proxy=TrustedNginxSource(nginx_uid),operations=self.operations,onboarding=self.onboarding,saas=self.saas,fulfillment=self.fulfillment,provider_actions=self.provider_actions,merchant_bills=self.merchant_bills,communities=self.communities,commerce=self.commerce,notifications=self.notifications)
         class Server(socketserver.UnixStreamServer):request_queue_size=128
         server=Server(str(path),handler)
         info=path.lstat();self._socket=(path,info.st_dev,info.st_ino)

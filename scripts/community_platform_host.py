@@ -21,7 +21,7 @@ CORE_SHA256 = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
 FIELDS = {'version','center_root','runtime_directory','application_config',
           'principals','bindings','operations','reviewers','socket_path',
           'https_origin','nginx_uid','nginx_gid'}
-OPTIONAL_FIELDS = {'community_admin_authority','registration_scenes','community_grants','provider_reader_config','commerce_provider_config'}
+OPTIONAL_FIELDS = {'community_admin_authority','registration_scenes','community_grants','provider_reader_config','commerce_provider_config','applyment_observer_config','platform_showcase_config'}
 
 
 def _require_nonroot():
@@ -53,7 +53,7 @@ def _configuration(plan, key_material, wechat):
         raise ValueError('EXACT_WECHAT_SECRET_INPUT_REQUIRED')
     from scripts.community_mini_login import WechatCodeClient
     WechatCodeClient(wechat['appid'], wechat['app_secret'])  # Validate; no provider IO.
-    for reference in ('provider_reader_config','commerce_provider_config'):
+    for reference in ('provider_reader_config','commerce_provider_config','applyment_observer_config','platform_showcase_config'):
         if reference not in plan:continue
         ref = plan[reference]
         if (type(ref) is not str or not Path(ref).is_absolute()
@@ -170,6 +170,8 @@ class PlatformHost:
         self.center_lock = None
         self.ocr = None
         self.ocr_lock = None
+        self.applyment_observer = None
+        self.native_workbench_reconcile = None
 
     @classmethod
     def open(cls, plan_path, keys_path, wechat_path):
@@ -227,6 +229,9 @@ class PlatformHost:
                 reader = _open_provider_reader(plan['provider_reader_config'], owner.center.now)
                 owner.application.configure_wechat_applyment(reader,submission_enabled=commerce_policy[0]['applyment_submission_enabled'] if commerce_policy else False)
             owner.application.configure_operations(operations,consumer_only=not bool(operations))
+            if 'platform_showcase_config' in plan:
+                from scripts.community_platform_showcase import mount
+                mount(owner.application.operations,load_protected(plan['platform_showcase_config']))
             if plan.get('community_grants') or has_admin_templates(owner.center,'/community/directory'):
                 owner.application.configure_communities(plan.get('community_grants',{}))
             if has_admin_templates(owner.center,'/customer/saas-api'):
@@ -236,7 +241,36 @@ class PlatformHost:
             if 'community_admin_authority' not in plan:
                 from scripts.community_admin_authority import attach_core_admin
                 attach_core_admin(owner.center,{value['project'] for value in config['scenes'].values()})
+            if ('applyment_observer_config' in plan or
+                    (owner.application.onboarding is not None and owner.application.onboarding.wechat_applyment is not None)):
+                from scripts.community_wechat_observer import ApplymentObserver
+                if owner.application.onboarding is None or owner.application.onboarding.wechat_applyment is None:
+                    raise PermissionError('ORIGINAL_APPLYMENT_REQUIRED_FOR_OBSERVER')
+                path=plan.get('applyment_observer_config')
+                authority=getattr(owner.center,'community_admin_authority',None)
+                projects={binding['project'] for binding in owner.application.identity.scenes.values()}
+                expected_project=getattr(authority,'project',None)
+                if expected_project is None and len(projects)==1:expected_project=next(iter(projects))
+                if expected_project not in projects:raise PermissionError('OBSERVER_ORIGINAL_HOST_PROJECT_REQUIRED')
+                # Approved single-record restore, while original Center locks are held,
+                # before observer workers and before listen_proxy. No new config/route.
+                from scripts.community_single_restore_startup import run as restore_single_7217
+                restore_single_7217(owner.center, owner.application.onboarding.wechat_applyment, expected_project)
+                if path is not None:
+                    loader=lambda:load_protected(path) # Preserve legacy protected policy semantics.
+                else:
+                    from scripts.community_wechat_observer_discovery import OriginalApplicationPolicy
+                    loader=OriginalApplicationPolicy(owner.application.onboarding.wechat_applyment,expected_project)
+                observer=ApplymentObserver(owner.application.onboarding.wechat_applyment,loader,expected_project=expected_project)
+                owner.applyment_observer=observer
+                owner.application.onboarding.wechat_applyment.observer=observer
+            # Reuse only protected, admitted original payment composition.
+            # No admission, provider identity, ad policy or split policy is invented.
+            owner.application.configure_fixed_cashier()
             owner.plan = plan
+            if owner.applyment_observer is not None:
+                from scripts.native_workbench_runtime import attach_native_workbench
+                owner.native_workbench_reconcile=attach_native_workbench(owner)
             return owner
         except BaseException:
             owner.close()
@@ -330,10 +364,7 @@ class PlatformHost:
         from services.ocr_engine import api,ocr_core
         ocr_core._verified_model_paths()  # Original immutable model hashes; no download.
         import json
-        pins=json.loads(Path(__file__).with_name('community_ocr_dependency.json').read_text())
-        for name,digest in pins['files'].items():
-            if hashlib.sha256((Path(api.__file__).parent/name).read_bytes()).hexdigest()!=digest:
-                raise PermissionError('OCR_PINNED_DEPENDENCY_REQUIRED')
+        _verify_ocr_sources(api)
         lock=os.open(str(db_path),os.O_RDWR|os.O_NOFOLLOW)
         try:
             if (os.fstat(lock).st_dev,os.fstat(lock).st_ino)!=(db_info.st_dev,db_info.st_ino):
@@ -349,6 +380,32 @@ class PlatformHost:
             return result
         except BaseException:
             os.close(lock);raise
+
+    def configure_applicant_license_upload_overlap(self, model_path):
+        # Original protected setup only; no HTTP/environment knob.
+        if self.application is None or self.application.server is not None or self.ocr is None:
+            raise PermissionError('LICENSE_UPLOAD_OVERLAP_CONFIGURATION_DENIED')
+        import stat
+        asset=Path(model_path)
+        if not asset.is_absolute() or str(asset)!=os.fspath(model_path) or '..' in asset.parts:
+            raise ValueError('EXACT_ABSOLUTE_OCR_REFERENCE_REQUIRED')
+        # Public immutable model asset is not a writable private-state file.
+        # Root ownership prevents the unprivileged service from replacing it;
+        # lstat rejects symlinks; untrusted group/other write is denied.
+        for parent in reversed(asset.parents):
+            info=parent.lstat()
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid!=0 or info.st_mode&0o022:
+                raise PermissionError('PROTECTED_LICENSE_MODEL_ANCESTRY_REQUIRED')
+        info=asset.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=0 or info.st_nlink!=1 or info.st_mode&0o022:
+            raise PermissionError('PROTECTED_LICENSE_MODEL_ASSET_REQUIRED')
+        # Existing adapter opens this path and verifies pinned exact bytes.
+        return self.ocr.configure_license_upload_overlap(str(asset))
+
+    def configure_applicant_aliyun_ocr(self, adapter):
+        if self.application is None or self.application.server is not None or self.ocr is None:
+            raise PermissionError('ALIYUN_OCR_CONFIGURATION_DENIED')
+        return self.ocr.configure_applicant_aliyun_ocr(adapter)
 
     def configure_applicant_image_scanner(self):
         """Opt in to the bundled image-only decode/sanitize/scan boundary."""
@@ -366,11 +423,13 @@ class PlatformHost:
         # Original serial UnixStreamServer keeps SQLite ownership in this thread.
         # Pump late authorization callbacks even between HTTP polls. Preserve any
         # original server housekeeping and the existing 0.25-second cadence.
-        if self.ocr is not None:
+        if self.ocr is not None or self.applyment_observer is not None:
             original_service_actions=server.service_actions
             def service_actions():
                 original_service_actions()
                 if self.ocr is not None:self.ocr.service_actions()
+                if self.applyment_observer is not None:self.applyment_observer.service_actions()
+                if self.native_workbench_reconcile is not None:self.native_workbench_reconcile.service_actions()
             server.service_actions=service_actions
         try:
             server.serve_forever(poll_interval=0.25)
@@ -379,6 +438,10 @@ class PlatformHost:
 
     def close(self):
         first = None
+        if self.applyment_observer is not None:
+            try:self.applyment_observer.close()
+            except BaseException as error:first=error
+            self.applyment_observer=None
         if self.ocr is not None:
             try:
                 self.ocr.close()
@@ -414,6 +477,14 @@ class PlatformHost:
         self.close()
 
 
+def _verify_ocr_sources(api):
+    import json
+    pins=json.loads(Path(__file__).with_name('community_ocr_dependency.json').read_text())
+    for name,digest in pins['files'].items():
+        if hashlib.sha256((Path(api.__file__).parent/name).read_bytes()).hexdigest()!=digest:
+            raise PermissionError('OCR_PINNED_DEPENDENCY_REQUIRED')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Admitted original community platform host')
     parser.add_argument('--plan',required=True)
@@ -423,9 +494,23 @@ def main(argv=None):
     parser.add_argument('--applicant-ocr-key-reference')
     parser.add_argument('--applicant-ocr-store-reference')
     parser.add_argument('--applicant-image-scanner',action='store_true')
+    parser.add_argument('--applicant-license-direction-model')
+    parser.add_argument('--applicant-aliyun-ocr-relay-caller-fd',type=int)
+    parser.add_argument('--applicant-aliyun-direct-sign-fd',type=int)
+    parser.add_argument('--check-applicant-aliyun-ocr', action='store_true')
     args = parser.parse_args(argv)
+    if args.applicant_license_direction_model and not (args.applicant_ocr_key_reference and args.applicant_ocr_store_reference and args.applicant_image_scanner):
+        parser.error('Existing applicant OCR and image scanner are required for license upload overlap')
     if bool(args.applicant_ocr_key_reference)!=bool(args.applicant_ocr_store_reference):
         parser.error('Both existing applicant OCR references are required')
+    aliyun_mode=args.applicant_aliyun_ocr_relay_caller_fd is not None
+    if (args.check_applicant_aliyun_ocr and not aliyun_mode
+            or aliyun_mode and (not args.applicant_ocr_key_reference or not args.applicant_image_scanner
+                               or args.applicant_license_direction_model or args.check_applicant_ocr_plan)):
+        parser.error('Existing relay caller FD requires applicant OCR and image scanner; choose exactly one mode')
+    direct_fd=args.applicant_aliyun_direct_sign_fd
+    if direct_fd is not None and (not args.applicant_ocr_key_reference or not args.applicant_image_scanner or direct_fd==args.applicant_aliyun_ocr_relay_caller_fd):
+        parser.error('Direct proof requires its own protected FD and existing applicant OCR/browser scanner')
     def stop(signum,frame):
         raise KeyboardInterrupt()
     previous = signal.signal(signal.SIGTERM,stop)
@@ -435,11 +520,30 @@ def main(argv=None):
             if args.check_applicant_ocr_plan:
                 print(result, flush=True)
                 return 0
+        adapter=None
+        if aliyun_mode:
+            from scripts.community_aliyun_ocr_relay import RelayAliyunAdapter
+            adapter=RelayAliyunAdapter(args.applicant_aliyun_ocr_relay_caller_fd)
+            if args.check_applicant_aliyun_ocr:
+                from services.ocr_engine import api
+                _verify_ocr_sources(api)
+                print('ALIYUN_RELAY_FD_VALIDATED_NO_SERVE_NO_REQUEST',flush=True)
+                return 0
+        direct_credentials=None
+        if direct_fd is not None:
+            from scripts.community_ocr_direct_sign import DirectProof, ProtectedCredential
+            direct_credentials=ProtectedCredential(direct_fd)
         with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret) as host:
             if args.applicant_image_scanner:
                 host.configure_applicant_image_scanner()
             if args.applicant_ocr_key_reference:
                 host.configure_applicant_ocr(args.applicant_ocr_key_reference,args.applicant_ocr_store_reference)
+            if args.applicant_license_direction_model:
+                host.configure_applicant_license_upload_overlap(args.applicant_license_direction_model)
+            if adapter is not None:
+                host.configure_applicant_aliyun_ocr(adapter)
+            if direct_credentials is not None:
+                host.ocr.direct_ocr_signer=DirectProof(host.ocr,direct_credentials)
             host.serve()
     except KeyboardInterrupt:
         return 0
@@ -448,6 +552,7 @@ def main(argv=None):
         code = str(error)
         if code not in ('OCR_ONBOARDING_REQUIRED', 'OCR_HOST_CONFIGURATION_DENIED',
                         'INVALID_EXISTING_OCR_KEY', 'OCR_PINNED_DEPENDENCY_REQUIRED',
+                        'OCR_RELAY_CALLER_FD_DENIED','ALIYUN_OCR_CONFIGURATION_DENIED',
                         'PROTECTED_PROVIDER_READER_REQUIRED_FOR_ONBOARDING',
                         'ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED',
                         'EXACT_PROTECTED_PROVIDER_READER_CONFIG_REQUIRED'):
