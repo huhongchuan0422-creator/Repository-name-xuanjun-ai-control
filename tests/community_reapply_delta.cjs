@@ -1,0 +1,28 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('demos/community-stage/onboarding.js','utf8');
+const fragment=source.slice(source.indexOf('  const reapplyAttempts=new Map();'),source.indexOf('  function render(app){'));
+assert(fragment.includes("request('reapply_release',attempt)"));
+const calls=[],messages=[],summary={append(b){this.button=b;}},ctx={Map,reviewMode:true,current:{application:'synthetic1'},crypto:{randomUUID:()=> 'a-b-c-d-000000000000'},document:{getElementById:()=>null},$:()=>summary,button:(label,handler)=>({label,handler}),message:s=>messages.push(s),window:{confirm:()=>false}};
+let fail=false,replyHeld;
+ctx.request=async(op,params)=>{calls.push({op,params:{...params}});if(fail)throw Error('synthetic network failure');if(replyHeld)return new Promise(resolve=>{replyHeld.resolve=resolve;});return {receipt:{replay:false}};};
+vm.createContext(ctx);vm.runInContext(fragment,ctx);
+(async()=>{
+ ctx.renderReapply(ctx.current);await summary.button.handler();assert.deepEqual(calls.map(c=>c.op),['reapply_preview']);
+ ctx.window.confirm=()=>true;await summary.button.handler();assert.equal(calls.at(-1).op,'reapply_release');
+ const key=calls.at(-1).params.idempotency_key;assert.deepEqual(Object.keys(calls.at(-1).params).sort(),['application','expected_version','idempotency_key']);
+ fail=true;await assert.rejects(summary.button.handler());assert.equal(ctx.current.application,'synthetic1');fail=false;await summary.button.handler();assert.equal(calls.at(-1).params.idempotency_key,key);
+ const before=calls.length;ctx.current={application:'other'};await summary.button.handler();assert.equal(calls.length,before);
+ ctx.current={application:'synthetic1'};replyHeld={};const pending=summary.button.handler();ctx.current={application:'other'};replyHeld.resolve({receipt:{}});await pending;assert.equal(calls.at(-1).op,'reapply_preview');
+ ctx.reviewMode=false;summary.button=null;ctx.renderReapply(ctx.current);assert.equal(summary.button,null);
+ const mini=fs.readFileSync('clients/community-mini/pages/merchant-join/index.js','utf8');
+ const selection='[...result.applications].filter(a=>!result.current_cursor||a.application===result.current_cursor.application)';
+ assert(mini.includes('const applications='+selection),'actual Mini current selection expression exists');
+ const select=new Function('result','return '+selection);
+ const old={application:'old',status:'APPROVED'},fresh={application:'new',status:'DRAFT'};
+ assert.deepEqual(select({applications:[old,fresh],current_cursor:{application:null}}),[]);
+ assert.deepEqual(select({applications:[old,fresh],current_cursor:{application:'new'}}),[fresh]);
+ assert.deepEqual(select({applications:[old,fresh]}),[old,fresh]);
+ assert(!calls.some(c=>/wechat_execute|wechat_query/.test(c.op)));
+ console.log('PASS original detail preview/confirm/cancel/failure-key/stale-response and Mini current generation selection');
+})().catch(e=>{console.error(e);process.exitCode=1;});

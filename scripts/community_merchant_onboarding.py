@@ -158,7 +158,7 @@ def _failure_diagnostic(error,commit_attempted,rollback,object_write):
 
 
 class MerchantOnboarding:
-    def __init__(self,center,reviewers):
+    def __init__(self,center,reviewers,*,reapply_authority=None):
         if type(center) is not Center or type(reviewers) is not dict or (not reviewers and not has_admin_templates(center,'/merchant/onboarding')):
             raise ValueError('EXISTING_CENTER_AND_PROTECTED_REVIEWERS_REQUIRED')
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!=\
@@ -168,6 +168,7 @@ class MerchantOnboarding:
             raise ValueError('ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED')
         if center.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
         self.center=center;self.reviewers=dict(reviewers)
+        self.reapply_authority=reapply_authority
         self.operations=None
         self.wechat_applyment=None
         self.provider_actions=None
@@ -204,6 +205,9 @@ class MerchantOnboarding:
         # success flag or a different merchant's provider result. No PII copies.
         if self.wechat_applyment is not None:
             record=self.wechat_applyment._read(application)
+            if meta.get('business_generation') and record is not None:
+                if record.get('provider_sp_mchid') not in (None,meta.get('business_provider_ref')):
+                    raise PermissionError('CURRENT_GENERATION_PROVIDER_MISMATCH')
             scenes=profile_scenes((record or {}).get('profile',{}))
             if scenes is not None:meta['sales_scenes_type']=checked_scenes(scenes)
             profile=(record or {}).get('profile')
@@ -358,11 +362,19 @@ class MerchantOnboarding:
         op,params=body['operation'],body['params'];c=self.center
         if op=='catalog' and params=={}:return self.catalog()
         if type(op) is str and op.startswith('wechat_'):
+            if op not in ('wechat_read','wechat_review_read','wechat_status') and params.get('application'):
+                uid=c.session(session,csrf)
+                try:_,meta,_=self._load(params['application'],uid)
+                except PermissionError:_,meta,_=self._load(params['application'],uid,True)
+                if 'test_reapply_cursor' in meta:raise PermissionError('HISTORICAL_GENERATION_READ_ONLY')
+                if meta.get('business_generation') and self.wechat_applyment is not None and self.wechat_applyment.reader._mchid!=meta.get('business_provider_ref'):
+                    raise PermissionError('CURRENT_GENERATION_PROVIDER_MISMATCH')
             if self.wechat_applyment is None:raise PermissionError('OFFICIAL_APPLYMENT_NOT_CONFIGURED')
             return self.wechat_applyment.dispatch(session,csrf,body)
         if type(csrf) is not str or not csrf:raise PermissionError('CENTER_CSRF_REQUIRED')
         uid=c.session(session,csrf)
-        schemas={'material_preview':{'application','revision','kind'},'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
+        schemas={'reapply_preview':{'application','expected_version','idempotency_key'},
+                 'reapply_release':{'application','expected_version','idempotency_key'},'material_preview':{'application','revision','kind'},'mine':set(),'save':{'application','revision','fields','entity_type','category','delegated'},
                  'upload':{'application','revision','kind','content_base64','expires_at'},
                  'remove_material':{'application','revision','kind','expected_wechat_version'},
                  'submit':{'application','revision'},'withdraw':{'application','revision'},'review_list':set(),
@@ -377,6 +389,9 @@ class MerchantOnboarding:
                 (not set(params).issubset({'cursor','status'}) if listing else (not (schemas[op]<=set(params)<=schemas[op]|{'identity_type','sales_scenes_type','declarations','redemption_percent','split_participation','requested_split_bps'}) if op=='save' else set(params)!=schemas[op]))):
             raise ValueError('INVALID_ONBOARDING_FIELDS')
         if c.db.in_transaction:raise ValueError('EXTERNAL_TRANSACTION_DENIED')
+        if op in ('reapply_preview','reapply_release'):
+            from scripts.community_onboarding_reapply import dispatch
+            return dispatch(self,session,csrf,op,params)
         if op=='material_preview':
             try:return self._material_preview(session,csrf,uid,params)
             except MaterialPreviewUnavailable as error:return {'status':'UNAVAILABLE','reason':str(error)}
@@ -398,8 +413,13 @@ class MerchantOnboarding:
             if status!='ALL':query+=' AND o.status=?';args.append(status)
             rows=c.db.execute(query+' ORDER BY l.subject_idx LIMIT 51',args).fetchall()
             page=rows[:50]
-            return {'applications':[self._view(row[0],*self._load(row[0],uid,op=='review_list')[1:]) for row in page],
+            result={'applications':[self._view(row[0],*self._load(row[0],uid,op=='review_list')[1:]) for row in page],
                     'next_cursor':page[-1][0] if len(rows)>50 else None}
+            if op=='mine':
+                from scripts.community_onboarding_reapply import current
+                cursor_state=current(self,uid)
+                if cursor_state is not None:result['current_cursor']=cursor_state
+            return result
         if op in ('notices','notice_read'):
             from scripts.community_onboarding_notices import dispatch
             return dispatch(self,session,csrf,op,params)
@@ -442,6 +462,10 @@ class MerchantOnboarding:
         try:
             # Reload under the original DB write lock for stale-version safety.
             if data is not None:owner,meta,data=self._load(application,uid,op in ('review','review_material'))
+            if data is not None and 'test_reapply_cursor' in meta:raise PermissionError('HISTORICAL_GENERATION_READ_ONLY')
+            if op=='save' and data is None:
+                from scripts.community_onboarding_reapply import attach_new
+                attach_new(self,owner,application,meta)
             if op=='withdraw' and c.session(session,csrf)!=uid:raise PermissionError('CURRENT_APPLICANT_SESSION_REQUIRED')
             c.limit('merchant-onboarding:'+uid,60,3600)
             if op=='save':

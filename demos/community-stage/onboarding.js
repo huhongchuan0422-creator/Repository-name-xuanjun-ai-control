@@ -70,6 +70,25 @@
     $('wechatMedia').querySelectorAll('button').forEach(e=>e.disabled=withdrawn);
     for(const id of ['wechatSubmitReview','wechatApprove','wechatCorrect','wechatExecute'])$(id).disabled=withdrawn;
   }
+  const reapplyAttempts=new Map();
+  function renderReapply(app){
+    document.getElementById('testReapplyAction')?.remove?.();
+    if(!reviewMode)return;
+    const control=button('预览授权测试对象重新申请',async()=>{
+      const application=app.application;
+      if(current?.application!==application)return;
+      let attempt=reapplyAttempts.get(application);
+      if(!attempt){attempt={application,expected_version:1,idempotency_key:'reapply_'+crypto.randomUUID().replaceAll('-','')};reapplyAttempts.set(application,attempt);}
+      const preview=await request('reapply_preview',attempt);
+      if(current?.application!==application)return;
+      message('仅释放当前申请游标；旧申请、订单、登录和历史保留，不自动进件。');
+      if(!window.confirm('确认仅释放这一个已授权测试对象的当前业务申请游标？不会解绑微信、发起支付或自动进件。'))return;
+      const result=await request('reapply_release',attempt);
+      if(current?.application!==application)return;
+      message(result.receipt.replay?'已回读原释放回执，未重复操作。':'当前业务游标已释放，可由原测试身份保存下一代草稿；旧历史保留。');
+    });
+    control.id='testReapplyAction';$('summary').append(control);
+  }
   function render(app){
     if(current?.application!==app?.application||current?.revision!==app?.revision){resetHistory();resetNotices();}
     if(current?.application!==app?.application)clearWechat();current=app;$('withdrawConfirmed').checked=false;withdrawalControls();$('detail').hidden=!app;refreshLicense();if(!app)return;
@@ -77,6 +96,7 @@
     $('applicationTitle').textContent=app.fields.store_name||'入驻申请';$('applicationState').textContent=states[app.status]||app.status;
     const bps=value=>Number.isSafeInteger(value)?(value/100).toFixed(2)+'%':'尚未核定';preserveReviewVersion();$('summary').replaceChildren();for(const [label,value] of [['主体名称',app.fields.legal_name],['门店名称',app.fields.store_name],['经营地址',app.fields.address],['联系人',app.fields.contact],['分账参与意愿',app.split_participation?'自愿参加':'不参加'],['申请分账比例',bps(app.requested_split_bps)],['微信核定最高比例',bps(app.provider_max_split_bps)],['最终生效分账比例',bps(app.effective_split_bps)],['爱心积分抵扣比例（申请值）',String(app.redemption_percent??0)+'%'],['爱心积分抵扣比例（审核生效）',app.approved_redemption_percent==null?'尚未审批':String(app.approved_redemption_percent)+'%']]){
       const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;$('summary').append(dt,dd);}
+    renderReapply(app);
     $('reviewNote').textContent=app.reviewer_note?'审核说明：'+app.reviewer_note:'';
     $('redemptionReview').textContent='分账参与意愿：'+(app.split_participation?'自愿参加':'不参加')+'；申请比例：'+bps(app.requested_split_bps)+'；微信核定最高比例：'+bps(app.provider_max_split_bps)+'；最终生效比例：'+bps(app.effective_split_bps)+'。爱心积分抵扣比例独立为 '+String(app.redemption_percent??0)+'%，不与分账比例混用。';
     const editable=['DRAFT','CORRECTION_REQUIRED'].includes(app.status),reviewable=['SUBMITTED','IN_REVIEW'].includes(app.status);
