@@ -10,7 +10,9 @@ def sha(b):return hashlib.sha256(b).hexdigest()
 def need(v,msg):
  if not v:raise ValueError(msg)
 def build(root,env,pair_pin=BACKEND_PAIR_SHA256):
- need(env.get('GITHUB_EVENT_NAME')=='push' and env.get('GITHUB_REPOSITORY')==REPO and env.get('GITHUB_REF')==REF and env.get('COMMUNITY_SNAPSHOT_PUSH')=='true','EXACT_ORIGINAL_PUSH_REQUIRED')
+ push=env.get('GITHUB_EVENT_NAME')=='push' and env.get('COMMUNITY_SNAPSHOT_PUSH')=='true'
+ manual=env.get('GITHUB_EVENT_NAME')=='workflow_dispatch' and env.get('COMMUNITY_SNAPSHOT_FROM_SOURCE')=='true' and env.get('PREVIEW_ENABLED')=='true' and env.get('PREVIEW_TARGET')=='uk-path-candidate' and env.get('PREVIEW_CONTROL_SHA')==env.get('GITHUB_SHA')
+ need((push or manual) and env.get('GITHUB_REPOSITORY')==REPO and env.get('GITHUB_REF')==REF,'EXACT_ORIGINAL_PUSH_REQUIRED')
  head=env.get('GITHUB_SHA','');need(re.fullmatch('[a-f0-9]{40}',head),'CONTROL_COMMIT_REQUIRED')
  need(type(pair_pin)is str and re.fullmatch('[a-f0-9]{64}',pair_pin),'REAL_BACKEND_PAIR_NOT_FROZEN')
  root=pathlib.Path(root);source=root/'deploy/community-preview/hangzhou-snapshot';need(not source.is_symlink(),'SOURCE_SYMLINK')
