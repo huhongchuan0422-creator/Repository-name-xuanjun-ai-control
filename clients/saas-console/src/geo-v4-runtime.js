@@ -46,9 +46,9 @@ export function geoRuntimeNotice(r){
 export function buildGeoView(r){
  const s=r?.snapshot||{},ent=r?.state?.entitlement||{};
  const brand=ready(s.brand)?{name:s.brand.name||null,website:s.brand.website||null}:null;
- const usage=ready(s.usage)?{plan:s.usage.plan||ent.plan||null,used:Number.isInteger(s.usage.used)?s.usage.used:null,quota:Number.isInteger(s.usage.quota)?s.usage.quota:ent.quota,valid_until:s.usage.valid_until??ent.valid_until}:null;
- const metrics=ready(s.metrics)?s.metrics:null,diagnosis=ready(s.diagnosis)?s.diagnosis:null,task=ready(s.task)?s.task:null,results=ready(s.results)?s.results:null,versions=ready(s.versions)?s.versions:null,scope=ready(s.scope)?s.scope:null,identity=ready(s.identity)?s.identity:null;
- return{verified:r?.mode==='CONNECTED',brand,usage,metrics,diagnosis,task,results,versions,scope,identity,notice:geoRuntimeNotice(r),actions:s.actions&&typeof s.actions==='object'?s.actions:{},noGuarantee:geoNoGuaranteeText()};
+ const usage=ready(s.usage)?{plan:s.usage.plan||ent.plan||null,used:Number.isInteger(s.usage.used)?s.usage.used:null,remaining:Number.isInteger(s.usage.remaining)?s.usage.remaining:null,quota:Number.isInteger(s.usage.quota)?s.usage.quota:ent.quota,valid_until:s.usage.valid_until??ent.valid_until,source:typeof s.usage.source==='string'&&s.usage.source?s.usage.source:null}:null;
+ const metrics=ready(s.metrics)?s.metrics:null,diagnosis=ready(s.diagnosis)?s.diagnosis:null,task=ready(s.task)?s.task:null,results=ready(s.results)?s.results:null,versions=ready(s.versions)?s.versions:null,next_round=ready(s.next_round)?s.next_round:null,scope=ready(s.scope)?s.scope:null,identity=ready(s.identity)?s.identity:null;
+ return{verified:r?.mode==='CONNECTED',brand,usage,metrics,diagnosis,task,results,versions,next_round,scope,identity,notice:geoRuntimeNotice(r),actions:s.actions&&typeof s.actions==='object'?s.actions:{},noGuarantee:geoNoGuaranteeText()};
 }
 
 function setText(el,v){if(el)el.textContent=v}
@@ -61,12 +61,13 @@ function bindMetrics(doc,metrics){
 }
 function maskRegions(doc,selectors,msg){for(const sel of selectors)for(const el of doc.querySelectorAll(sel)){el.setAttribute?.('data-geo-masked','true');el.textContent=msg}}
 function maskUnboundDemo(doc,v){
- maskRegions(doc,['.tablewrap','.chartwrap'],'真实明细未接入或数据不足');
+ maskRegions(doc,['.tablewrap','.chartwrap','.evidencebox','.quotebox'],'真实明细未接入或数据不足');
  if(!v.scope)maskRegions(doc,['.scope'],'真实观察范围未接入');
  if(!v.diagnosis)maskRegions(doc,['#issuelist','.explain'],'真实诊断数据未接入');
  if(!v.task)maskRegions(doc,['.nextaction','.hero','.planitem','.execstep','.detailhero','.history','.emptyhistory','.sourcebox','.ownerline'],'真实优化任务未接入');
- if(!v.versions)maskRegions(doc,['.review','.comment','.evidencebox','.quotebox'],'真实版本与证据未接入');
- if(!v.results)maskRegions(doc,['.reportbanner','.comparison','.callnext','.rowline'],'真实效果数据未接入或数据不足');
+ if(!v.versions)maskRegions(doc,['.review','.comment'],'真实版本与确认状态未接入');
+ if(!v.results)maskRegions(doc,['.reportbanner','.comparison','.rowline'],'真实效果数据未接入或数据不足');
+ if(!v.results||!v.next_round)maskRegions(doc,['.callnext'],v.results?'下一轮资格与任务创建状态未接入':'真实效果数据未接入或数据不足');
  for(const el of doc.querySelectorAll('select'))if(!v.scope)el.disabled=true;
 }
 function bindDiagnosis(doc,d){
@@ -82,9 +83,26 @@ function bindTask(doc,t){
  if(steps.length)nodes.forEach((el,i)=>{const x=steps[i];if(!x){el.textContent='该步骤真实状态未接入';return}setText(el.querySelector('h3'),x.title||('步骤 '+(i+1)));const ps=el.querySelectorAll('p');if(ps[0])setText(ps[0],x.summary||'');if(ps[1])setText(ps[1],x.status_label||x.state||'')});
  else maskRegions(doc,['.execstep'],'真实任务步骤未接入');
 }
+function bindVersions(doc,vv){
+ const ver=Number.isInteger(vv?.current_version)&&vv.current_version>0?vv.current_version:null;
+ const conf={PENDING:'等待你确认',APPROVED:'已批准',CHANGES_REQUESTED:'需修改后再确认'}[String(vv?.confirmation_state||'').toUpperCase()]||'确认状态未知';
+ for(const el of doc.querySelectorAll('.review')){const mini=el.querySelector('.mini');setText(mini,'发布预览 · 第 '+(ver===null?'待接入':ver)+' 版 · '+conf)}
+ const list=Array.isArray(vv?.comments)?vv.comments.filter(x=>typeof x==='string'&&x.trim()):[];
+ const nodes=[...doc.querySelectorAll('.comment')];
+ nodes.forEach((el,i)=>{el.textContent=list[i]?'我的内容意见 '+list[i]:(list.length?'其余版本评论未接入展示':'暂无版本评论记录')});
+}
+const NEXT_ELIGIBILITY={ELIGIBLE:'本轮结果可转入下一轮',NOT_ELIGIBLE:'本轮结果暂不满足下一轮条件',BLOCKED:'下一轮被服务限制'};
+const NEXT_TASK_STATE={CREATED:'新任务已创建',PENDING:'等待你确认后创建',NOT_CREATED:'未创建新任务',RUNNING:'下一轮任务进行中',SUCCEEDED:'下一轮任务已完成'};
+function bindNextRound(doc,nr){
+ const elig=NEXT_ELIGIBILITY[String(nr?.eligibility||'').toUpperCase()]||'下一轮资格未确认';
+ const task=NEXT_TASK_STATE[String(nr?.task_creation_state||'').toUpperCase()]||'新任务状态未知';
+ const src=typeof nr?.source_result==='string'&&nr.source_result?nr.source_result:'来源结果未接入';
+ for(const el of doc.querySelectorAll('.callnext')){setText(el.querySelector('h2'),elig);setText(el.querySelector('p'),'来源结果：'+src+'；'+task)}
+}
 function bindResults(doc,r){
  const banner=doc.querySelector('.reportbanner div');if(banner)setText(banner,r?.summary||'真实效果数据已接入；仅展示服务返回的可比结果。');
- for(const el of doc.querySelectorAll('.chartnote'))setText(el,r?.scope_label||'真实结果范围来自服务端');
+ const scopeText=r?.scope_label||(typeof r?.comparison_scope==='string'&&r.comparison_scope?r.comparison_scope+(Number.isInteger(r.sample_size)&&r.sample_size>0?' · 样本 '+r.sample_size+' 条':''):null);
+ for(const el of doc.querySelectorAll('.chartnote'))setText(el,scopeText||'真实结果范围来自服务端');
 }
 
 export function applyGeoRuntimeView(document,runtime){
@@ -95,7 +113,8 @@ export function applyGeoRuntimeView(document,runtime){
  if(side){
   setText(side.querySelector('span'),v.usage?.plan||'套餐未接入');
   setText(side.querySelector('b'),connected?'GEO 服务已核实':v.notice);
-  setText(side.querySelector('small'),v.usage&&v.usage.used!==null&&v.usage.quota!==null?'我的观察用量 '+v.usage.used+' / '+v.usage.quota:'观察用量未接入');
+  if(connected){const u=v.usage;if(u&&u.used!==null&&u.quota!==null)setText(side.querySelector('small'),'我的观察用量 '+u.used+' / '+u.quota+(u.source?' · 来源 '+u.source:''));else if(u&&u.remaining!==null&&u.quota!==null)setText(side.querySelector('small'),'我的剩余观察额度 '+u.remaining+' / '+u.quota+(u.source?' · 来源 '+u.source:''));else setText(side.querySelector('small'),'观察用量未接入')}
+ else setText(side.querySelector('small'),v.usage&&v.usage.used!==null&&v.usage.quota!==null?'我的观察用量 '+v.usage.used+' / '+v.usage.quota:'观察用量未接入');
   const progress=side.querySelector('.progress i');if(progress)progress.style.width=v.usage&&v.usage.used!==null&&v.usage.quota>0?Math.min(100,Math.max(0,v.usage.used/v.usage.quota*100)).toFixed(1)+'%':'0%';
  }
  setText(document.querySelector('#sidebarbrand'),v.brand?.name||'当前品牌未接入');
@@ -110,6 +129,8 @@ export function applyGeoRuntimeView(document,runtime){
  if(v.diagnosis)bindDiagnosis(document,v.diagnosis);else{const l=document.querySelector('#issuelist');if(l)l.textContent='真实诊断数据未接入'}
  if(v.task)bindTask(document,v.task);else{const n=document.querySelector('.nextaction');if(n)n.textContent='真实优化任务未接入'}
  if(v.results)bindResults(document,v.results);else{const b=document.querySelector('.reportbanner div');if(b)b.textContent='真实效果数据未接入';for(const x of document.querySelectorAll('.chartnote'))x.textContent='数据不足；不会使用 V4 演示数字作为真实效果'}
+ if(v.versions)bindVersions(document,v.versions);
+ if(v.next_round)bindNextRound(document,v.next_round);
  maskUnboundDemo(document,v);
  document.body?.removeAttribute('data-geo-loading');
  if(runtime?.mode!=='LOADING')document.getElementById?.('geo-runtime-guard')?.remove?.();
