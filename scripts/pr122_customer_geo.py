@@ -30,8 +30,9 @@ def import_authority(center, document, key):
     if type(document['signature']) is not str or not hmac.compare_digest(hmac.new(key, canonical(data), hashlib.sha256).hexdigest(), document['signature']):
         raise Denied('GEO_AUTHORITY_SIGNATURE')
     fields = {'project_id', 'tenant_id', 'customer_id', 'revision', 'enabled', 'plan', 'valid_until', 'quota', 'remaining', 'source_ref'}
-    if type(data) is not dict or set(data) != fields:
+    if type(data) is not dict or set(data) not in (fields, fields|{'version_document_id'}):
         raise ValueError('GEO_AUTHORITY_FIELDS')
+    if 'version_document_id' in data:identifier(data['version_document_id'])
     for k in ('project_id', 'tenant_id', 'customer_id', 'source_ref'):
         identifier(data[k])
     if type(data['revision']) is not int or data['revision'] < 1 or type(data['enabled']) is not bool:
@@ -90,6 +91,9 @@ class Geo:
             # Missing real sampling/version/usage providers stay missing, not mock READY.
             for domain in ('diagnosis','task','versions','results','next_round','billing_usage'):
                 result[domain] = {'status':'NOT_CONNECTED'}
+            if ent['enabled']:
+                from scripts.pr122_customer_geo_versions import accepted_version
+                result['versions'] = accepted_version(self.c,p)
             row = self.c.db.execute('SELECT request_id,state FROM geo_commands WHERE project=? AND actor=? ORDER BY rowid DESC LIMIT 1', (p['id'],uid)).fetchone()
             result['last_command'] = dict(row) if row else None
             return result
