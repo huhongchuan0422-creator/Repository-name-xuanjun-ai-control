@@ -1,0 +1,10 @@
+{
+  "base_artifact": "3d4209fe39caccdbab905a0fe6587661f59e62d799ed754ad1adeeac0b4ac09c",
+  "files": {
+    "community-preview.inc": "64ecfd228fa40abf0285ae792cd7a243ce0ce2b24095be111a0eb11edbe3027a",
+    "demos/community-stage/fixed-ad-preview.js": "ABSENT",
+    "demos/community-stage/fixed-code.html": "5901ef7e4b0516b29a6e3008a82d5929706646a1cdbf4b58caf0c54c120b772b",
+    "scripts/community_fixed_cashier_host.py": "9580a154832229d09761acbea403aaef66718c5fc466eb06b595edeb57d22934",
+    "scripts/community_fixed_cashier_http.py": "2b7c41d72c30b8644c33f8237ea770b5a4ec997997099977f981f5cb1cbe5a30"
+  }
+}

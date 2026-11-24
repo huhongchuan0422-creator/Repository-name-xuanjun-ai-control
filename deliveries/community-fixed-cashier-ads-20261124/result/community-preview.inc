@@ -1,0 +1,63 @@
+# CANDIDATE ONLY: include inside the EXISTING uk HTTPS server after route/TLS review.
+# No listen/server_name/certificate directives; do not replace the host root routes.
+# API only: browser workspace assets/redirects require separate prefix verification.
+location = /community-preview/mini/merchant {
+    client_max_body_size 7m;
+    rewrite ^/community-preview(/mini/merchant)$ $1 break;
+    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
+    proxy_http_version 1.1;
+    proxy_set_header Host uk.wenwenwenyiyiyi.work;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Xuanjun-Client-IP "";
+    proxy_set_header X-Xuanjun-Client-IP $remote_addr;
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header Forwarded "";
+}
+location ^~ /community-preview/mini/ {
+    rewrite ^/community-preview(/mini/.*)$ $1 break;
+    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
+    proxy_http_version 1.1;
+    proxy_set_header Host uk.wenwenwenyiyiyi.work;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Xuanjun-Client-IP "";
+    proxy_set_header X-Xuanjun-Client-IP $remote_addr;
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header Forwarded "";
+}
+location = /community-preview/community/health {
+    rewrite ^ /community/health break;
+    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
+    proxy_http_version 1.1;
+    proxy_set_header Host uk.wenwenwenyiyiyi.work;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Xuanjun-Client-IP "";
+    proxy_set_header X-Xuanjun-Client-IP $remote_addr;
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header Forwarded "";
+}
+
+# Original browser role pages/assets and their existing authenticated API paths only.
+location ~ ^/community-preview/(merchant/(join|review|fixed-code|workbench(\.js|\.css)?|onboarding(\.js|\.css)?)|community/(fixed-ad-preview\.js|fixed-workbench\.js|fixed-cashier(\.js|\.css)?|portal(\.js|\.css)?|admin-shell\.(css|js)|web-session\.js|session/(login|check|logout|wechat)|entrypoints|admin|operations|directory|commerce|provider-actions|merchant-bills))$ {
+    client_max_body_size 1m;
+    rewrite ^/community-preview(/.*)$ $1 break;
+    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
+    proxy_http_version 1.1;
+    proxy_set_header Host uk.wenwenwenyiyiyi.work;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Xuanjun-Client-IP "";
+    proxy_set_header X-Xuanjun-Client-IP $remote_addr;
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header Forwarded "";
+}
+
+# Fixed store locator: preserve prefix required by the original fixed URL contract.
+location ~ "^/community-preview/go/fx[0-9a-f]{24}$" {
+    proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
+    proxy_http_version 1.1;
+    proxy_set_header Host uk.wenwenwenyiyiyi.work;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Xuanjun-Client-IP "";
+    proxy_set_header X-Xuanjun-Client-IP $remote_addr;
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header Forwarded "";
+}

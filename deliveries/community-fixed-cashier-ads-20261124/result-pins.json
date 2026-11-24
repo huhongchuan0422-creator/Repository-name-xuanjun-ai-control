@@ -1,0 +1,7 @@
+{
+  "community-preview.inc": "0973cc5b667d266fb68c33743f97def69eb4d9122ffdea49fef0f334da3eb868",
+  "demos/community-stage/fixed-ad-preview.js": "00d82da84611ecdc5226c690e3b18f4474e7964e1141919c1f7b2754efc853c0",
+  "demos/community-stage/fixed-code.html": "9feb01bc728886d85f63e11b0c1d459ad23f9760fb2af1bdaf5cd75de59b87c2",
+  "scripts/community_fixed_cashier_host.py": "6e8ec3ccfcd63859f7d58c15c7c46dbeec736dae258744896b837e6b25c513ab",
+  "scripts/community_fixed_cashier_http.py": "7ae502daefc807700dc76b5d3e85fa931a2ad363a6072db5c6eabbe21aef4639"
+}

@@ -1,0 +1,157 @@
+diff --git a/community-preview.inc b/community-preview.inc
+index 598e3e8e25f5eb3a5c27c019111d908361364de1..caaf4cd06ac62cbc1c2846a7a3baf35e1938f56d 100644
+--- a/community-preview.inc
++++ b/community-preview.inc
+@@ -37,7 +37,7 @@ location = /community-preview/community/health {
+ }
+ 
+ # Original browser role pages/assets and their existing authenticated API paths only.
+-location ~ ^/community-preview/(merchant/(join|review|fixed-code|workbench(\.js|\.css)?|onboarding(\.js|\.css)?)|community/(fixed-workbench\.js|fixed-cashier(\.js|\.css)?|portal(\.js|\.css)?|admin-shell\.(css|js)|web-session\.js|session/(login|check|logout|wechat)|entrypoints|admin|operations|directory|commerce|provider-actions|merchant-bills))$ {
++location ~ ^/community-preview/(merchant/(join|review|fixed-code|workbench(\.js|\.css)?|onboarding(\.js|\.css)?)|community/(fixed-ad-preview\.js|fixed-workbench\.js|fixed-cashier(\.js|\.css)?|portal(\.js|\.css)?|admin-shell\.(css|js)|web-session\.js|session/(login|check|logout|wechat)|entrypoints|admin|operations|directory|commerce|provider-actions|merchant-bills))$ {
+     client_max_body_size 1m;
+     rewrite ^/community-preview(/.*)$ $1 break;
+     proxy_pass http://unix:/run/xuanjun-community-preview/preview.sock:;
+diff --git a/demos/community-stage/fixed-ad-preview.js b/demos/community-stage/fixed-ad-preview.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..bfbd4241006d6507607ff27750a9b2f9a767254f
+--- /dev/null
++++ b/demos/community-stage/fixed-ad-preview.js
+@@ -0,0 +1,26 @@
++
++'use strict';
++(() => {
++  const original=window.configureCommunityFixedCashier;
++  let epoch=0;
++  const image=/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
++  function render(prefix, creative, message) {
++    document.getElementById(prefix+'Status').textContent=message;
++    document.getElementById(prefix+'Title').textContent=creative && typeof creative.title==='string' ? creative.title : '';
++    const img=document.getElementById(prefix+'Image');img.hidden=true;img.removeAttribute('src');
++    if(creative && typeof creative.image_data==='string' && creative.image_data.length<=550000 && image.test(creative.image_data)) {img.src=creative.image_data;img.hidden=false;}
++  }
++  function clear(message) {render('amountPreview',null,message);render('successPreview',null,message);}
++  window.configureCommunityFixedCashier = value => {
++    original(value);const ticket=++epoch;clear('预览，非已付款；等待授权');
++    if(!value || !value.csrf || !value.workspace)return;
++    fetch('/community-preview/community/fixed-cashier',{method:'POST',credentials:'same-origin',redirect:'error',cache:'no-store',headers:{'Content-Type':'application/json','X-CSRF-Token':value.csrf},body:JSON.stringify({op:'ad_preview',workspace:value.workspace})})
++      .then(async response=>{if(!response.ok)throw Error('预览读取未获授权');return response.json();})
++      .then(result=>{
++        if(ticket!==epoch)return;
++        if(result.display_context!=='AD_PREVIEW_ONLY' || result.payment_success_verified!==false || result.payable!==false)throw Error('预览上下文不符');
++        render('amountPreview',result.amount_ad,result.amount_ad?'金额页广告预览 · 非已付款':'本门店暂无已审核启用素材');
++        render('successPreview',result.success_ad_preview,result.success_ad_preview?'完成页广告预览 · 非已付款':'本门店暂无已审核启用素材；非已付款');
++      }).catch(()=>{if(ticket===epoch)clear('广告预览暂不可用，非已付款');});
++  };
++})();
+diff --git a/demos/community-stage/fixed-code.html b/demos/community-stage/fixed-code.html
+index f74bf57ffe0b9548e9aebe0f4d26faf2ce57e20d..2fe6797b2da5584cfa1ef604f91ee3f0512c7617 100644
+--- a/demos/community-stage/fixed-code.html
++++ b/demos/community-stage/fixed-code.html
+@@ -1 +1 @@
+-<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/community-preview/community/fixed-cashier.css"><title>门店固定收款码</title><body data-surface="merchant"><main><header><span>门店工作台 / COLLECTION</span><h1>门店固定收款码</h1><p id="status" role="status" aria-live="polite">请从已登录的原工作台打开。</p></header><section id="codeSection" hidden><h2 id="storeName"></h2><img id="qr" class="qr" alt="本门店长期固定金额页二维码"><p id="qualification"></p><a id="download" class="button" download="门店收款码.png">下载原图</a><a id="fixedLink" rel="noreferrer" target="_blank">打开金额页</a></section><button id="reload" class="secondary" disabled>重新读取</button><footer>同一门店固定链接长期不变。码可展示不等于支付资格已核实。</footer></main><script src="/community-preview/community/fixed-cashier.js" defer></script></body></html>
+\ No newline at end of file
++<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/community-preview/community/fixed-cashier.css"><title>门店固定收款码</title><body data-surface="merchant"><main><header><span>门店工作台 / COLLECTION</span><h1>门店固定收款码</h1><p id="status" role="status" aria-live="polite">请从已登录的原工作台打开。</p></header><section id="codeSection" hidden><h2 id="storeName"></h2><img id="qr" class="qr" alt="本门店长期固定金额页二维码"><p id="qualification"></p><a id="download" class="button" download="门店收款码.png">下载原图</a><a id="fixedLink" rel="noreferrer" target="_blank">打开金额页</a></section><section id="adPreview" aria-label="两个广告位预览"><h2>广告位预览 · 非已付款</h2><p>仅展示本门店原已审核启用素材，不创建订单，不表示付款成功。</p><article><h3>金额页广告位</h3><p id="amountPreviewStatus">等待原工作台授权</p><p id="amountPreviewTitle"></p><img id="amountPreviewImage" alt="本门店金额页广告预览" hidden></article><article><h3>支付完成页广告位 · 仅预览</h3><p id="successPreviewStatus">预览，非已付款</p><p id="successPreviewTitle"></p><img id="successPreviewImage" alt="本门店完成页广告预览，非已付款" hidden></article></section><button id="reload" class="secondary" disabled>重新读取</button><footer>同一门店固定链接长期不变。码可展示不等于支付资格已核实。</footer></main><script src="/community-preview/community/fixed-cashier.js" defer></script><script src="/community-preview/community/fixed-ad-preview.js" defer></script></body></html>
+\ No newline at end of file
+diff --git a/scripts/community_fixed_cashier_host.py b/scripts/community_fixed_cashier_host.py
+index 6532d4a1d0e6d32e5e465d8de89afdf34ca9d309..743526d72c40e4e91d1b057d1fb80cd7572c75ea 100644
+--- a/scripts/community_fixed_cashier_host.py
++++ b/scripts/community_fixed_cashier_host.py
+@@ -59,7 +59,7 @@ class FixedCashierHost:
+         self.https_origin = https_origin
+         self._payer_authority = payer_authority
+         self._qualification = qualification if callable(qualification) else (lambda store: {})
+-        self._ad_settings = ad_settings if callable(ad_settings) else (lambda store: (_ for _ in ()).throw(LookupError('NO_AD_SETTINGS')))
++        self._ad_settings = ad_settings if callable(ad_settings) else self.original_ad_settings
+         # Locator uniqueness across admitted scenes: two stores can never share
+         # one fixed code. Validated once at composition.
+         seen = {}
+@@ -76,6 +76,40 @@ class FixedCashierHost:
+                                freeze_original_split=freeze_original_split) if payments is not None else None
+         self.wire = Wire(self.cashier, self._ad_settings) if self.cashier else None
+ 
++    def _original_ads(self, identity):
++        # Original active/approved/time-bounded campaigns only; no publishing,
++        # payment admission, metrics, order or provider operations.
++        from scripts.community_ad_store import choose
++        from scripts.community_ad_contract import AMOUNT, SUCCESS
++        import sqlite3
++        ads = {}
++        for slot in (AMOUNT, SUCCESS):
++            try:
++                ads[slot] = choose(self.runtime.demo.ad_db, identity, slot, self.center.now())
++            except sqlite3.DatabaseError:
++                ads[slot] = None
++        return ads
++
++    def original_ad_settings(self, store):
++        from scripts.community_fixed_cashier_wire import AdSettings
++        from scripts.community_ad_contract import AMOUNT, SUCCESS
++        ads = self._original_ads(store.scope())
++        return AdSettings(store, 'OWN' if ads[AMOUNT] else 'NONE',
++                          'OWN' if ads[SUCCESS] else 'NONE')
++
++    def ad_preview(self, session, csrf, workspace):
++        from scripts.community_ad_contract import AMOUNT, SUCCESS
++        grant = self.authorize_workspace(session, csrf, workspace)
++        identity = dict(grant['scope'])
++        ads = self._original_ads(identity)
++        return dict(identity, display_context='AD_PREVIEW_ONLY',
++                    preview_label='广告位预览 · 非已付款', payable=False,
++                    payment_started=False, payment_success_verified=False,
++                    finance_status='UNCONFIRMED',
++                    amount_ad=ads[AMOUNT], success_ad_preview=ads[SUCCESS],
++                    amount_state='AVAILABLE' if ads[AMOUNT] else 'NO_ACTIVE_APPROVED_MATERIAL',
++                    success_state='AVAILABLE' if ads[SUCCESS] else 'NO_ACTIVE_APPROVED_MATERIAL')
++
+     def preview_scope(self, locator):
+         # Re-read original grants per use; preview creates no payment admission.
+         for grant in self.operations.grants.values():
+@@ -202,8 +236,15 @@ class FixedCashierHost:
+ 
+     def amount(self, locator):
+         if locator not in self._locators:
+-            return dict(self.preview_scope(locator), store_name='', payable=False,
+-                        availability=PENDING, amount_mode='NONE', amount_ad=None)
++            identity = self.preview_scope(locator)
++            from scripts.community_ad_contract import AMOUNT
++            selected = self._original_ads(identity)[AMOUNT]
++            try:
++                name = store_profile(self.runtime.demo.merchant_db, identity)['name']
++            except (KeyError, ValueError):
++                name = ''
++            return dict(identity, store_name=name, payable=False, availability=PENDING,
++                        amount_mode='OWN' if selected else 'NONE', amount_ad=selected)
+         view = self.wire.amount(locator)
+         status = self._qualification(self.store_authority(locator))
+         ready = status.get('official_verified') is True and callable(self._payer_authority)
+diff --git a/scripts/community_fixed_cashier_http.py b/scripts/community_fixed_cashier_http.py
+index 236c73aa9cc114dd57ed19667dc25cf6c9b4b420..0ca6fe04344285a38e785ec13310e5cd4bcbc03b 100644
+--- a/scripts/community_fixed_cashier_http.py
++++ b/scripts/community_fixed_cashier_http.py
+@@ -10,7 +10,7 @@ import time
+ from pathlib import Path
+ 
+ API = '/community/fixed-cashier'
+-ASSETS = {'/community/fixed-workbench.js': ('fixed-workbench.js', 'application/javascript; charset=utf-8'),
++ASSETS = {'/community/fixed-ad-preview.js': ('fixed-ad-preview.js', 'application/javascript; charset=utf-8'),'/community/fixed-workbench.js': ('fixed-workbench.js', 'application/javascript; charset=utf-8'),
+           '/merchant/workbench': ('workbench.html', 'text/html; charset=utf-8'),
+           '/community/fixed-cashier.js': ('fixed-cashier.js', 'application/javascript; charset=utf-8'),
+           '/community/fixed-cashier.css': ('fixed-cashier.css', 'text/css; charset=utf-8'),
+@@ -102,7 +102,7 @@ def _extend(base, host, origin, trusted_proxy):
+                 op = body.get('op')
+                 fields = {'amount': {'op', 'locator'}, 'reserve': {'op', 'locator', 'reference', 'yuan'},
+                           'prepare': {'op', 'locator', 'reference'}, 'result': {'op', 'locator', 'reference'},
+-                          'qr_view': {'op', 'workspace'}, 'qr_download': {'op', 'workspace'}}
++                          'ad_preview': {'op', 'workspace'}, 'qr_view': {'op', 'workspace'}, 'qr_download': {'op', 'workspace'}}
+                 if type(op) is not str or op not in fields or set(body) != fields[op]:
+                     raise ValueError('INVALID_OPERATION')
+                 if op == 'amount': return self.answer(200, host.amount(body['locator']))
+@@ -115,7 +115,7 @@ def _extend(base, host, origin, trusted_proxy):
+                 session = cookies[0] if cookies else session
+                 csrf = csrf or self.headers.get('X-CSRF-Token', '')
+                 host.center.session(session, csrf)
+-                if op in ('qr_view', 'qr_download'):
++                if op in ('qr_view', 'qr_download', 'ad_preview'):
+                     value = getattr(host, op)(session, csrf, body['workspace'])
+                 elif op == 'reserve':
+                     value = host.reserve(session, csrf, body['locator'], body['reference'], body['yuan'])

@@ -1,0 +1,8 @@
+{
+  "scripts/community_platform_host.py": "952b38cd383f9086a470403266bbeb37c7656db378e65efd884603022789f4c4",
+  "scripts/community_mini_http.py": "bc5a5198bd68059be1dd412da9ad65a2cd0b465e39711a67e7a2e04b434b4bba",
+  "scripts/community_web_session.py": "17a4f62859afef00b093b9436a632c32fc95e656ee8e3f108e2e3af61f75d277",
+  "demos/community-stage/web-session.js": "088822b7738effd548111762b987a858d9ffccb21ea875e397cb297ef1b9c33f",
+  "scripts/community_platform_showcase.py": "066999cfe06ed65dbdc244643ad7db525dc8a52cd3d40a5935569ac8f85967ad",
+  "demos/community-stage/workbench.html": "49f3d89df45eb75c129b9ece33b59054e5bfef79563ada6db3646ce4516368ce"
+}
