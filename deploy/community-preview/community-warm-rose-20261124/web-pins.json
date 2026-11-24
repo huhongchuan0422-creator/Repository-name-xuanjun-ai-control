@@ -1,0 +1,14 @@
+{
+  "demos/community-stage/fixed-cashier.css": {
+    "before": "d80715694a37fd89cff1edb31634f787ecfa6e5d5dc0c06618b3510cf84f8844",
+    "result": "4a2062b752c4bd42ee9536b585c4bc2905cbbedf94a6445e821773901e50ab72"
+  },
+  "demos/community-stage/fixed-cashier.js": {
+    "before": "202cd7ccc9897c3f0ec235c9aef1a3178f91640002ac35b1889f05087b082aa9",
+    "result": "62c12c6ff49716eb5f324d512ee166c4755249a4284b48352ba645739985e016"
+  },
+  "demos/community-stage/fixed-cashier.html": {
+    "before": "33111c626919fb11024774f8ec637815b855923dab38dd924813d973504e5979",
+    "result": "d0dc0095fde826f74894176f62fa5d48b2253fa101261443f2d77cac9dd7ab9f"
+  }
+}

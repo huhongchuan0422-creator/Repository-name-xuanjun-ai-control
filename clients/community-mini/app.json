@@ -10,8 +10,8 @@
               ],
     "window":  {
                    "navigationBarTitleText":  "社区服务",
-                   "navigationBarBackgroundColor":  "#f9f5f5",
-                   "backgroundColor":  "#f9f5f5",
+                   "navigationBarBackgroundColor":  "#fff5f6",
+                   "backgroundColor":  "#fff5f6",
                    "navigationBarTextStyle":  "black"
                }
 }
