@@ -1,0 +1,20 @@
+--- a/scripts/community_mini_http.py
++++ b/scripts/community_mini_http.py
+@@ -33,6 +33,8 @@
+ 
+ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,onboarding=None,saas=None,fulfillment=None,provider_actions=None,merchant_bills=None,communities=None,commerce=None,notifications=None):
+     source_sha = runtime_version()  # immutable for this running composition
++    from scripts.community_native_version import native_snapshot
++    native_source = native_snapshot(os.path.dirname(os.path.dirname(__file__))) if source_sha is None else None
+     # Remember admitted dependencies so a lost SaaS backend cannot silently
+     # turn a previously full composition into a healthy community-only one.
+     saas_required=(getattr(getattr(gateway,'runtime',None),'saas',None) is not None
+@@ -132,6 +134,8 @@
+                 if source_sha is not None:
+                     health.update(runtime_source_sha=source_sha,version_source='IMAGE_BUILD_STAMP',
+                                   observed_at=int(time.time()))
++                elif native_source is not None:
++                    health.update(native_source, observed_at=int(time.time()))
+                 return self.answer(503 if maintenance else 200,health)
+             if proxy_origin=='https://uk.wenwenwenyiyiyi.work':
+                 from scripts.community_web_entries import asset,entries

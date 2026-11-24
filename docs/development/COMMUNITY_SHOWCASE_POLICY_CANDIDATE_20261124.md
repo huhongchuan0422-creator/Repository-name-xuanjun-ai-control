@@ -7,8 +7,8 @@ The existing protected template/binding_digest mechanism now accepts PLATFORM_SH
 
 The deployed route gate has newer onboarding-reader and operation restrictions absent from this Git base. DO NOT replace it with this source file. The deployment patch in deploy/community-preview/showcase-policy-runtime.delta.patch preserves those newer restrictions. Matching base/result hashes are recorded in the delivery runtime-identities.json; fail closed if live files changed. Source and merged-runtime candidates are tested separately.
 
-## Candidate only
-Candidate workspace platform_showcase is NOT approved. Preserve the original directory/local_donation and onboarding scopes and every capability. Add only /community/operations#platform_showcase and its protected template after explicit Owner decision. Project/tenant community_platform; operator original ROOT. Original showcase 066999 remains unchanged and its existing 1+6 evidence is reused.
+## Owner confirmation update 10:29
+Owner messages om_x100b7f7b26c354a0cf3021fca2cea05 and om_x100b7f7b26966ca4cfd01a47461dc1f confirm the exact minimal scope/ROOT3-to-4/session-cleanup contract. platform_showcase is the concrete name for that one display workspace; no repeated product/principle authorization is needed. Real TTY and private login remain required. The following files remain candidate-only, not executed. Preserve the original directory/local_donation and onboarding scopes and every capability. Add only /community/operations#platform_showcase and its protected template after explicit Owner decision. Project/tenant community_platform; operator original ROOT. Original showcase 066999 remains unchanged and its existing 1+6 evidence is reused.
 
 Delivery candidate-plan-intent.json is a metadata projection, not an executable preflight or authorization record. It contains original two templates plus proposed third, exact binding/manifest, request ID issue76-pomelo-policy-20261124-candidate1, expected revision 3 and side-effect intent. Projection must be rechecked against current live state. Do not pass it to maintenance as a plan.
 
