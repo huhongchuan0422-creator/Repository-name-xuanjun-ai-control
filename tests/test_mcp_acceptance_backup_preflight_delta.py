@@ -12,6 +12,10 @@ import backup_component_hostcycle as component
 class TerminalPreflightDelta(unittest.TestCase):
     def setUp(self):
         self.f=fixture.AcceptanceEvidence();self.f.setUp();self.addCleanup(self.f.tearDown)
+        # This fixture's acceptance is produced by the real SOURCE-only 8fe
+        # bridge below; neutralize the base fixture's simulated prepared seam
+        # so the genuine task_center_backup_bridge_v2 module stays visible.
+        self.f.stop_seam()
         self.host=self.f.host;self.db=self.f.h.control.db;self.adapter=self.f.adapter
         contracts=[copy.deepcopy(c) for c in self.f.contract.contracts]
         for c in contracts:

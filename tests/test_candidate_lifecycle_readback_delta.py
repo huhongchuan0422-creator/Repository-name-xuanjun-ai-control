@@ -14,6 +14,19 @@ class CandidateLifecycleReadback(fixture.AcceptanceEvidence):
         # Existing lifecycle producer path; fixture receipt, no signature claim.
         lifecycle(self.tmp.name,'apply',self.path,{'verified':True})
         self.adapter.assess_candidate_bundle=LifecycleCandidateReadback(self.h.supervisor.db,'tenant-mcp',self.tmp.name)
+    def test_missing_handoff_and_unreadable_artifact_fail_closed(self):
+        # Same fail-closed boundaries as the inherited fixture test; only the
+        # unreadable-artifact injection is moved to the real lifecycle store
+        # this class installed in place of the simulated bundle bytes.
+        cid=self.make_candidate();self.handoff(cid)
+        digest=hashlib.sha256(self.adapter.content).hexdigest()
+        path=os.path.join(self.tmp.name,'artifacts',digest)
+        with open(path,'wb') as f:f.write(b'different-bytes')
+        with self.assertRaisesRegex(ValueError,'CANDIDATE_BUNDLE_READBACK_REQUIRED'):self.call(cid)
+        with open(path,'wb') as f:f.write(self.adapter.content)
+        self.h.control.db.execute("DELETE FROM events WHERE event_id=?",('handoff-contract:'+self.adapter.event,));self.h.control.db.commit()
+        with self.assertRaisesRegex(ValueError,'CANDIDATE_HANDOFF_RECEIPTS_REQUIRED'):self.call(cid)
+        self.assertEqual(self.h.supervisor._task('demo-b')['state'],'STARTED')
     def test_original_rpc_reads_existing_lifecycle_artifact(self):
         cid=self.make_candidate();self.handoff(cid)
         # Restart the original HTTP app with this host-injected adapter.

@@ -10,6 +10,7 @@ class DelegateHost(HostAuthAdapter):
     def __init__(self, identity):self.identity=identity
     def authenticate_and_authorize(self,*args):return self.identity.authenticate_and_authorize(*args)
     def assess_backup(self,binding):return self.identity.assess_backup(binding)
+    def prepare_backup_assessment(self,host):return self.identity.prepare_backup_assessment(host)
     def assess_provider(self,binding):return self.identity.assess_provider(binding)
 
 class HostWiring(fixture.AcceptanceEvidence):

@@ -1,10 +1,31 @@
 """Original lifecycle + original authenticated handoff; isolated fake host only."""
-import hashlib,json,time,unittest
+import copy,hashlib,json,sys,threading,time,types,unittest
+from unittest.mock import patch
 import test_mcp_completion as fixtures
 from task_center_handoff_host import HandoffHost,HostAuthAdapter
 from task_center_role_contract import RoleContractResolver
 from task_center_mcp_dispatch_host import dispatch_rpc,validate_config
 from task_center_mcp_service import MCPTaskService
+
+# Since the reviewed preflight interface change, HandoffHost.record and
+# _accept_with_prepared_backup refuse the legacy in-transaction assess_backup
+# callback and require a host-prepared two-phase assessment bound to this DB.
+# This simulated provider mirrors the already-reviewed pattern in
+# test_mcp_acceptance_backup_preflight_delta: it reasserts the SAME fixture
+# facts inside the serialized transaction only, and grants no real backup,
+# identity or production evidence.
+class SimulatedPrepared:
+    def __init__(self,host,adapter):self.db=host.db;self.adapter=adapter;self._guard=threading.Lock();self.expected=None
+    def execute(self,host,session,value,binding):
+        self.expected=copy.deepcopy(binding)
+        try:return host.record(session,value)
+        finally:self.expected=None
+    def __call__(self,binding):
+        if not self.db.in_transaction or binding!=self.expected:return None
+        return self.adapter.assess_backup(binding)
+
+_V2_FAKE=types.ModuleType('task_center_backup_bridge_v2')
+_V2_FAKE.PreparedBackupAssessment=SimulatedPrepared
 
 class SimulatedHost(HostAuthAdapter):
     def __init__(self):
@@ -15,6 +36,7 @@ class SimulatedHost(HostAuthAdapter):
           'session_id':'session-'+session,'role_id':roles[session],'scope':'handoff:'+action,'expires_at':time.time()+300}
     def assess_provider(self,binding):return 'CONNECTED'
     def assess_backup(self,binding):return {'state':'COMPLETE' if self.backup else 'INCOMPLETE','missing':[] if self.backup else ['RESTORE'],'cycle_at':self.cycle}
+    def prepare_backup_assessment(self,host):return SimulatedPrepared(host,self)
     def assess_candidate_bundle(self,binding):
         if hashlib.sha256(self.content).hexdigest()!=binding['artifact_sha256']:return None
         return {'candidate_id':binding['candidate_id'],'artifact_sha256':binding['artifact_sha256'],
@@ -22,7 +44,13 @@ class SimulatedHost(HostAuthAdapter):
           'handoff_event_id':self.event}
 
 class AcceptanceEvidence(unittest.TestCase):
+    def _start_seam(self):
+        if not self._seam_started:self._seam.start();self._seam_started=True
+    def stop_seam(self):
+        if self._seam_started:self._seam.stop();self._seam_started=False
     def setUp(self):
+        self._seam=patch.dict(sys.modules,{'task_center_backup_bridge_v2':_V2_FAKE})
+        self._seam_started=False;self._start_seam()
         self.fx=fixtures.CompletionHTTPTests();self.fx.setUp();self.h=self.fx.h;h=self.h
         # Real fixture provider/model registrations for independent reviewer roles;
         # no customer data, no provider call for this setup.
@@ -48,7 +76,7 @@ class AcceptanceEvidence(unittest.TestCase):
         self.host=HandoffHost(h.supervisor.db,'tenant-mcp','formal-fixture',self.adapter,mcp_config=self.config,role_contract=self.contract)
         self.service=MCPTaskService(h.f.db,fx_key(),'tenant-mcp',h.f.master,'acceptor','project-mcp',execution_enabled=False)
         self.identity={'tenant_id':'tenant-mcp','principal_id':'acceptor','project_id':'project-mcp','scopes':['task:submit','task:read']}
-    def tearDown(self):self.fx.tearDown()
+    def tearDown(self):self.stop_seam();self.fx.tearDown()
     def make_candidate(self,review=True):
         h=self.h;artifact=hashlib.sha256(self.adapter.content).hexdigest()
         cid=h.rpc(h.token(principal='developer-1'),'task_submit_candidate',self.fx.args(artifact_sha256=artifact,checklist_sha256=self.fx.check))['candidate_id']
