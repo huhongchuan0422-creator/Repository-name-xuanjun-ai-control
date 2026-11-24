@@ -35,6 +35,8 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(hashlib.sha256(raw).hexdigest(),expected)
                 self.assertEqual(raw,(root/name).read_bytes())
             self.assertEqual(manifest['production_payment'],'HOLD')
+            for name in ('deploy/community-preview/native-snapshot-version.json','tests/fixtures/pomelo-native-startup-pins.json'):
+                self.assertIn(name, manifest['files'])
             for suffix in ('js','json','wxml','wxss'):
                 self.assertIn('clients/community-mini/pages/h5-confirm/index.'+suffix,manifest['files'])
             for name in ('tests/test_community_portal_pagination.mjs',
