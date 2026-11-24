@@ -20,7 +20,7 @@ Page({
   openMerchantJoin(){return auth.navigate(this,'join',wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   scanStore(){return auth.scanStore(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   goBack(){return auth.back(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
-  data: {sceneStorefront:null,demoStore:null,demoImagePath:DEMO_PHOTO_ASSET,demoPhotoFailed:false,demoState:'UNKNOWN',directory:[],categories:LOCAL_CATEGORIES,categoryId:'',visibleDirectoryCount:0,directoryState:'NOT_QUERIED',directoryError:'',directoryMore:false,directoryCursor:null,contexts:[],contextsState:'NOT_QUERIED',contextsError:'',ordersState:'NOT_QUERIED',ordersError:'',detailState:'NOT_QUERIED',detailError:'',serviceView:'home',serviceTitles:{home:'更多门店服务',community:'我的社区','community-list':'发现社区','community-detail':'社区详情','community-code':'通过推广码加入',referral:'推荐关系',products:'门店商品与服务',checkout:'核对订单',payment:'支付与订单恢复',refund:'申请售后','refund-detail':'售后进度','legacy-profile':'个人资料','legacy-notices':'我的通知'},selectedCommunity:null,communityRelation:null,orderFilter:'all',visibleOrderCount:0,needsScene:true,viewMode:'recommendations',activeSection:'recommendations',sessionReady:false,detailsCollapsed:false,selectedRecommendation:null,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',ownReferralCode:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
+  data: {nativeCollectionEntry:false,sceneStorefront:null,demoStore:null,demoImagePath:DEMO_PHOTO_ASSET,demoPhotoFailed:false,demoState:'UNKNOWN',directory:[],categories:LOCAL_CATEGORIES,categoryId:'',visibleDirectoryCount:0,directoryState:'NOT_QUERIED',directoryError:'',directoryMore:false,directoryCursor:null,contexts:[],contextsState:'NOT_QUERIED',contextsError:'',ordersState:'NOT_QUERIED',ordersError:'',detailState:'NOT_QUERIED',detailError:'',serviceView:'home',serviceTitles:{home:'更多门店服务',community:'我的社区','community-list':'发现社区','community-detail':'社区详情','community-code':'通过推广码加入',referral:'推荐关系',products:'门店商品与服务',checkout:'核对订单',payment:'支付与订单恢复',refund:'申请售后','refund-detail':'售后进度','legacy-profile':'个人资料','legacy-notices':'我的通知'},selectedCommunity:null,communityRelation:null,orderFilter:'all',visibleOrderCount:0,needsScene:true,viewMode:'recommendations',activeSection:'recommendations',sessionReady:false,detailsCollapsed:false,selectedRecommendation:null,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',ownReferralCode:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   openMerchant(){return auth.navigate(this,'merchant',wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   navigateSection(e){return auth.navigate(this,e.currentTarget.dataset.section,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前订单和客户资料已清除，请重新进入对应门店',false);return;}if(this._sceneStale)return;const mode=getApp().globalData.checkoutMode;getApp().globalData.checkoutMode='';const view=mode||this.data.viewMode||'recommendations';const selectedRecommendation=view==='store-detail'?this.data.selectedRecommendation:null;this.setData({viewMode:view,activeSection:view==='orders'?'orders':view==='services'||view==='profile'?'profile':'recommendations',selectedRecommendation,sceneStorefront:view==='store-detail'?this.data.sceneStorefront:null});if((mode||this.data.demoStore)&&this.data.sessionReady){if(view==='recommendations')this.loadDirectory();else if(view==='orders')this.loadOrders();else if(view==='services'&&!this.scene)this.loadContexts();}if(!mode&&this.data.sessionReady&&this.data.selectedRecommendation&&this.data.selectedRecommendation.is_demo)this.openRecommendation({currentTarget:{dataset:{id:this.data.selectedRecommendation.id}}});if(this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated()&&!this.data.pending&&!this._sceneStale){this.onLoad({scene:this.scene,view:this.data.viewMode});}},
@@ -93,6 +93,22 @@ Page({
   validDemoStore(r){return r&&typeof r.id==='string'&&/^demo_[a-f0-9]{64}$/.test(r.id)&&r.is_demo===true&&r.display_only===true&&r.payment_enabled===false&&r.purchasing_enabled===false&&r.include_in_real_statistics===false&&r.category_state==='DEMO'&&r.version===1&&r.profile_version===0&&r.photo_asset_id==='community-demo-storefront-v1'&&r.storefront_photo===null&&r.photo_state==='BUNDLED_DEMO_ASSET_PENDING'&&typeof r.name==='string'&&typeof r.description==='string';},
   demoImageError(){this.setData({demoPhotoFailed:true});},
   validPublicStore(r){return r&&r.is_demo!==true&&typeof r.id==='string'&&/^[a-f0-9]{64}$/.test(r.id)&&typeof r.name==='string'&&typeof r.description==='string'&&r.storefront_photo===null&&r.photo_state==='NOT_CONNECTED'&&(r.platform_self_operated===undefined&&r.scene===undefined||typeof r.platform_self_operated==='boolean'&&(r.platform_self_operated?typeof r.scene==='string'&&/^[A-Za-z0-9_-]{1,32}$/.test(r.scene):r.scene===null));},
+  async cacheShowcaseCover(record,current){
+    if(!record.platform_showcase||!record.showcase_cover)return record;
+    const image=record.showcase_cover.image_data;
+    if(typeof image!=='string'||image.length>550000||!/^data:image\/(?:jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)||!(image.startsWith('data:image/jpeg;base64,/9j/')||image.startsWith('data:image/png;base64,iVBORw0KGgo')))return {...record,coverFailed:true};
+    const file=wx.env.USER_DATA_PATH+'/showcase-cover-'+record.id+'-'+Date.now()+'-'+Math.random().toString(16).slice(2)+(image.startsWith('data:image/png;')?'.png':'.jpg');
+    try{
+      await new Promise((resolve,reject)=>wx.getFileSystemManager().writeFile({filePath:file,data:image.split(',')[1],encoding:'base64',success:resolve,fail:reject}));
+      if(!current()){this.deleteShowcaseCover(file);return record;}
+      (this._coverFiles||(this._coverFiles=new Set())).add(file);
+      return {...record,coverPath:file,coverFailed:false,coverLoaded:false};
+    }catch(e){this.deleteShowcaseCover(file);return {...record,coverFailed:true};}
+  },
+  deleteShowcaseCover(file){if(file)try{wx.getFileSystemManager().unlink({filePath:file,fail(){}});}catch(e){}},
+  clearShowcaseCovers(){for(const file of this._coverFiles||[])this.deleteShowcaseCover(file);this._coverFiles=new Set();},
+  showcaseCoverLoad(e){const id=e.currentTarget.dataset.id,path=e.currentTarget.dataset.path;this.setData({directory:this.data.directory.map(r=>r.id===id&&r.coverPath===path?{...r,coverLoaded:true}:r)});},
+  showcaseCoverError(e){const id=e.currentTarget.dataset.id,path=e.currentTarget.dataset.path;this.setData({directory:this.data.directory.map(r=>r.id===id&&r.coverPath===path?{...r,coverFailed:true,coverLoaded:false}:r)});},
   directoryVisible(record,category=this.data.categoryId){if(!category)return true;const local=LOCAL_CATEGORIES.find(c=>c.id===category);if(!local)return record.category_id===category;const text=[record.category_name,record.name,record.description].filter(v=>typeof v==='string').join('');return local.keywords.some(word=>text.includes(word));},
   async loadDirectory(e){
     if(!this.session||!this.data.sessionReady)return;
@@ -100,13 +116,14 @@ Page({
     this.clearDemoProjection('正在重新核对展示商家状态');
     const request={...this.customerReadToken(),category:this.data.categoryId};this._directoryRequest=request;
     const params={};if(request.category&&!request.category.startsWith('local:'))params.category_id=request.category;if(more)params.after_id=this.data.directoryCursor;
+    if(!more)this.clearShowcaseCovers();
     this.setData({demoStore:null,demoState:'UNKNOWN',directoryState:'LOADING',directoryError:'',...(!more?{directory:[],directoryCursor:null,directoryMore:false,demoStore:null,demoState:'UNKNOWN',demoPhotoFailed:false}:{})});
     const current=()=>this.customerReadCurrent(request)&&this._directoryRequest===request&&this.data.categoryId===request.category;
     try{const r=await request.session.customer('directory',params);if(!current())return;
       if(!r||!Array.isArray(r.records)||r.records.some(v=>!this.validPublicStore(v))||!Array.isArray(r.categories)||r.categories.some(v=>!v||typeof v.id!=='string'||typeof v.name!=='string')||typeof r.has_more!=='boolean'||(r.has_more?typeof r.next_cursor!=='string'||!r.next_cursor||r.next_cursor===params.after_id:r.next_cursor!==null))throw Error('推荐列表返回未确认');
       const demo=r.demo;
       if(demo&&(!['VISIBLE','HIDDEN_REAL_APPROVAL_OBSERVED','UNKNOWN','NOT_CURRENT_PROJECT'].includes(demo.state)||(demo.state==='VISIBLE'?!this.validDemoStore(demo.record):demo.record!==null)))throw Error('展示商家状态未确认');
-      const records=more?this.data.directory.slice():[];for(const v of r.records)if(!records.some(x=>x.id===v.id))records.push(v);
+      const records=more?this.data.directory.slice():[];for(const v of r.records)if(!records.some(x=>x.id===v.id))records.push(await this.cacheShowcaseCover(v,current));if(!current())return;
       const categories=[...LOCAL_CATEGORIES,...r.categories.filter(category=>!LOCAL_CATEGORIES.some(local=>local.name===category.name))],visibleRecords=records.map(v=>({...v,visible:this.directoryVisible(v,request.category)}));
       this.setData({demoStore:demo&&demo.state==='VISIBLE'?demo.record:null,demoState:demo?demo.state:'UNKNOWN',directory:visibleRecords,categories,directoryState:'READY',visibleDirectoryCount:visibleRecords.filter(v=>v.visible).length,directoryMore:r.has_more,directoryCursor:r.next_cursor});
     }catch(e){if(this.customerReadDenied(request,e))return;if(current())this.setData({directoryState:'FAILED',directoryError:e.message});}
@@ -151,7 +168,7 @@ Page({
   },
 
   async onLoad(options) {
-    this._sceneStale=false;
+    this._sceneStale=false;this.setData({nativeCollectionEntry:false});
     this._detailRequest=null;this.setData({sceneStorefront:null,detailState:'NOT_QUERIED',detailError:'',directoryError:''});
     if(options&&['recommendations','orders','store-detail','services'].includes(options.view)){const view=options.view;this.setData({viewMode:view,activeSection:view==='orders'?'orders':view==='services'?'profile':'recommendations',selectedRecommendation:null});}
     this._pageUnloaded=false;this._authEpoch=auth.current();this._consumerRequest=null;this._productRequest=null;this._projectMessagesContext=null;
@@ -179,15 +196,17 @@ Page({
         this.setData({needsScene:false});
         const scene = parseScene(options&&options.scene?options:{scene:config.scene});
         this.scene=scene;config.scene=scene;
+        const nativeEntry=/^wxn_[a-f0-9]{28}$/.test(scene)&&!(options&&options.view);
+        if(nativeEntry)this.setData({nativeCollectionEntry:true,viewMode:'services',activeSection:'profile',serviceView:'checkout',commerceEnabled:false,paymentsEnabled:false});
         if(options&&typeof options.promotion==='string'&&/^cp_[0-9a-f]{32}$/.test(options.promotion))this.setData({promotionCode:options.promotion});
         this.session = getSharedSession(wx,config,undefined,this);
         this._authEpoch=auth.current();lifecycle=this._pageGeneration=(this._pageGeneration||0)+1;
         await this.session.ensureLogin({automatic:true,prepared:true});
         if(!current())return;
-        if(config.commerce===true){this.setData({commerceEnabled:true,status:'支付尚未开放，可浏览商品和查询订单'});await this.reloadProducts();if(!current())return;}
+        if(config.commerce===true&&!nativeEntry){this.setData({commerceEnabled:true,status:'支付尚未开放，可浏览商品和查询订单'});await this.reloadProducts();if(!current())return;}
         this.client = makeClient(body => this.session.transport(scene,body));
         this.setData({sessionReady:!!this.session&&auth.active(this._authEpoch)});if(this.data.viewMode==='recommendations'&&typeof this.session.customer==='function')await this.loadDirectory();else if(this.data.viewMode==='orders')await this.loadOrders();if(!current())return;
-        if(config.payments===true){this.paymentFlow=createPaymentFlow(wx,(op,reference)=>this.session.payment(scene,op,reference));this.setData({paymentsEnabled:true,status:'请创建订单，或输入原订单号查询微信结果'});}
+        if(config.payments===true&&!nativeEntry){this.paymentFlow=createPaymentFlow(wx,(op,reference)=>this.session.payment(scene,op,reference));this.setData({paymentsEnabled:true,status:'请创建订单，或输入原订单号查询微信结果'});}
       } else {
     this.client = makeClient(body => new Promise((resolve,reject) => {
       const {baseUrl,token} = getApp().globalData;
@@ -199,13 +218,18 @@ Page({
     }));
       }
     if(this.scene&&this.data.viewMode==='store-detail'){await this.loadSceneStorefront();return;}
-    this.client.storefront().then(s=>current()&&this.setData({merchant:s.merchant.name,
-      beforeAd:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.title : '',
-      beforeAdImage:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.image_data||'' : ''}))
+    this.client.storefront().then(s=>{
+      if(!current())return;
+      if(this.data.nativeCollectionEntry&&(!s.collection_entry||s.collection_entry.scene!==this.scene||s.collection_entry.approval_verified!==true||s.collection_entry.payment_product_admitted!==false))throw Error('NATIVE_COLLECTION_ENTRY_UNCONFIRMED');
+      this.setData({merchant:s.merchant.name,
+        ...(this.data.nativeCollectionEntry?{status:'本商家微信申请已通过；支付产品接线待核实，暂不发起交易'}:{}),
+        beforeAd:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.title : '',
+        beforeAdImage:s.ads.AD_SLOT_PAYMENT_AMOUNT ? s.ads.AD_SLOT_PAYMENT_AMOUNT.image_data||'' : ''});
+    })
       .catch(e=>{if(current())this.setData({status:customerError(e)});});
     } catch(e) {if(current())this.setData({status:customerError(e)});}
   },
-  onUnload() {this._detailRequest=null;this.setData({sessionReady:false,sceneStorefront:null,detailState:'NOT_QUERIED',detailError:''});this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
+  onUnload() {this.clearShowcaseCovers();this._detailRequest=null;this.setData({sessionReady:false,sceneStorefront:null,detailState:'NOT_QUERIED',detailError:''});this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
   customerSessionRevoked(status='登录已退出，请重新登录',revokeIdentity=true){
     this._directoryRequest=null;this._contextRequest=null;this._allOrdersRequest=null;this._detailRequest=null;this._orderScopes=null;this._pageGeneration=(this._pageGeneration||0)+1;this._consumerRequest=null;this._productRequest=null;this._projectRequest=null;this._noticeRequest=null;this._profileRequest=null;
     if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(revokeIdentity&&this.session)this.session.clear();
