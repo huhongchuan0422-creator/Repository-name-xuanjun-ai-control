@@ -32,7 +32,7 @@ permissions:
 jobs:
   click-through:
     if: "!contains(github.event.head_commit.message, '[shared-license-cas-scope]') && !contains(github.event.head_commit.message, '[community-ocr-host-scope]') && !contains(github.event.head_commit.message, '[community-ocr-scope]') && !contains(github.event.head_commit.message, '[preview-version-scope]') && !contains(github.event.head_commit.message, '[preview-inspection-scope]')"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     env:
       COMMUNITY_UI_EVIDENCE: ui-evidence
@@ -50,6 +50,14 @@ jobs:
           node-version: '22'
       - run: python -m pip install playwright==1.55.0 cryptography==46.0.3
       - run: python -m playwright install --with-deps chromium
+      - name: Exact snapshot pomelo recommendation and four-image preview
+        run: python -B -m unittest discover -s tests -p test_community_pomelo_preview.py -v
+      - name: Preserve directly openable pomelo preview and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pomelo-recommendation-preview
+          path: pomelo-preview-evidence/
       - name: Original-field generated assets must be committed exactly
         run: |
           python scripts/community_ui_preview_build.py
