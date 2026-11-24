@@ -17,7 +17,7 @@ from scripts.pr122_customer_core import Center, canonical, digest, Denied
 
 SOURCE_NAMES=('community_admin_authority.py','community_admin_bootstrap.py','community_admin_preflight.py','community_admin_management.py','community_admin_route_gate.py','community_admin_route_inventory.py','community_platform_host.py','community_web_session.py','community_mini_http.py','pr122_customer_core.py')
 
-def build_plan(host_path,keys_path,wechat_path,backup_path,identity_record_path,request_id,project=None):
+def build_plan(host_path,keys_path,wechat_path,backup_path,identity_record_path,request_id,project=None,*,policy_preservation=False):
  from scripts.community_admin_bootstrap import _regular, OWNER_SOURCE_MESSAGES
  from scripts.pr122_customer_core import identifier
  identifier(request_id)
@@ -51,8 +51,10 @@ def build_plan(host_path,keys_path,wechat_path,backup_path,identity_record_path,
  expected={'project','tenant','capabilities','workspace_scopes','workspace_bindings','manifest_sha'}
  if set(admin)!=expected:raise Denied('EXACT_PROTECTED_ADMIN_CONFIGURATION_REQUIRED')
  management={'/community/admin#'+op for op in ('catalog','list','create','grant','revoke')}
- if set(admin['capabilities']) != set(BUSINESS_CAPABILITIES)|management:
+ if type(policy_preservation) is not bool:raise Denied('EXACT_POLICY_PREFLIGHT_MODE_REQUIRED')
+ if (not policy_preservation or core_only) and set(admin['capabilities']) != set(BUSINESS_CAPABILITIES)|management:
   raise Denied('COMPLETE_COMMUNITY_CAPABILITY_INVENTORY_REQUIRED')
+ if policy_preservation and core_only:raise Denied('EXISTING_CONFIGURED_ROOT_REQUIRED')
  for key, template in admin['workspace_bindings'].items():
   if type(template) is dict and template.get('role')=='PLATFORM_SHOWCASE_ROOT':
    from scripts.community_showcase_template import validate
@@ -74,6 +76,10 @@ def build_plan(host_path,keys_path,wechat_path,backup_path,identity_record_path,
   realm=json.loads(Center.decrypt(SimpleNamespace(keys=keys),row['payload'],'project:'+admin['project']))
   if realm.get('kind')!='COMMUNITY_PLATFORM_REALM' or realm.get('source')!='OWNER_APPROVED_FIRST_INSTALL' or realm.get('requirements')!=[]:raise Denied('ORIGINAL_COMMUNITY_REALM_REQUIRED')
   existing=db.execute("SELECT count(*) FROM links WHERE channel='COMMUNITY_ADMIN_AUTHORITY_V1' AND project=?",(admin['project'],)).fetchone()[0]
+  if policy_preservation:
+   from scripts.community_admin_capability_preservation import readonly_original_root,unchanged_capabilities
+   original=readonly_original_root(db,keys,admin['project'],admin['tenant'])
+   unchanged_capabilities(original['capabilities'],admin['capabilities'])
  finally:db.close()
  if (info.st_dev,info.st_ino)!=(_regular(dbpath,uid).st_dev,_regular(dbpath,uid).st_ino):raise Denied('ORIGINAL_CENTER_IDENTITY_CHANGED')
  for path in (backup_path,identity_record_path):

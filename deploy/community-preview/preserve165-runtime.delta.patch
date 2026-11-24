@@ -1,0 +1,60 @@
+--- a/scripts/community_admin_preflight.py
++++ b/scripts/community_admin_preflight.py
+@@ -17,7 +17,7 @@
+ 
+ SOURCE_NAMES=('community_admin_authority.py','community_admin_bootstrap.py','community_admin_preflight.py','community_admin_management.py','community_admin_route_gate.py','community_admin_route_inventory.py','community_platform_host.py','community_web_session.py','community_mini_http.py','pr122_customer_core.py')
+ 
+-def build_plan(host_path,keys_path,wechat_path,backup_path,identity_record_path,request_id,project=None):
++def build_plan(host_path,keys_path,wechat_path,backup_path,identity_record_path,request_id,project=None,*,policy_preservation=False):
+  from scripts.community_admin_bootstrap import _regular, OWNER_SOURCE_MESSAGES
+  from scripts.pr122_customer_core import identifier
+  identifier(request_id)
+@@ -51,8 +51,10 @@
+  expected={'project','tenant','capabilities','workspace_scopes','workspace_bindings','manifest_sha'}
+  if set(admin)!=expected:raise Denied('EXACT_PROTECTED_ADMIN_CONFIGURATION_REQUIRED')
+  management={'/community/admin#'+op for op in ('catalog','list','create','grant','revoke')}
+- if set(admin['capabilities']) != set(BUSINESS_CAPABILITIES)|management:
++ if type(policy_preservation) is not bool:raise Denied('EXACT_POLICY_PREFLIGHT_MODE_REQUIRED')
++ if (not policy_preservation or core_only) and set(admin['capabilities']) != set(BUSINESS_CAPABILITIES)|management:
+   raise Denied('COMPLETE_COMMUNITY_CAPABILITY_INVENTORY_REQUIRED')
++ if policy_preservation and core_only:raise Denied('EXISTING_CONFIGURED_ROOT_REQUIRED')
+  for key, template in admin['workspace_bindings'].items():
+   if type(template) is dict and template.get('role')=='PLATFORM_SHOWCASE_ROOT':
+    from scripts.community_showcase_template import validate
+@@ -74,6 +76,10 @@
+   realm=json.loads(Center.decrypt(SimpleNamespace(keys=keys),row['payload'],'project:'+admin['project']))
+   if realm.get('kind')!='COMMUNITY_PLATFORM_REALM' or realm.get('source')!='OWNER_APPROVED_FIRST_INSTALL' or realm.get('requirements')!=[]:raise Denied('ORIGINAL_COMMUNITY_REALM_REQUIRED')
+   existing=db.execute("SELECT count(*) FROM links WHERE channel='COMMUNITY_ADMIN_AUTHORITY_V1' AND project=?",(admin['project'],)).fetchone()[0]
++  if policy_preservation:
++   from scripts.community_admin_capability_preservation import readonly_original_root,unchanged_capabilities
++   original=readonly_original_root(db,keys,admin['project'],admin['tenant'])
++   unchanged_capabilities(original['capabilities'],admin['capabilities'])
+  finally:db.close()
+  if (info.st_dev,info.st_ino)!=(_regular(dbpath,uid).st_dev,_regular(dbpath,uid).st_ino):raise Denied('ORIGINAL_CENTER_IDENTITY_CHANGED')
+  for path in (backup_path,identity_record_path):
+--- a/scripts/community_admin_policy.py
++++ b/scripts/community_admin_policy.py
+@@ -19,9 +19,9 @@
+ 
+ def policy_intent(target,request_id):
+     identifier(request_id)
+-    if target.capabilities!=frozenset(full_community_capabilities()):raise Denied('FULL_COMMUNITY_POLICY_REQUIRED')
+     old,root=current_root(target)
+-    if old.capabilities!=target.capabilities:raise Denied('POLICY_CAPABILITY_CHANGE_NOT_IN_SCOPE')
++    from scripts.community_admin_capability_preservation import unchanged_capabilities
++    unchanged_capabilities(root['capabilities'],target.capabilities)
+     if old.manifest_sha==target.manifest_sha:raise Conflict('POLICY_ALREADY_CURRENT')
+     children=[]
+     for row in target.c.db.execute('SELECT subject_idx,payload,active FROM links WHERE channel=? AND project=? AND subject_idx!=? ORDER BY subject_idx',(CHANNEL,target.project,root['uid'])):
+--- a/scripts/community_admin_bootstrap.py
++++ b/scripts/community_admin_bootstrap.py
+@@ -113,6 +113,9 @@
+     action=action or (sys.argv[1] if len(sys.argv)==2 else None)
+     if action not in ('--inspect','--bootstrap'):
+         raise Denied('EXPLICIT_FIXED_ACTION_REQUIRED')
++    if action=='--bootstrap':
++        from scripts.community_admin_authority import full_community_capabilities
++        if set(b['capabilities'])!=set(full_community_capabilities()):raise Denied('COMPLETE_COMMUNITY_CAPABILITY_INVENTORY_REQUIRED')
+     _regular(b['host_path'],b['run_uid'])
+     if digest(Path(b['host_path']).read_bytes())!=b['host_sha256']:
+         raise Denied('ORIGINAL_HOST_CONFIG_CHANGED')

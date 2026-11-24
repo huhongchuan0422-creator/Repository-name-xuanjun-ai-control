@@ -113,6 +113,9 @@ def run(candidate=None, action=None):
     action=action or (sys.argv[1] if len(sys.argv)==2 else None)
     if action not in ('--inspect','--bootstrap'):
         raise Denied('EXPLICIT_FIXED_ACTION_REQUIRED')
+    if action=='--bootstrap':
+        from scripts.community_admin_authority import full_community_capabilities
+        if set(b['capabilities'])!=set(full_community_capabilities()):raise Denied('COMPLETE_COMMUNITY_CAPABILITY_INVENTORY_REQUIRED')
     _regular(b['host_path'],b['run_uid'])
     if digest(Path(b['host_path']).read_bytes())!=b['host_sha256']:
         raise Denied('ORIGINAL_HOST_CONFIG_CHANGED')

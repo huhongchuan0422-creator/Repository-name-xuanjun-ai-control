@@ -19,9 +19,9 @@ def current_root(target):
 
 def policy_intent(target,request_id):
     identifier(request_id)
-    if target.capabilities!=frozenset(full_community_capabilities()):raise Denied('FULL_COMMUNITY_POLICY_REQUIRED')
     old,root=current_root(target)
-    if old.capabilities!=target.capabilities:raise Denied('POLICY_CAPABILITY_CHANGE_NOT_IN_SCOPE')
+    from scripts.community_admin_capability_preservation import unchanged_capabilities
+    unchanged_capabilities(root['capabilities'],target.capabilities)
     if old.manifest_sha==target.manifest_sha:raise Conflict('POLICY_ALREADY_CURRENT')
     children=[]
     for row in target.c.db.execute('SELECT subject_idx,payload,active FROM links WHERE channel=? AND project=? AND subject_idx!=? ORDER BY subject_idx',(CHANNEL,target.project,root['uid'])):
