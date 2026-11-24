@@ -46,10 +46,10 @@ function parseScene(options) {
 function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
   if (!/^https:\/\/[A-Za-z0-9.-]+(?::443)?$/.test(baseUrl) &&
       !/^http:\/\/127\.0\.0\.1:[0-9]{4,5}$/.test(baseUrl) &&
-      baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview' && baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-h5-test')throw Error('TRUSTED_BACKEND_REQUIRED');
+      baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview' && baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-test-354d1fac' && baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-h5-test')throw Error('TRUSTED_BACKEND_REQUIRED');
   let token=null,expires=0,generation=0;
   const request=(path,data,credential,scene)=>new Promise((resolve,reject)=>{
-    wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'?30000:path==='/mini/merchant'&&data.operation==='ocr'?15000:path==='/mini/login'||path==='/mini/merchant'&&data.operation==='collection_code'?15000:5000,
+    wx.request({url:baseUrl+path,method:'POST',data,timeout:path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&(data.params.operation==='upload'||data.params.operation==='wechat_media')?30000:path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='direct_ocr_sign'?30000:path==='/mini/merchant'&&data.operation==='ocr'?15000:path==='/mini/login'||path==='/mini/merchant'&&data.operation==='collection_code'?15000:5000,
       header:{'content-type':'application/json',...(credential?{'X-Community-Session':credential}:{}),...(scene?{'X-Community-Scene':scene}:{})},
       success:r=>{
         if(r.statusCode===200){if(path==='/mini/merchant'&&data.operation==='ocr'&&classifyOcrEmptyResponse(r.data)){const emptyError=Error('OCR_EMPTY_RESPONSE');emptyError.ocrCode='OCR_EMPTY_RESPONSE';emptyError.emptyResponseClassified=true;reject(emptyError);return;}resolve(r.data);return;}
@@ -66,10 +66,14 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
         if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
         if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;
         if(r.statusCode===400&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&['submit','wechat_submit_review','wechat_apply'].includes(data.params.operation)&&r.data&&r.data.error==='MINI_LICENSE_REGION_INVALID'&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','DIRECTORY_MISMATCH','AMBIGUOUS_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(r.data.reason))error.regionReason=r.data.reason;
-        // Preserve a credential only for exact, typed capability-unavailable replies.
+        // Preserve a credential only for exact typed operation-local failures.
         // The operation still fails; generic access denial and every 401 clear it.
         if(r.statusCode===403&&path==='/mini/merchant'){
-          if(data.operation==='ocr'&&['OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(error.ocrCode))error.sessionPreserved=true;
+          const d=error.ocrDiagnostic;
+          const staleDraftVersion=data.operation==='ocr'&&error.ocrCode==='OCR_SOURCE_CHANGED'&&
+            d&&d.stage==='SOURCE_BINDING'&&
+            ['APPLICATION_REVISION_CHANGED','PROVIDER_VERSION_CHANGED'].includes(d.reason);
+          if(data.operation==='ocr'&&(['OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(error.ocrCode)||staleDraftVersion))error.sessionPreserved=true;
           if(data.operation==='onboarding'&&data.params&&data.params.operation==='wechat_media'&&r.data&&r.data.error==='WECHAT_MEDIA_UNAVAILABLE'){
             error.mediaCode='WECHAT_MEDIA_UNAVAILABLE';error.sessionPreserved=true;
           }
@@ -171,9 +175,9 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
     },
     async merchant(scene, operation, params) {
       if(!token||now()>=expires)throw Error('SESSION_EXPIRED');
-      const applicantOcr=scene===''&&operation==='ocr'&&params&&['submit','read','confirm','delete','apply_confirmed','recover_view','recover_confirm','recover_apply'].includes(params.action);
+      const applicantOcr=scene===''&&operation==='ocr'&&params&&['submit','read','confirm','delete','apply_confirmed','recover_view','recover_confirm','recover_apply','locate','review_current'].includes(params.action);
       const applicantOnly=applicantOcr||scene===''&&operation==='onboarding'&&params&&
-        ['material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history','notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_apply','wechat_status','wechat_media','wechat_cashier_link','wechat_qualifications_select'].includes(params.operation);
+        ['material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history','notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_apply','wechat_status','wechat_owner_sign_qr','wechat_media_status','wechat_media','wechat_cashier_link','wechat_qualifications_select'].includes(params.operation);
       if((!applicantOnly&&(typeof scene!=='string'||!/^[A-Za-z0-9_-]{1,32}$/.test(scene)))||
          !['workspaces','onboarding','read','write','collection_code','ocr'].includes(operation)||!params||typeof params!=='object'||Array.isArray(params))throw Error('INVALID_MERCHANT_REQUEST');
       const version=generation;

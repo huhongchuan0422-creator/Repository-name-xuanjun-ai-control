@@ -1,5 +1,6 @@
+const getProfilePhonePolicy = require('./pages/user-agreement/content').policy;
 App({
-  globalData: {baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false},
+  globalData: {baseUrl: 'https://uk.wenwenwenyiyiyi.work/community-preview', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '', profilePhonePolicy: getProfilePhonePolicy()},
   // Same-runtime applicant test access. The caller supplies the existing page,
   // never a login code/token. This does not enable cross-browser identity reuse.
   createDraftTestDriver(page) {
@@ -13,8 +14,9 @@ App({
     this.globalData = {baseUrl, token, mode: 'OFFLINE'};
   },
   configureService(baseUrl, payments=false, commerce=false) {
-    if (!/^https:\/\/[A-Za-z0-9.-]+$/.test(baseUrl)) throw Error('HTTPS_BACKEND_REQUIRED');
+    if (baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview' && !/^https:\/\/[A-Za-z0-9.-]+$/.test(baseUrl)) throw Error('HTTPS_BACKEND_REQUIRED');
     if(typeof payments!=='boolean'||typeof commerce!=='boolean')throw Error('INVALID_PAYMENT_CONFIGURATION');
     this.globalData = {baseUrl, token: '', mode: 'WECHAT_LOGIN', payments, commerce};
+    if (baseUrl==='https://uk.wenwenwenyiyiyi.work/community-preview') this.globalData.profilePhonePolicy = getProfilePhonePolicy();
   }
 });

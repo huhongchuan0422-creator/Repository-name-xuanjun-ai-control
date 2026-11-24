@@ -1,0 +1,8 @@
+<view style="padding:32rpx;color:#222;line-height:1.75;">
+  <block wx:if="{{document}}">
+    <view style="font-size:40rpx;font-weight:600;">用户服务协议</view>
+    <view style="margin:8rpx 0 24rpx;color:#555;">版本：{{document.version}}</view>
+    <view wx:for="{{document.sections}}" wx:key="*this" style="margin-bottom:20rpx;">{{item}}</view>
+  </block>
+  <view wx:else>用户服务协议暂未发布。</view>
+</view>
