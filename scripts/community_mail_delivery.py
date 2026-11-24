@@ -432,6 +432,8 @@ class MailDelivery:
         except BaseException:self.db.rollback();raise
 
 def install(center,bindings=(),transports=None):
+    from scripts.pr122_customer_identity import install as install_identity
+    install_identity(center) # IF-NOT-EXISTS DDL only; the frozen 3629 core installs the same tables on its lineage.
     delivery=MailDelivery(center.db,bindings,transports,clock=center.clock);center.mail_delivery=delivery;center.mail_ready=delivery.ready
     def mail_challenge(self,kind,outbox_kind,user,address):
         for row in self.db.execute("SELECT * FROM outbox WHERE user_id=? AND kind=? AND status!='CANCELLED' ORDER BY at DESC,rowid DESC",(user,outbox_kind)).fetchall():
@@ -466,5 +468,22 @@ def install(center,bindings=(),transports=None):
         if oid:self.deliver_outbox(oid)
         return {'status':'CHECK_VERIFICATION_CHANNEL'}
     from scripts.pr122_customer_core import Unavailable,canonical
-    center._mail_unavailable=Unavailable;center._mail_canonical=canonical;center.mail_challenge=types.MethodType(mail_challenge,center);center.deliver_outbox=types.MethodType(deliver_outbox,center);center.register=types.MethodType(register,center);center.request_reset=types.MethodType(request_reset,center)
+    def mail_receipt(self,user_id,kind):
+        # CRM receipt read-back for the same user through the original Center entry.
+        # Non-secret control states only: never decrypts outbox payloads or exposes addresses/tokens.
+        if kind not in ('VERIFY','RESET'):raise self._mail_unavailable('MAIL_RECEIPT_KIND_INVALID')
+        row=self.db.execute("SELECT id,status,at FROM outbox WHERE user_id=? AND kind=? ORDER BY at DESC,rowid DESC LIMIT 1",(user_id,kind)).fetchone()
+        if not row:return None
+        key='outbox:'+row['id'];result={'outbox_id':row['id'],'state':row['status'],'created':row['at']}
+        idem=self.db.execute('SELECT state,provider,attempt_id,updated FROM mail_idempotency WHERE message_key=?',(key,)).fetchone()
+        if idem and idem['state']!='NOT_SUBMITTED':
+            result['state']=idem['state'];result['provider']=idem['provider'];result['attempt_id']=idem['attempt_id'];result['updated']=idem['updated']
+            if idem['attempt_id']:
+                attempt=self.db.execute('SELECT detail,detail_sha256,provider_ref FROM mail_provider_attempts WHERE id=? AND message_key=?',(idem['attempt_id'],key)).fetchone()
+                if attempt is not None:
+                    if attempt['detail'] in DETAIL_CODES and attempt['detail_sha256']==_sha(attempt['detail']):
+                        result['detail_code']=attempt['detail'];result['provider_ref']=attempt['provider_ref']
+                    else:result['state']='UNKNOWN';result['detail_code']='RECONCILIATION_PENDING'
+        return result
+    center._mail_unavailable=Unavailable;center._mail_canonical=canonical;center.mail_challenge=types.MethodType(mail_challenge,center);center.deliver_outbox=types.MethodType(deliver_outbox,center);center.register=types.MethodType(register,center);center.request_reset=types.MethodType(request_reset,center);center.mail_receipt=types.MethodType(mail_receipt,center)
     return delivery
