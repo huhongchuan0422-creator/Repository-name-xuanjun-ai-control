@@ -2,7 +2,7 @@
   "runtime_source_sha": "17ecb128e8e0407e0a99259959babd0fbeea6085",
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
-  "startup_source_manifest_sha256": "76f26fb7f3750cdfab99e32d1be698b1fac949ccec0adcdf60f4437bdb81a771",
+  "startup_source_manifest_sha256": "8212a86de627bebb0b9d03a713e76136d7ef628650ebd43e80931821a565a34f",
   "frontend_manifest_sha256": "1877e83c8e78fe7cc15fe25ac8d9be8193fc3ff41c9d3e85bb6c586b4af93f92",
   "frontend_archive_sha256": "69b8c4c9647a51912be10ff3e68eb32aae78fc89dcee49c21746f32222f85b33",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
