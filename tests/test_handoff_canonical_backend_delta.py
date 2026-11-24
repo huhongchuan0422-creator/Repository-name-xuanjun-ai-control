@@ -71,11 +71,13 @@ class CanonicalBackend(unittest.TestCase):
             self.assertEqual(verify.call_count,1)
 
     def test_wrong_database_and_nonfinite_clock_do_not_authorize(self):
-        factory=self.sessions.connection_factory
-        self.sessions.connection_factory=lambda:sqlite3.connect(str(self.root/'other.sqlite'))
+        with patch.object(self.sessions,'connection_factory',side_effect=AssertionError('must use pinned readonly canonical DB')):
+            self.assertIsNotNone(self.backend.current_session(self.session))
+        path=self.backend.db_path;missing=self.root/'must-not-create.sqlite'
+        self.backend.db_path=str(missing)
         try:
-            with self.assertRaisesRegex(ValueError,'CANONICAL_SESSION_DATABASE_MISMATCH'):self.backend._read()
-        finally:self.sessions.connection_factory=factory
+            self.assertIsNone(self.backend.current_session(self.session));self.assertFalse(missing.exists())
+        finally:self.backend.db_path=path
         self.backend.clock=lambda:float('nan')
         self.assertIsNone(self.backend.current_session(self.session))
         self.assertIsNone(self.backend.authorize(self.current,'READ',self.binding))

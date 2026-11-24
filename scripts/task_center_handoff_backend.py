@@ -6,6 +6,7 @@ Action rights come only from explicit existing formal_approval_roles records,
 not role labels, a developer owner grant or an inferred phase mapping.
 """
 import copy,json,math,os,sqlite3,time
+from urllib.parse import quote
 from task_center_handoff_host import FormalHandoffIdentityProvider,ACTIONS,ID
 from task_center_session_auth import SessionStore,FileTestIdentityProvider
 
@@ -33,7 +34,8 @@ class CanonicalHandoffBackend:
         return self.identity_provider.verify(username,password)
 
     def _read(self):
-        db=self.sessions.connection_factory();db.row_factory=sqlite3.Row
+        db=sqlite3.connect('file:%s?mode=ro'%quote(self.db_path,safe='/'),uri=True,timeout=5)
+        db.row_factory=sqlite3.Row
         try:
             db.execute('PRAGMA query_only=ON')
             paths=[r[2] for r in db.execute('PRAGMA database_list') if r[1]=='main']
