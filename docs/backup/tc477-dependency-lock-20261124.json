@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "kind": "EXISTING_8FE_SOURCE_IMPORT_CLOSURE",
+  "files": [
+    {
+      "path": "scripts/backup.py",
+      "source_path": "/home/xuanjun_dev/.openclaw/workspace-platform-engineer/deliveries/source-backup-1889-candidate/backup.py",
+      "sha256": "331658a5825eec59286fa75d13421929bf4e0c72943018ba458f7dad3d53b95b",
+      "size": 11327,
+      "transformation": "NONE_BYTE_IDENTICAL"
+    },
+    {
+      "path": "scripts/handoff.py",
+      "source_path": "/home/xuanjun_dev/.openclaw/workspace-platform-engineer/deliveries/source-backup-1889-candidate/handoff.py",
+      "sha256": "4583f36fe821a1e32e9c8d31318b50365660c46ee94ab3b54225c23aa5c395c8",
+      "size": 2245,
+      "transformation": "NONE_BYTE_IDENTICAL"
+    },
+    {
+      "path": "scripts/source_adapter.py",
+      "source_path": "/home/xuanjun_dev/.openclaw/workspace-platform-engineer/deliveries/source-backup-1889-candidate/source_adapter.py",
+      "sha256": "e097f701fd37fc835a1165b26d1852efaa186189bb49fdc5c4437e6ccc79645f",
+      "size": 4793,
+      "transformation": "NONE_BYTE_IDENTICAL"
+    },
+    {
+      "path": "scripts/backup_component_hostcycle.py",
+      "source_path": "/home/xuanjun_dev/.openclaw/workspace-platform-engineer/deliveries/source-backup-1889-candidate/backup_component_hostcycle.py",
+      "sha256": "d554742e1223ba4ca6e4dddbe1f0e727a5f2b971b75176a15ea0db7d030d8406",
+      "size": 22951,
+      "transformation": "NONE_BYTE_IDENTICAL"
+    },
+    {
+      "path": "scripts/task_center_backup_bridge.py",
+      "source_path": "/home/xuanjun_dev/.openclaw/workspace-platform-engineer/deliveries/source-backup-1889-candidate/task_center_backup_bridge.py",
+      "sha256": "f13268d5ba8293bafb0f9f44af60525c2d566541daec03433b8c72d7cc79300a",
+      "size": 2009,
+      "transformation": "NONE_BYTE_IDENTICAL"
+    },
+    {
+      "path": "scripts/task_center_backup_bridge_v2.py",
+      "source_path": "/home/xuanjun_dev/.openclaw/workspace-platform-engineer/deliveries/source-backup-1889-candidate/task_center_backup_bridge_v2.py",
+      "sha256": "140d0122bb74695c205bf7271f32fd4159467a8a7e43f25e9cdea21aae18573f",
+      "size": 5533,
+      "transformation": "NONE_BYTE_IDENTICAL"
+    }
+  ],
+  "no_producer_job_or_config_included": true,
+  "no_real_backup_restore_claim": true
+}
