@@ -122,7 +122,8 @@ class Geo:
             form = body.get('form')
             if type(form) is not dict or set(form) != {'name','website'}:
                 raise ValueError('GEO_BRAND_FIELDS')
-            safe_text(form['name'],150); safe_text(form['website'],2000)
+            safe_text(form['name'],150)
+            if form['website'] != '':safe_text(form['website'],2000)
             if not form['name'].strip() or (form['website'] and not form['website'].startswith('https://')):
                 raise ValueError('GEO_BRAND_INPUT')
             old_brand = self.c.db.execute('SELECT revision FROM geo_brand WHERE project=?', (p['id'],)).fetchone()

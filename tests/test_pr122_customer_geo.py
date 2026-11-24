@@ -130,4 +130,9 @@ class GeoTests(unittest.TestCase):
   self.assertEqual(self.c.db.execute('SELECT count(*) FROM geo_brand').fetchone()[0],0)
   self.assertEqual(self.c.db.execute('SELECT count(*) FROM geo_commands').fetchone()[0],0)
 
+ def test_empty_website_remains_optional_without_new_form_gate(self):
+  self.admit();self.c.geo.command(self.owner,{**self.cmd,'form':{'name':'synthetic-brand','website':''}})
+  self.assertEqual(self.c.geo.snapshot(self.owner,self.scope)['brand']['website'],'')
+  with self.assertRaises(ValueError):self.c.geo.command(self.owner,{**self.cmd,'idempotency_key':'bad-url','form':{'name':'synthetic-brand','website':'http://example.invalid'}})
+
 if __name__=='__main__':unittest.main()
