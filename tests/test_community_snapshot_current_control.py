@@ -9,7 +9,7 @@ class CurrentControl(unittest.TestCase):
   shutil.copytree(ROOT/'deploy/community-preview/hangzhou-snapshot',p/'hangzhou-snapshot')
   self.env=dict(GITHUB_EVENT_NAME='workflow_dispatch',GITHUB_REPOSITORY=REPO,GITHUB_REF=REF,GITHUB_SHA='c'*40,PREVIEW_CONTROL_SHA='c'*40,PREVIEW_ENABLED='true',PREVIEW_TARGET='uk-path-candidate',COMMUNITY_SNAPSHOT_FROM_SOURCE='true')
  def test_new_control_binds_unchanged_pinned_archive(self):
-  build(self.root,self.env);b=json.loads((self.root/'hangzhou-snapshot-input/binding.json').read_text());self.assertEqual(b['control_source_sha'],'c'*40);self.assertEqual(b['archive_sha256'],'ca05f1558d7d13b95b025bf59c1607917c3fc8f304a830c2e72497f818943a12');self.assertEqual((self.root/'hangzhou-snapshot-input/snapshot.zip').read_bytes(),(self.root/'deploy/community-preview/hangzhou-snapshot/snapshot.zip').read_bytes())
+  build(self.root,self.env);b=json.loads((self.root/'hangzhou-snapshot-input/binding.json').read_text());self.assertEqual(b['control_source_sha'],'c'*40);self.assertEqual(b['archive_sha256'],'19343328fc44b7b7b404d742fa3db2d107bf6a6d871cfa0b89a570db3c9d7333');self.assertEqual((self.root/'hangzhou-snapshot-input/snapshot.zip').read_bytes(),(self.root/'deploy/community-preview/hangzhou-snapshot/snapshot.zip').read_bytes())
  def test_node_prepare_preserves_exact_57_file_snapshot(self):
   import hashlib
   from scripts.community_mini_snapshot_input import prepare
