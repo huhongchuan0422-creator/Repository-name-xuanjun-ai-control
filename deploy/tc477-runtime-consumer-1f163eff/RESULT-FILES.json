@@ -1,0 +1,30 @@
+{
+  "before_install_manifest_sha256": "258113cd9e3891ae04675ddb14dd2ce9469382741f61a29981d8accee5fc0420",
+  "before_release": "/opt/xuanjun-task-center-test/releases/tc477-runtime-overlay-a8a72185-20261124",
+  "build_id": "tc477-consumer-1f163eff206a",
+  "config_policy": "OWNER_0600_SELECTORS_NO_SECRET_BODY_NO_PLUGIN_LOADER",
+  "delete_files": [],
+  "dependency_lock_sha256": "339ed2f04d782d3edb76639823553c8a9f125327d2147c75d1b3f905c40392c9",
+  "expected_result_directory_count": 66,
+  "expected_result_file_count": 674,
+  "files": [
+    {
+      "before_mode": "0644",
+      "before_sha256": "2f5060df69d113aec894a2ef02d47cf0f827f4c55e2f0997ba8a1bffa2ca1ca5",
+      "mode": "0o644",
+      "path": "scripts/task_center_handoff_runtime.py",
+      "result_sha256": "eab6299401384de40c6b56f881a42a5f100f9458348da0d71b8e902c77332e69",
+      "size": 8806
+    }
+  ],
+  "formal_handoff_default": "DISABLED_OR_BACKEND_UNAVAILABLE_NO_FAKE_COMPLETE",
+  "install_performed": false,
+  "installed_base_artifact_sha256": "26c98cb9a2d7673e42e3bbc2c48d2e1c6cdec252ff2f0a4c84908c84256edb19",
+  "kind": "INSTALLER_DELTA_CANDIDATE",
+  "launch_entry": "scripts/task_center_handoff_launch.py",
+  "preserve_all_unlisted_installed_paths": true,
+  "schema": 1,
+  "source_commit": "1f163eff206a636a6ae0c618e58cd6995e7c31f7",
+  "source_tree": "b00148379bd42b6b181e3fa84cb3fc92a0754b3e",
+  "unchanged_base_payload_count": 46
+}
