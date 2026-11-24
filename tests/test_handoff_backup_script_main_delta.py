@@ -81,6 +81,41 @@ class ScriptMainBackup(unittest.TestCase):
         self.assertEqual(captured[1][0],200);receipt=captured[1][1];self.assertEqual(receipt['backup_state'],'INCOMPLETE')
         self.assertNotIn('SOURCE',receipt['missing']);self.assertIn('CREDENTIAL_RECOVERY',receipt['missing']);self.assertEqual(receipt['alert_delivery'],'UNKNOWN')
         self.assertEqual(observed,[False])
+    def test_lifecycle_root_survives_backup_host_reassembly_and_http(self):
+        root=self.root/'lifecycle';(root/'artifacts').mkdir(parents=True)
+        captured,binding,observed=self.run_main([
+            '--handoff-candidate-lifecycle-root',str(root),
+            '--handoff-backup-inventory-file',str(self.config)])
+        host,bridge=binding[0]
+        self.assertEqual(host._lifecycle_candidate_readback.artifacts,str(root/'artifacts'))
+        self.assertIs(bridge.host,host)
+        self.assertIs(host.role_contract,self.host.role_contract)
+        self.assertIsNone(self.host._lifecycle_candidate_readback)
+        self.assertIs(self.bridge.host,self.host)
+        self.assertEqual(captured[0][0],200)
+        self.assertEqual(captured[1][1]['backup_state'],'INCOMPLETE')
+        self.assertIn('CREDENTIAL_RECOVERY',captured[1][1]['missing'])
+        self.assertEqual(observed,[False])
+
+    def test_lifecycle_root_without_backup_config_preserves_adapter(self):
+        root=self.root/'lifecycle';(root/'artifacts').mkdir(parents=True)
+        captured,binding,observed=self.run_main(['--handoff-candidate-lifecycle-root',str(root)])
+        host,bridge=binding[0]
+        self.assertIs(host.adapter,self.auth)
+        self.assertIs(bridge.host,host)
+        self.assertEqual(host._lifecycle_candidate_readback.artifacts,str(root/'artifacts'))
+        self.assertEqual(captured[1][1]['backup_state'],'UNKNOWN')
+        self.assertEqual(observed,[])
+
+    def test_lifecycle_config_fails_before_listener_for_missing_root_or_host(self):
+        with patch.object(app,'make_server',side_effect=AssertionError('must not bind')):
+            with self.assertRaisesRegex(ValueError,'EXISTING_CANDIDATE_LIFECYCLE_ROOT_REQUIRED'):
+                app.main(self.argv+['--handoff-candidate-lifecycle-root',str(self.root/'missing')],
+                    identity_provider=IdentityStub(),session_store=self.sessions,handoff_host=self.host)
+            with self.assertRaisesRegex(ValueError,'HANDOFF_HOST_REQUIRED_FOR_LIFECYCLE_CONFIG'):
+                app.main(self.argv+['--handoff-candidate-lifecycle-root',str(self.root)],
+                    identity_provider=IdentityStub(),session_store=self.sessions)
+
     def test_disabled_config_keeps_existing_host_bridge_and_unknown(self):
         self.write_config({'schema_version':1,'enabled':False,'policies':[]})
         captured,binding,observed=self.run_main(['--handoff-backup-inventory-file',str(self.config)])

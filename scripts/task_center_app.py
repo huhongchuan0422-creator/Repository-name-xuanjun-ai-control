@@ -1754,6 +1754,7 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
     parser.add_argument('--delivery-backup-observation-file')
     parser.add_argument('--delivery-backup-receipt-file')
     parser.add_argument('--handoff-backup-inventory-file')
+    parser.add_argument('--handoff-candidate-lifecycle-root')
     args = parser.parse_args(argv)
     ledger_config=(args.delivery_ledger_root,args.delivery_ledger_namespace,args.delivery_ledger_writer)
     observation_config=(args.delivery_observation_file,args.delivery_observation_collector)
@@ -1829,6 +1830,23 @@ def main(argv=None, *, execution_provider=None, delivery_ledger_reader=None,
         raise ValueError('ADMIN_TOKEN_OR_IDENTITY_REQUIRED')
     if identity_provider is not None and (admin_token is not None or actor_tokens):
         raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
+    if args.handoff_candidate_lifecycle_root is not None:
+        from task_center_handoff_host import HandoffHost
+        from task_center_handoff_ledger import HandoffLedgerBridge
+        if type(handoff_host) is not HandoffHost:
+            raise ValueError('HANDOFF_HOST_REQUIRED_FOR_LIFECYCLE_CONFIG')
+        if ledger_bridge is not None and (type(ledger_bridge) is not HandoffLedgerBridge or ledger_bridge.host is not handoff_host):
+            raise ValueError('HANDOFF_LEDGER_HOST_BINDING_REQUIRED')
+        root=args.handoff_candidate_lifecycle_root
+        if not os.path.isabs(root) or not os.path.isdir(os.path.join(root,'artifacts')):
+            raise ValueError('EXISTING_CANDIDATE_LIFECYCLE_ROOT_REQUIRED')
+        # Select only the host-owned artifact reader. No lifecycle apply,
+        # identity grant or backup completeness is inferred from this path.
+        handoff_host=HandoffHost(handoff_host.db,handoff_host.tenant_id,handoff_host.issuer,
+            handoff_host.adapter,clock=handoff_host.clock,mcp_config=handoff_host.mcp_config,
+            role_contract=handoff_host.role_contract,candidate_lifecycle_root=root)
+        if ledger_bridge is not None:
+            ledger_bridge=HandoffLedgerBridge(handoff_host,ledger_bridge.root,ledger_bridge.namespace,ledger_bridge.writer)
     if args.handoff_backup_inventory_file is not None:
         if handoff_host is None:raise ValueError('HANDOFF_HOST_REQUIRED_FOR_BACKUP_CONFIG')
         if ledger_bridge is not None:
