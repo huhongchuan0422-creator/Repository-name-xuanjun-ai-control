@@ -13,7 +13,7 @@ function identity(env,{verifySource}){
  for(const n of ['manifest_sha256','archive_sha256','compatibility_evidence_sha256'])need(/^[a-f0-9]{64}$/.test(b[n]||''));
  need(/^[a-f0-9]{40}$/.test(b.backend_source_sha||''));
  const receipt=JSON.parse(fs.readFileSync(path.join(root,'snapshot-receipt.json'),'utf8'));
- need(receipt.status==='SNAPSHOT_STAGED_NOT_UPLOAD_ADMITTED'&&receipt.manifest_sha256===b.manifest_sha256&&receipt.zip_sha256===b.archive_sha256&&receipt.appid===b.appid&&Object.keys(receipt.source_files).length===51);
+ need(receipt.status==='SNAPSHOT_STAGED_NOT_UPLOAD_ADMITTED'&&receipt.manifest_sha256===b.manifest_sha256&&receipt.zip_sha256===b.archive_sha256&&receipt.appid===b.appid&&Object.keys(receipt.source_files).length===57);
  // Receipt cannot substitute the externally pinned complete source map.
  need(JSON.stringify(Object.entries(receipt.source_files).sort())===JSON.stringify(Object.entries(b.source_files).sort()));
  verifySource(path.join(root,'clients/community-mini'),b.source_files);
