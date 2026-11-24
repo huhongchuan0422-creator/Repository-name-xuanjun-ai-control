@@ -37,7 +37,7 @@ class OriginalApplicationPolicy:
     if submission_evidence_class(record)=='DRAFT':
      reason='NOT_SUBMITTED';raise ValueError()
     reason='PROVIDER_MERCHANT_MISMATCH'
-    if merchant!=self.applyment.reader._mchid:raise ValueError()
+    if merchant!=self.applyment.reader_for_record(record)._mchid:raise ValueError()
     reason='NO_VERIFIED_SUBMISSION'
     receipts=list(record.get('submission_receipts',[]))
     if type(record.get('submission_recovery_receipt'))is dict:receipts.append(record['submission_recovery_receipt'])

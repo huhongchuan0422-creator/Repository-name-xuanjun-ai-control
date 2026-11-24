@@ -34,7 +34,7 @@ class OwnerSubmissionRecovery:
         need(record['owner_submit_confirmation'].get('account_epoch')==account[1])
         need(record['owner_submit_confirmation'].get('project')==self.project)
         code=record.get('business_code');merchant=record.get('provider_sp_mchid')
-        need(type(code)is str and re.fullmatch('[A-Za-z0-9_-]{1,64}',code) and merchant==self.a.reader._mchid)
+        need(type(code)is str and re.fullmatch('[A-Za-z0-9_-]{1,64}',code) and merchant==self.a.reader_for_record(record)._mchid)
         return copy.deepcopy(dict(application=application,owner=owner,record=record,meta=meta,platform=platform,
             account=tuple(account),realm=tuple(realm),project=self.project,merchant=merchant,code=code))
     @staticmethod
@@ -74,7 +74,7 @@ class OwnerSubmissionRecovery:
             except (PermissionError,ValueError,KeyError,TypeError):
                 self.due[application]=time.monotonic()+self.interval;continue
             binding={'merchant':snapshot['merchant'],'code':snapshot['code']}
-            self.pending=(snapshot,self.worker.submit(self.network,self.a.reader,binding));break
+            self.pending=(snapshot,self.worker.submit(self.network,self.a.reader_for_record(snapshot['record']),binding));break
     def close(self):
         self.owner_thread();self.closed=True
         if self.pending:self.pending[1].cancel()

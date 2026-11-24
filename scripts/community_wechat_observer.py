@@ -63,7 +63,7 @@ class ApplymentObserver:
         need(realm_compatible(c,application,g['owner'],meta,r,g['project']))
         need(type(r)is dict and r.get('state')!='SUBMISSION_UNKNOWN')
         need(r.get('business_code')==g['business_code'] and r.get('applyment_id')==g['applyment_id'])
-        need(r.get('provider_sp_mchid')==g['provider_merchant']==self.reader._mchid)
+        need(r.get('provider_sp_mchid')==g['provider_merchant']==self.applyment.reader_for_record(r)._mchid)
         # Stored proof comes only from the original verified submission/recovery.
         receipts=list(r.get('submission_receipts',[]))
         if type(r.get('submission_recovery_receipt'))is dict:receipts.append(r['submission_recovery_receipt'])
@@ -82,6 +82,7 @@ class ApplymentObserver:
     @staticmethod
     def network(reader,binding):
         # No Center, SQLite, records/materials, request-controlled path or POST.
+        need(reader._mchid==binding['provider_merchant'],'OBSERVATION_PROVIDER_READER_MISMATCH')
         return request(reader,'GET','/v3/applyment4sub/applyment/business_code/'+binding['business_code'],include_verification=True)
     def commit(self,prepared,result):
         self.owner_thread();g=prepared['snapshot']['grant'];application=g['application'];c=self.center
@@ -141,7 +142,7 @@ class ApplymentObserver:
             need(self._matching(previous,current) and previous.get('provider_state')=='APPLYMENT_STATE_FINISHED'
                  and previous.get('sync_error') is None,'CURRENT_FINISHED_MERCHANT_REQUIRED')
             prepared={'snapshot':current,'previous':previous}
-        result=self.network(self.reader,current['grant'])
+        result=self.network(self.applyment.reader_for_record(current['record']),current['grant'])
         self.commit(prepared,result)
         with self.center.tx():
             binding=self.collection_binding(application)
@@ -239,7 +240,7 @@ class ApplymentObserver:
                 self.due[app]=time.monotonic()+p['interval_seconds'];continue
             if prepared is None:continue
             binding=copy.deepcopy(prepared['snapshot']['grant'])
-            self.pending=(prepared,self.worker.submit(self.network,self.reader,binding));break
+            self.pending=(prepared,self.worker.submit(self.network,self.applyment.reader_for_record(prepared['snapshot']['record']),binding));break
     def close(self):
         self.owner_thread();self.closed=True
         self.owner_recovery.close()

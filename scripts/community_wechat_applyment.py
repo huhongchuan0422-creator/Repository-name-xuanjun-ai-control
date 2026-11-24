@@ -219,11 +219,14 @@ def original_submission_intent(current,code,version):
 
 
 class WechatApplyment:
-    def __init__(self,onboarding,reader,*,submission_enabled=False):
+    def __init__(self,onboarding,reader,*,submission_enabled=False,provider_readers=None,submission_provider=None):
         from scripts.community_merchant_onboarding import MerchantOnboarding
         from scripts.community_wechat_sp_readonly import PartnerOrderReader
         if type(onboarding) is not MerchantOnboarding or not isinstance(reader,PartnerOrderReader) or type(submission_enabled) is not bool:raise ValueError('ORIGINAL_ONBOARDING_AND_PROVIDER_REQUIRED')
         self.onboarding,self.center,self.reader=onboarding,onboarding.center,reader
+        if provider_readers is not None and (type(provider_readers) is not dict or any(not isinstance(value,PartnerOrderReader) for value in provider_readers.values())):raise ValueError('ORIGINAL_PROVIDER_READERS_REQUIRED')
+        from scripts.community_applyment_readers import ApplymentReaders
+        self.provider_readers=ApplymentReaders(reader,provider_readers,submission_provider)
         self.enabled=submission_enabled
         self.observer=None
     def _read(self,application):
@@ -617,22 +620,16 @@ class WechatApplyment:
             if source_check is not None:source_check(revision,result['version'])
             return dict(written=True,application_revision=revision,wechat_version=result['version'],applied=applied,skipped=skipped)
 
+    def reader_for_record(self,record,*,submission=False):
+        return self.provider_readers.for_record(record,submission=submission)
     def _provider_domain(self,record,*,submission=False):
-        merchant=self.reader._mchid
-        if type(merchant) is not str or not re.fullmatch('[0-9]{6,32}',merchant):
-            raise ValueError('PROTECTED_PROVIDER_MERCHANT_REQUIRED')
-        bound=record.get('provider_sp_mchid')
-        if bound is not None and bound!=merchant:
-            raise PermissionError('PROVIDER_APPLICATION_SERVICE_MERCHANT_CHANGED')
-        if submission and record.get('business_code') and bound is None:
-            raise PermissionError('PROVIDER_APPLICATION_DOMAIN_UNCONFIRMED_QUERY_REQUIRED')
-        return merchant
+        return self.reader_for_record(record,submission=submission)._mchid
     def _check_response_owner(self,application,code,merchant,applyment_id,verified):
         # BEGIN IMMEDIATE serializes the check and the following original-record
         # save across all applications/connections. No separate account or ledger.
         c=self.center
         if not c.db.in_transaction:raise ValueError('ORIGINAL_CENTER_TRANSACTION_REQUIRED')
-        if self.reader._mchid!=merchant:
+        if merchant not in self.provider_readers.readers:
             raise PermissionError('PROVIDER_APPLICATION_SERVICE_MERCHANT_CHANGED')
         rows=c.db.execute("SELECT subject_idx,project,payload FROM links WHERE channel='COMMUNITY_WECHAT_APPLYMENT'")
         for row in rows:
@@ -692,12 +689,13 @@ class WechatApplyment:
         from scripts.community_applyment_conditions import validate
         validate(profile,entity,self.center.now())
         # Current official industry/bank catalogs and provider review remain authoritative.
-    def _encrypt(self,value,key=None):
-        if type(value) is dict:return {k:self._encrypt(v,k) for k,v in value.items()}
-        if type(value) is list:return [self._encrypt(v,key) for v in value]
+    def _encrypt(self,value,key=None,*,reader=None):
+        reader=self.reader if reader is None else reader
+        if type(value) is dict:return {k:self._encrypt(v,k,reader=reader) for k,v in value.items()}
+        if type(value) is list:return [self._encrypt(v,key,reader=reader) for v in value]
         if key in SENSITIVE:
-            if type(value) is not str or not value or len(value.encode())>serialization.load_pem_public_key(self.reader._public).key_size//8-42:raise ValueError('INVALID_SENSITIVE_OFFICIAL_FIELD')
-            public=serialization.load_pem_public_key(self.reader._public)
+            if type(value) is not str or not value or len(value.encode())>serialization.load_pem_public_key(reader._public).key_size//8-42:raise ValueError('INVALID_SENSITIVE_OFFICIAL_FIELD')
+            public=serialization.load_pem_public_key(reader._public)
             return base64.b64encode(public.encrypt(value.encode(),padding.OAEP(mgf=padding.MGF1(hashes.SHA1()),algorithm=hashes.SHA1(),label=None))).decode()
         return value
     def _owner_direct_wire_profile(self, profile):
@@ -735,12 +733,14 @@ class WechatApplyment:
 
     def _validate_media(self,profile,application,meta,*,_owner_direct_integrity=False):
         rows=self.center.db.execute("SELECT subject_idx,payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' AND project=? AND active=1",(application,)).fetchall()
+        merchant=self.reader_for_record(self._read(application) or {},submission=True)._mchid
         admitted=set()
         by_media_id={}; referenced_kinds=set()
         for key,payload in rows:
             value=json.loads(self.center.decrypt(payload,'wechat-media:'+key))
             current=meta['materials'].get(value['kind'])
-            if current and current['sha256']==value['sha256'] and (current['expires_at'] is None or current['expires_at']>self.center.now()):
+            expected=hashlib.sha256(canonical([merchant,application,value['kind'],value['sha256']])).hexdigest()
+            if key==expected and current and current['sha256']==value['sha256'] and (current['expires_at'] is None or current['expires_at']>self.center.now()):
                 admitted.add(value['media_id'])
                 if _owner_direct_integrity:by_media_id.setdefault(value['media_id'],set()).add(value['kind'])
         def walk(value,key=''):
@@ -780,6 +780,7 @@ class WechatApplyment:
         # Same verified query commit for original reviewer, explicit owner retry,
         # and the original host's narrowly bound automatic owner-intent recovery.
         c=self.center;data,digest,verified=result
+        if self.reader_for_record(record)._mchid!=merchant:raise PermissionError('PROVIDER_APPLICATION_SERVICE_MERCHANT_CHANGED')
         verified=signed_response_context(verified)
         if data.get('business_code')!=record['business_code'] or type(data.get('applyment_state')) is not str:raise ValueError('PROVIDER_APPLYMENT_BINDING_MISMATCH')
         applyment_id=provider_applyment_id(data)
@@ -930,8 +931,9 @@ class WechatApplyment:
             if _owner_query is not None:
                 if _owner_query()!=uid or owner!=uid or not self._owner_intent_matches(record,application,owner):
                     raise PermissionError('ORIGINAL_OWNER_SUBMISSION_INTENT_REQUIRED')
-            merchant=self._provider_domain(record)
-            data,digest,verified=request(self.reader,'GET','/v3/applyment4sub/applyment/business_code/'+record['business_code'],include_verification=True)
+            reader=self.reader_for_record(record)
+            merchant=reader._mchid
+            data,digest,verified=request(reader,'GET','/v3/applyment4sub/applyment/business_code/'+record['business_code'],include_verification=True)
             def authorize_query():
                 if c.session(session,csrf)!=uid or (_owner_query is not None and _owner_query()!=uid):raise PermissionError('CURRENT_ORIGINAL_QUERY_OWNER_REQUIRED')
                 self.onboarding._load(application,uid,_owner_query is None)
@@ -950,7 +952,8 @@ class WechatApplyment:
                 if _owner_submit()!=uid or owner!=uid:raise PermissionError('CURRENT_ORIGINAL_APPLICANT_REQUIRED')
                 if record is None or record['state'] not in ('DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED'):
                     raise PermissionError('CURRENT_OWNER_SUBMISSION_VERSION_REQUIRED')
-            merchant=self._provider_domain(record,submission=True)
+            reader=self.reader_for_record(record,submission=True)
+            merchant=reader._mchid
             if _owner_submit is None:
                 self.onboarding._check_materials(application,meta)
                 self._validate(record['profile'],meta['entity_type'])
@@ -983,7 +986,7 @@ class WechatApplyment:
             attempt=code if not (correction or parameter_retry) else code+':revision:'+str(version)
             retry_sequence=record.get('explicit_retry_sequence',0)
             intent_token=secrets.token_hex(16)
-            payload=dict(self._encrypt(provider_submission_profile(record['profile']) if _owner_submit is None else outgoing),business_code=code)
+            payload=dict(self._encrypt(provider_submission_profile(record['profile']) if _owner_submit is None else outgoing,reader=reader),business_code=code)
             with c.tx():
                 if c.session(session,csrf)!=uid or (_owner_submit is not None and _owner_submit()!=uid):raise PermissionError('CURRENT_ORIGINAL_SUBMITTER_REQUIRED')
                 current_owner,current_meta,current_platform=self.onboarding._load(application,uid,_owner_submit is None)
@@ -1007,7 +1010,7 @@ class WechatApplyment:
                 current.pop('correction_receipt',None);self._save(application,owner,current)
                 c.audit(application,uid,'WECHAT_APPLYMENT_SUBMISSION_ATTEMPT',code)
             try:
-                data,digest,verified=request(self.reader,'POST','/v3/applyment4sub/applyment/',payload,include_verification=True)
+                data,digest,verified=request(reader,'POST','/v3/applyment4sub/applyment/',payload,include_verification=True)
             except Exception as error:
                 self._retain_verified_provider_error(error,application,owner,code,version,retry_sequence=retry_sequence,intent_token=intent_token)
                 if _owner_submit is not None and not isinstance(error,PermissionError) and self._owner_intent_matches(self._read(application),application,owner):
@@ -1193,7 +1196,8 @@ class WechatApplyment:
             raise PermissionError('SCANNED_ORIGINAL_MATERIAL_REQUIRED')
         if row[3] not in ('image/jpeg','image/png','application/pdf'):
             raise ValueError('UNSUPPORTED_PROVIDER_MEDIA')
-        key = hashlib.sha256(canonical([self.reader._mchid,application,kind,source])).hexdigest()
+        reader=self.reader_for_record(self._read(application) or {},submission=True)
+        key = hashlib.sha256(canonical([reader._mchid,application,kind,source])).hexdigest()
         result = dict(application=application,kind=kind,source_sha256=source,state='PENDING_OR_UNKNOWN')
         # An old missing receipt is not proof that no upstream attempt occurred.
         row = c.db.execute("SELECT payload FROM links WHERE channel='COMMUNITY_WECHAT_MEDIA' "
@@ -1251,7 +1255,8 @@ class WechatApplyment:
         # Once sent, retain the original response evidence even if the applicant
         # later withdraws locally. Withdrawal never cancels a provider operation.
         _actor=_mini_actor if callable(_mini_actor) else reauthorize
-        _key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+        reader=self.reader_for_record(self._read(application) or {},submission=True)
+        _key=hashlib.sha256(canonical([reader._mchid,application,kind,material['sha256']])).hexdigest()
         _direct=callable(_mini_actor) and _start is not None and 'expected_source_sha256' not in _start
         with _MINI_ACTIVE_MEDIA_LOCKS[int(_key[:2],16)%len(_MINI_ACTIVE_MEDIA_LOCKS)]:
             with c.tx():
@@ -1284,7 +1289,7 @@ class WechatApplyment:
             if _owner!=uid or _meta['materials'].get(kind)!=material or _platform['status']=='WITHDRAWN' or (callable(_mini_actor) and _platform['revision']!=_start['application_revision']):
                 raise PermissionError('ORIGINAL_MINI_MEDIA_CONTEXT_CHANGED')
             try:
-                data,digest=request(self.reader,'POST','/v3/merchant/media/upload',raw=body,content_type='multipart/form-data; boundary='+boundary,signing_body=metadata)
+                data,digest=request(reader,'POST','/v3/merchant/media/upload',raw=body,content_type='multipart/form-data; boundary='+boundary,signing_body=metadata)
             except Exception as error:
                 try:
                     cls=type(error).__name__
@@ -1301,7 +1306,7 @@ class WechatApplyment:
                 raise
             if type(data.get('media_id')) is not str or not 1<=len(data['media_id'])<=1024:raise ValueError('INVALID_PROVIDER_MEDIA_ID')
             with c.tx():
-                key=hashlib.sha256(canonical([self.reader._mchid,application,kind,material['sha256']])).hexdigest()
+                key=hashlib.sha256(canonical([reader._mchid,application,kind,material['sha256']])).hexdigest()
                 c.db.execute("INSERT OR IGNORE INTO links VALUES('COMMUNITY_WECHAT_MEDIA',?,?,?,?,1)",(key,owner,application,c.encrypt(canonical(dict(media_id=data['media_id'],kind=kind,sha256=material['sha256'],provider_response_sha256=digest)),'wechat-media:'+key)))
                 c.audit(application,uid,'WECHAT_MEDIA_UPLOADED',key)
                 # The winning persisted receipt is authoritative under concurrent uploads.

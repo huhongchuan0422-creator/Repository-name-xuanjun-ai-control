@@ -21,7 +21,7 @@ CORE_SHA256 = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
 FIELDS = {'version','center_root','runtime_directory','application_config',
           'principals','bindings','operations','reviewers','socket_path',
           'https_origin','nginx_uid','nginx_gid'}
-OPTIONAL_FIELDS = {'community_admin_authority','registration_scenes','community_grants','provider_reader_config','commerce_provider_config','applyment_observer_config','platform_showcase_config'}
+OPTIONAL_FIELDS = {'community_admin_authority','registration_scenes','community_grants','provider_reader_config','commerce_provider_config','applyment_observer_config','platform_showcase_config','applyment_provider_readers_config'}
 
 
 def _require_nonroot():
@@ -53,7 +53,7 @@ def _configuration(plan, key_material, wechat):
         raise ValueError('EXACT_WECHAT_SECRET_INPUT_REQUIRED')
     from scripts.community_mini_login import WechatCodeClient
     WechatCodeClient(wechat['appid'], wechat['app_secret'])  # Validate; no provider IO.
-    for reference in ('provider_reader_config','commerce_provider_config','applyment_observer_config','platform_showcase_config'):
+    for reference in ('provider_reader_config','commerce_provider_config','applyment_observer_config','platform_showcase_config','applyment_provider_readers_config'):
         if reference not in plan:continue
         ref = plan[reference]
         if (type(ref) is not str or not Path(ref).is_absolute()
@@ -62,6 +62,8 @@ def _configuration(plan, key_material, wechat):
     admin_spec=plan.get('community_admin_authority')
     admin_templates=admin_spec.get('workspace_bindings') if type(admin_spec) is dict else None
     admin_onboarding=type(admin_templates) is dict and '/merchant/onboarding#__community_onboarding__' in admin_templates
+    if 'applyment_provider_readers_config' in plan and (not (plan['reviewers'] or admin_onboarding) or 'provider_reader_config' not in plan):
+        raise PermissionError('ORIGINAL_ONBOARDING_READER_REQUIRED_FOR_APPLYMENT_REGISTRY')
     if 'commerce_provider_config' in plan and (not (plan['reviewers'] or admin_onboarding) or 'provider_reader_config' not in plan):
         raise PermissionError('ORIGINAL_ONBOARDING_READER_REQUIRED_FOR_COMMERCE')
     if (plan['reviewers'] or admin_onboarding) and 'provider_reader_config' not in plan:
@@ -106,6 +108,29 @@ def _open_provider_reader(protected_path, clock):
     return PartnerOrderReader(config['sp_mchid'],config['merchant_serial'],
         config['private_key_pem'].encode('ascii'),
         config['public_key_id'],config['public_key_pem'].encode('ascii'),clock)
+
+
+def _open_applyment_readers(protected_path, legacy, clock):
+    """Read only existing protected references; never derives credential roles."""
+    if protected_path is None:return None,None
+    value=load_protected(protected_path)
+    if (type(value) is not dict or set(value)!={'version','submission_provider','additional_readers'}
+            or type(value['version']) is not int or value['version']!=1
+            or type(value['submission_provider']) is not str
+            or type(value['additional_readers']) is not dict):
+        raise ValueError('EXACT_PROTECTED_APPLYMENT_READERS_REQUIRED')
+    readers={}
+    for merchant,reference in value['additional_readers'].items():
+        if (type(reference) is not str or not Path(reference).is_absolute()
+                or str(Path(reference))!=reference or '..' in Path(reference).parts):
+            raise ValueError('PROTECTED_APPLYMENT_READER_REFERENCE_REQUIRED')
+        reader=_open_provider_reader(reference,clock)
+        if merchant!=reader._mchid or merchant==legacy._mchid:
+            raise ValueError('APPLYMENT_READER_IDENTITY_MISMATCH')
+        readers[merchant]=reader
+    from scripts.community_applyment_readers import ApplymentReaders
+    ApplymentReaders(legacy,readers,value['submission_provider'])
+    return readers,value['submission_provider']
 
 
 def _commerce_policy(protected_path):
@@ -227,7 +252,8 @@ class PlatformHost:
                 if 'provider_reader_config' not in plan:raise PermissionError('PROTECTED_PROVIDER_READER_REQUIRED_FOR_ONBOARDING')
                 owner.application.configure_onboarding(plan['reviewers'])
                 reader = _open_provider_reader(plan['provider_reader_config'], owner.center.now)
-                owner.application.configure_wechat_applyment(reader,submission_enabled=commerce_policy[0]['applyment_submission_enabled'] if commerce_policy else False)
+                applyment_readers,submission_provider=_open_applyment_readers(plan.get('applyment_provider_readers_config'),reader,owner.center.now)
+                owner.application.configure_wechat_applyment(reader,submission_enabled=commerce_policy[0]['applyment_submission_enabled'] if commerce_policy else False,provider_readers=applyment_readers,submission_provider=submission_provider)
             owner.application.configure_operations(operations,consumer_only=not bool(operations))
             if 'platform_showcase_config' in plan:
                 from scripts.community_platform_showcase import mount
@@ -321,7 +347,8 @@ class PlatformHost:
                for k, v in plan['reviewers'].items()):
             raise ValueError('ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED')
         # Validate original protected Reader locally; construction has no IO.
-        _open_provider_reader(plan['provider_reader_config'], lambda: 0)
+        reader=_open_provider_reader(plan['provider_reader_config'], lambda: 0)
+        _open_applyment_readers(plan.get('applyment_provider_readers_config'),reader,lambda:0)
         return 'OCR_CONFIGURATION_VALIDATED_NOT_ACTIVATED'
 
     def preflight_applicant_ocr(self):
