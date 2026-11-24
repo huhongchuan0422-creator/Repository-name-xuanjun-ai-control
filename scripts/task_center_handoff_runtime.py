@@ -98,6 +98,12 @@ class HostActionAdapter(HostAuthAdapter):
                 or claims['expires_at']>current['expires_at']):return None
         return copy.deepcopy(claims)
 
+    @property
+    def assess_backup(self):
+        # The original v1 loader requires the exact live consumer, not a
+        # forwarding callback. Resolve on each access so replacement revokes it.
+        return getattr(self.evidence,'assess_backup',super().assess_backup)
+
     def _evidence(self,name,args,default=None):
         fn=getattr(self.evidence,name,None)
         if not callable(fn):return default
