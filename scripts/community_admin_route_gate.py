@@ -21,6 +21,12 @@ ROUTE_FAMILIES = (
 )
 
 
+def authorize_workspace_operation(center, authority, session, csrf, route, operation, workspace):
+    proof = authority.authorize(session, csrf, route, operation, workspace=workspace)
+    from scripts.community_showcase_template import authorize
+    return authorize(center, authority, proof, route, operation, workspace)
+
+
 def enforce_admin_route(center, session, csrf, route, body):
     if type(center) is not Center or route not in ROUTE_FAMILIES:
         raise Denied('ORIGINAL_COMMUNITY_ROUTE_REQUIRED')
@@ -47,7 +53,7 @@ def enforce_admin_route(center, session, csrf, route, body):
     workspace = '__community_onboarding__' if route == '/merchant/onboarding' else body.get('workspace')
     if type(workspace) is not str or not workspace:
         raise Denied('EXACT_COMMUNITY_WORKSPACE_REQUIRED')
-    return authority.authorize(session, csrf, route, body['operation'], workspace=workspace)
+    return authorize_workspace_operation(center, authority, session, csrf, route, body['operation'], workspace)
 
 
 _CURRENT = ContextVar('original_community_admin_request', default=None)
@@ -85,7 +91,7 @@ def community_project(center, uid, project, roles):
     authority = getattr(center, 'community_admin_authority', None)
     if type(authority) is not CommunityAdminAuthority or authority.c is not center:
         raise Denied('EXACT_COMMUNITY_AUTHORITY_COMPOSITION_REQUIRED')
-    live = authority.authorize(context[1], context[2], context[3], context[4], workspace=context[6])
+    live = authorize_workspace_operation(center, authority, context[1], context[2], context[3], context[4], context[6])
     if live != context[5] or project != live['project']:
         raise Denied('COMMUNITY_ADMIN_SCOPE_OR_REVISION_CHANGED')
     record = authority._realm()
@@ -100,7 +106,7 @@ def resolve_admin_workspace(center, legacy_grants, workspace, uid):
     if context is None or context[0] is not center or context[5]['uid'] != uid:
         return legacy_grants.get(workspace)
     authority = getattr(center, 'community_admin_authority', None)
-    admitted = authority.authorize(context[1], context[2], context[3], context[4], workspace=workspace)
+    admitted = authorize_workspace_operation(center, authority, context[1], context[2], context[3], context[4], workspace)
     if admitted != context[5]:
         raise Denied('COMMUNITY_ADMIN_REVISION_CHANGED')
     templates = getattr(center, 'community_admin_workspace_bindings', {})
@@ -114,6 +120,8 @@ def resolve_admin_workspace(center, legacy_grants, workspace, uid):
         raise Denied('COMMUNITY_ADMIN_TEMPLATE_CHANGED')
     if template['project'] != authority.project:
         raise Denied('COMMUNITY_ADMIN_TEMPLATE_PROJECT_CHANGED')
+    if template.get('role') == 'PLATFORM_SHOWCASE_ROOT':
+        raise Denied('SHOWCASE_TEMPLATE_NOT_MERCHANT_GRANT')
     from copy import deepcopy
     grant = {k: (v if k == 'principal' else deepcopy(v)) for k,v in template.items()}
     grant['user_id'] = uid
@@ -151,7 +159,11 @@ def configure_admin_routes(center, runtime, principals, config):
         grant = deepcopy(raw)
         if grant.get('project') != authority.project:
             raise Denied('ADMIN_TEMPLATE_REALM_REQUIRED')
-        if 'principal' in grant:
+        if grant.get('role') == 'PLATFORM_SHOWCASE_ROOT':
+            from scripts.community_showcase_template import validate
+            validate(key, grant, authority.project, authority.tenant)
+            grant['operations'] = tuple(grant['operations'])
+        elif 'principal' in grant:
             if (set(grant) != {'project','project_roles','principal','onboarding_required'}
                     or grant['principal'] not in principals
                     or type(grant['project_roles']) is not list or not grant['project_roles']
@@ -205,7 +217,7 @@ def admin_workspace_catalog(center, legacy_grants):
     current = authority.authority(context[5]['uid'])
     prefix = context[3]+'#'
     for key in current['workspace_scopes']:
-        if key.startswith(prefix):
+        if key.startswith(prefix) and getattr(center, 'community_admin_workspace_bindings', {}).get(key, {}).get('role') != 'PLATFORM_SHOWCASE_ROOT':
             workspace=key[len(prefix):]
             grant=resolve_admin_workspace(center,legacy_grants,workspace,current['uid'])
             if grant is not None:result[workspace]=grant

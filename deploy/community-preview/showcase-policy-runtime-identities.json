@@ -1,0 +1,14 @@
+{
+  "community_admin_preflight.py": {
+    "base_sha256": "550cc1bf27285d20cf0c6e6ca65eead44c5b2c576da4eb0347306ff1b54eebdb",
+    "result_sha256": "0535c467700369c259043bc3fd9c6fcb6bd2bec9d4ea96adc47378a749d26a50"
+  },
+  "community_admin_route_gate.py": {
+    "base_sha256": "c978146a196c5239a59a6d67387d63bc4fd9201d26e715c26671b115cbcf9382",
+    "result_sha256": "33e4429f5fdfbda6e32cefd016e764f497b2c15815e189513d90adf72d9ba234"
+  },
+  "community_showcase_template.py": {
+    "base": "ABSENT",
+    "result_sha256": "0b40dcb1c474ee84b958fd20ebd2f298514dc72426b68872dfe1766171512ac0"
+  }
+}

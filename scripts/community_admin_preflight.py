@@ -53,6 +53,10 @@ def build_plan(host_path,keys_path,wechat_path,backup_path,identity_record_path,
  management={'/community/admin#'+op for op in ('catalog','list','create','grant','revoke')}
  if set(admin['capabilities']) != set(BUSINESS_CAPABILITIES)|management:
   raise Denied('COMPLETE_COMMUNITY_CAPABILITY_INVENTORY_REQUIRED')
+ for key, template in admin['workspace_bindings'].items():
+  if type(template) is dict and template.get('role')=='PLATFORM_SHOWCASE_ROOT':
+   from scripts.community_showcase_template import validate
+   validate(key,template,admin['project'],admin['tenant'])
  if set(admin['workspace_scopes'])!=set(admin['workspace_bindings']):
   raise Denied('EXACT_ADMIN_SCOPE_TEMPLATES_REQUIRED')
  binding_sha=binding_digest(admin['workspace_bindings'],SimpleNamespace(bindings=bindings),principals)

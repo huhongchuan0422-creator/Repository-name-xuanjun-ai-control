@@ -1,0 +1,56 @@
+--- a/scripts/community_admin_route_gate.py
++++ b/scripts/community_admin_route_gate.py
+@@ -32,7 +32,8 @@
+             raise Denied('COMMUNITY_ADMIN_TEMPLATE_CHANGED')
+         if operation not in template['operations']:
+             raise Denied('COMMUNITY_ADMIN_TEMPLATE_OPERATION_DENIED')
+-    return admitted
++    from scripts.community_showcase_template import authorize
++    return authorize(center, authority, admitted, route, operation, workspace)
+ 
+ def enforce_admin_route(center, session, csrf, route, body):
+     if type(center) is not Center or route not in ROUTE_FAMILIES:
+@@ -127,6 +128,8 @@
+         raise Denied('COMMUNITY_ADMIN_TEMPLATE_CHANGED')
+     if template['project'] != authority.project:
+         raise Denied('COMMUNITY_ADMIN_TEMPLATE_PROJECT_CHANGED')
++    if template.get('role') == 'PLATFORM_SHOWCASE_ROOT':
++        raise Denied('SHOWCASE_TEMPLATE_NOT_MERCHANT_GRANT')
+     from copy import deepcopy
+     grant = {k: (v if k == 'principal' else deepcopy(v)) for k,v in template.items()}
+     grant['user_id'] = uid
+@@ -167,7 +170,11 @@
+             raise Denied('EXACT_TEMPLATE_OPERATION_SUBSET_REQUIRED')
+         if grant.get('project') != authority.project:
+             raise Denied('ADMIN_TEMPLATE_REALM_REQUIRED')
+-        if 'principal' in grant:
++        if grant.get('role') == 'PLATFORM_SHOWCASE_ROOT':
++            from scripts.community_showcase_template import validate
++            validate(key, dict(grant, operations=operations), authority.project, authority.tenant)
++            # Original composition restores the validated operations below.
++        elif 'principal' in grant:
+             if (set(grant) != {'project','project_roles','principal','onboarding_required'}
+                     or grant['principal'] not in principals
+                     or type(grant['project_roles']) is not list or not grant['project_roles']
+@@ -225,7 +232,7 @@
+     current = authority.authority(context[5]['uid'])
+     prefix = context[3]+'#'
+     for key in current['workspace_scopes']:
+-        if key.startswith(prefix):
++        if key.startswith(prefix) and getattr(center, 'community_admin_workspace_bindings', {}).get(key, {}).get('role') != 'PLATFORM_SHOWCASE_ROOT':
+             workspace=key[len(prefix):]
+             grant=resolve_admin_workspace(center,legacy_grants,workspace,current['uid'])
+             if grant is not None:result[workspace]=grant
+--- a/scripts/community_admin_preflight.py
++++ b/scripts/community_admin_preflight.py
+@@ -53,6 +53,10 @@
+  management={'/community/admin#'+op for op in ('catalog','list','create','grant','revoke')}
+  if set(admin['capabilities']) != set(BUSINESS_CAPABILITIES)|management:
+   raise Denied('COMPLETE_COMMUNITY_CAPABILITY_INVENTORY_REQUIRED')
++ for key, template in admin['workspace_bindings'].items():
++  if type(template) is dict and template.get('role')=='PLATFORM_SHOWCASE_ROOT':
++   from scripts.community_showcase_template import validate
++   validate(key,template,admin['project'],admin['tenant'])
+  if set(admin['workspace_scopes'])!=set(admin['workspace_bindings']):
+   raise Denied('EXACT_ADMIN_SCOPE_TEMPLATES_REQUIRED')
+  binding_sha=binding_digest(admin['workspace_bindings'],SimpleNamespace(bindings=bindings),principals)
