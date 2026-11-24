@@ -81,7 +81,7 @@ def _scope(scope):
     if not isinstance(scope, dict) or set(scope) != {"tenant_id","merchant_id","store_id"}:
         raise ValueError("INVALID_SCOPE")
     values=tuple(scope[k] for k in ("tenant_id","merchant_id","store_id"))
-    if not all(isinstance(x,str) and 1<=len(x)<=100 and x.isascii() and x.replace("_","").replace("-","").isalnum() for x in values):
+    if not all(isinstance(x,str) and 1<=len(x)<=100 and _ascii(x) and x.replace("_","").replace("-","").isalnum() for x in values):
         raise ValueError("INVALID_SCOPE")
     return values
 
@@ -193,3 +193,43 @@ def review_creative(db, scope, campaign_id, approved, actor, now, expected_versi
         db.execute("INSERT INTO audit_events(tenant_id,merchant_id,store_id,campaign_id,actor_id,action,previous_version,new_version,happened_at) VALUES(?,?,?,?,?,?,?,?,?)",
                    (t,m,s,campaign_id,actor["actor_id"],"MODERATION_"+verdict,expected_version,expected_version+1,now))
     return {"id":campaign_id,"moderation":verdict,"version":expected_version+1}
+
+
+def _ascii(value):
+    try:
+        value.encode("ascii")
+        return True
+    except (AttributeError,UnicodeEncodeError):
+        return False
+
+def metric_report(db, scope, starts_at, ends_at, limit=50, after_id=""):
+    """Read original events in a half-open UTC interval; never infer revenue."""
+    t,m,s = _scope(scope)
+    _now(starts_at); _now(ends_at)
+    if starts_at >= ends_at or ends_at - starts_at > 366 * 86400:
+        raise ValueError("INVALID_REPORT_WINDOW")
+    if (type(limit) is not int or not 1 <= limit <= 200 or
+            type(after_id) is not str or len(after_id) > 100 or
+            (after_id and (not _ascii(after_id) or
+             not after_id.replace("_", "").replace("-", "").isalnum()))):
+        raise ValueError("INVALID_PAGE")
+    rows = db.execute("""
+        SELECT c.campaign_id,c.slot,c.status,
+               COALESCE(SUM(e.kind='IMPRESSION'),0),
+               COALESCE(SUM(e.kind='CLICK'),0)
+        FROM campaigns c LEFT JOIN metric_events e
+          ON e.tenant_id=c.tenant_id AND e.merchant_id=c.merchant_id
+         AND e.store_id=c.store_id AND e.campaign_id=c.campaign_id AND e.slot=c.slot
+         AND e.created_at>=? AND e.created_at<?
+        WHERE c.tenant_id=? AND c.merchant_id=? AND c.store_id=? AND c.campaign_id>?
+        GROUP BY c.campaign_id,c.slot,c.status ORDER BY c.campaign_id LIMIT ?
+        """, (starts_at,ends_at,t,m,s,after_id,limit+1)).fetchall()
+    campaigns = []
+    for cid,slot,status,impressions,clicks in rows[:limit]:
+        campaigns.append(dict(id=cid,slot=slot,status=status,impressions=impressions,
+                              clicks=clicks,click_rate=None if not impressions else clicks/impressions))
+    return dict(campaigns=campaigns,has_more=len(rows)>limit,
+                next_cursor=rows[limit-1][0] if len(rows)>limit else None,
+                starts_at=starts_at,ends_at=ends_at,interval="START_INCLUSIVE_END_EXCLUSIVE",
+                measurement="RECORDED_EVENTS_NOT_VERIFIED_UNIQUE_VISITORS",
+                payment_affected=False,provider_settlement_verified=False)

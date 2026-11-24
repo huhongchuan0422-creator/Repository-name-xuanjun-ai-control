@@ -14,6 +14,7 @@ import secrets
 import sqlite3
 import time
 from pathlib import Path
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from scripts.community_merchant_contract import valid_id
 
 class Denied(PermissionError): pass
@@ -108,8 +109,6 @@ class Center:
         self.db.execute("INSERT OR IGNORE INTO settings VALUES('index_key',?)",(self.key_id,))
         self.index_key=self.db.execute("SELECT v FROM settings WHERE k='index_key'").fetchone()[0]
         if self.index_key not in keys: raise Unavailable('INDEX_KEY_RESTORE_REQUIRED')
-        from scripts.pr122_customer_identity import install as install_identity
-        install_identity(self)
         from scripts.pr122_customer_evidence import install
         try:
             install(self)
@@ -122,11 +121,9 @@ class Center:
     def now(self): return int(self.clock())
     def idx(self,value): return hmac.new(self.keys[self.index_key],value.encode(),hashlib.sha256).hexdigest()
     def encrypt(self,value,aad):
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
         nonce=secrets.token_bytes(12)
         return canonical({'key':self.key_id,'data':base64.b64encode(nonce+AESGCM(self.keys[self.key_id]).encrypt(nonce,value,aad.encode())).decode()})
     def decrypt(self,value,aad):
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
         d=json.loads(value); raw=base64.b64decode(d['data'],validate=True)
         return AESGCM(self.keys[d['key']]).decrypt(raw[:12],raw[12:],aad.encode())
     @contextlib.contextmanager
@@ -151,9 +148,7 @@ class Center:
         if type(p) is not str or not 12<=len(p)<=128: raise ValueError('PASSWORD_12_TO_128')
         return hashlib.scrypt(p.encode(),salt=salt,n=16384,r=8,p=1,dklen=32)
     def challenge(self,kind,user,payload,ttl=600):
-        # Bind tokens travel through the normal secret-scanned chat boundary.
-        # Hex keeps the same 256 random bits without accidental "sk-" substrings.
-        token=secrets.token_hex(32) if kind=='bind' else secrets.token_urlsafe(32)
+        token=secrets.token_urlsafe(32)
         self.db.execute('INSERT INTO challenges VALUES(?,?,?,?,?,0)',(digest(token.encode()),kind,user,self.encrypt(canonical(payload),'challenge'),self.now()+ttl))
         return token
     def consume(self,token,kind,user=None):
@@ -346,7 +341,6 @@ class Center:
             self.project(uid,pid,('OWNER',)); r=self.db.execute('SELECT role FROM members WHERE project=? AND user_id=?',(pid,target)).fetchone()
             if not r or r[0] in ('OWNER','REVIEWER'): raise Denied('PROTECTED_ROLE')
             self.db.execute('UPDATE members SET active=0 WHERE project=? AND user_id=?',(pid,target)); self.db.execute('UPDATE links SET active=0 WHERE project=? AND user_id=?',(pid,target))
-            self.db.execute('UPDATE identity_grants SET used=1 WHERE project_id=? AND user_id=?',(pid,target))
             self.db.execute("UPDATE challenges SET used=1 WHERE kind IN ('invite','bind','confirm_link') AND user_id=?",(target,)); self.audit(pid,uid,'REVOKE',target)
         return {'revoked':True}
     def save(self,uid,pid,item,revision,kind,content,expires=None):
