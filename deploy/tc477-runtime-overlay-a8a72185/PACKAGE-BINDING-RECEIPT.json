@@ -1,0 +1,16 @@
+{
+  "all_before_bindings_and_modes_unchanged": true,
+  "all_payloads_match_frozen_source": true,
+  "artifact_sha256": "26c98cb9a2d7673e42e3bbc2c48d2e1c6cdec252ff2f0a4c84908c84256edb19",
+  "before_install_manifest_sha256": "15ecfa38228e106dc9b8528e98f5b32e9f7d92e67284c71cc1ab521f22091ac6",
+  "long_tests_or_site_install_performed": false,
+  "old_independent_dry_reused": true,
+  "original_artifact_sha256": "5b0ce602042cf92cc5fcecebd87291be53f91cb3e5b003fd2b6bb3a0fede2e01",
+  "original_artifact_unchanged": true,
+  "payload_count": 47,
+  "result_manifest_sha256": "57b7f34b3aaa2b43e6bd5b229ed7ab164c4cd5adb245ac785a97dbd3d06f6af5",
+  "source_commit": "a8a72185ed6164beaf2f8691cca9d682aed5e6e3",
+  "unchanged_payloads": 46,
+  "updated_payload": "scripts/task_center_handoff_launch.py",
+  "updated_payload_sha256": "16b82e92b31795b92e869be4e500c7e4a174ae58a31b89695fb0c4f11198e236"
+}
