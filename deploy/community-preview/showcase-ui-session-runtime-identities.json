@@ -1,0 +1,10 @@
+{
+  "web_session_js": {
+    "base_sha256": "e402fe207f0fcaeee8b2b682c01b61d813f49d64608c00cc6dae74e0449ce2c9",
+    "result_sha256": "088822b7738effd548111762b987a858d9ffccb21ea875e397cb297ef1b9c33f"
+  },
+  "web_session_py": {
+    "base_sha256": "2d7793274b621cb6eae8d35bcba595606233f774979ea7091fb0732e44d4af96",
+    "result_sha256": "17a4f62859afef00b093b9436a632c32fc95e656ee8e3f108e2e3af61f75d277"
+  }
+}

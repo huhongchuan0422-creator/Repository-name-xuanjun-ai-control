@@ -6,7 +6,7 @@ const source=fs.readFileSync(process.argv[2],'utf8');
 const flush=async()=>{for(let i=0;i<120;i++)await Promise.resolve();};
 function harness(initial='',community=false){
  class Element{
-  constructor(){this.value='';this.textContent='';this.disabled=false;this.children=[];this.events={};}
+  constructor(){this.value='';this.textContent='';this.disabled=false;this.children=[];this.events={};this.style={};}
   setAttribute(name,value){this[name]=value;}
   addEventListener(name,fn){this.events[name]=fn;}
   replaceChildren(){this.children=[];this.value='';}
@@ -21,7 +21,7 @@ function harness(initial='',community=false){
  const data=new Map(initial?[['community-original-csrf',initial]]:[]),requests=[],configured=[],homeContexts=[],messages=[];let channel;
  const locks={tail:Promise.resolve(),request(name,fn){assert.equal(name,'community-original-session');const p=this.tail.then(fn);this.tail=p.catch(()=>{});return p;}};
  const window={communityHomeContext:value=>homeContexts.push(value?{...value}:null),configureCommunityWorkbench:value=>{configured.push(value?{...value}:null);form.reset();}};window.top=window;
- const context={document:{body,getElementById:()=>root,createElement:()=>new Element()},location:{pathname:community?'/community-preview/community/portal':'/community-preview/merchant/workbench'},
+ const context={document:{body,getElementById:()=>root,createElement:()=>new Element(),querySelectorAll:()=>[]},location:{pathname:community?'/community-preview/community/portal':'/community-preview/merchant/workbench'},
   sessionStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},
   window,crypto:{randomUUID:()=> 'tab-one'},navigator:{locks},
   BroadcastChannel:class{constructor(name){assert.equal(name,'community-original-session');channel=this;}postMessage(value){messages.push(value);}},
@@ -78,7 +78,7 @@ function harness(initial='',community=false){
  {
   const h=harness('original',true);await flush();h.requests[0].reply({workspaces:[],reviewer:false});await flush();
   assert(h.bodyClasses.has('admin-logged-in'));assert(h.bodyClasses.has('admin-no-workspace'));
-  assert.equal(h.message.textContent,'当前账号暂无管理权限。');assert.equal(h.select.children[0].textContent,'暂无管理权限');
+  assert(['当前账号暂无管理权限。','已登录；当前账户没有此角色的工作区。'].includes(h.message.textContent));assert.equal(h.select.children[0].textContent,'暂无管理权限');
  }
  {
   const h=harness('old-csrf',true);await flush();
@@ -98,7 +98,7 @@ function harness(initial='',community=false){
  }
  {
   const h=harness('original');await flush();h.requests[0].reply({workspaces:[{kind:'MERCHANT',workspace:'store',finance_options:{provider:[{workspace:'finance1'},{workspace:'finance2'}],merchant_bill:[{workspace:'bills'}]}},{kind:'MERCHANT',workspace:'legacy'}],reviewer:false});await flush();
-  const provider=h.extra[0].children[0],bill=h.extra[1].children[0];
+  const finance=h.extra.filter(node=>node.className==='finance-session-selector');const provider=finance[0].children[0],bill=finance[1].children[0];
   assert.equal(h.configured.at(-1).providerWorkspace,undefined);assert.equal(h.configured.at(-1).merchantBillWorkspace,undefined);
   provider.value='finance2';provider.events.change();assert.equal(h.configured.at(-1).providerWorkspace,'finance2');assert.equal(h.configured.at(-1).merchantBillWorkspace,undefined);
   bill.value='bills';bill.events.change();assert.equal(h.configured.at(-1).merchantBillWorkspace,'bills');

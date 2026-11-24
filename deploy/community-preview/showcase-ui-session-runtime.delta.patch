@@ -1,0 +1,63 @@
+--- a/demos/community-stage/web-session.js
++++ b/demos/community-stage/web-session.js
+@@ -9 +9 @@
+- const key='community-original-csrf';let csrf=sessionStorage.getItem(key)||'',generation=0,active=null,workspaces=[];
++ const key='community-original-csrf';let csrf=sessionStorage.getItem(key)||'',generation=0,active=null,workspaces=[],platformShowcase=null;
+@@ -135,0 +136 @@
++  if(showcaseEditor)showcaseEditor.configure(platformShowcase);
+@@ -138 +139 @@
+- const clear=text=>{renderSessionAccount(null);adminReset();reviewerAccess=false;csrf='';sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
++ const clear=text=>{renderSessionAccount(null);adminReset();reviewerAccess=false;csrf='';platformShowcase=null;sessionStorage.removeItem(key);workspaces=[];select.replaceChildren();resetFinanceSelectors();configure(null);message.textContent=text;};
+@@ -174 +175 @@
+-  adminIdentity=result.community_admin||null;reviewerAccess=result.reviewer===true;adminRender();
++  adminIdentity=result.community_admin||null;platformShowcase=adminIdentity?.kind==='ROOT'&&result.platform_showcase?.display_only===true?result.platform_showcase:null;reviewerAccess=result.reviewer===true;adminRender();
+@@ -208,0 +210,49 @@
++ // BEGIN_PLATFORM_SHOWCASE_EDITOR
++ function createPlatformShowcaseEditor(container,request){
++  if(!container||typeof container.prepend!=='function')return null;
++  const node=(tag,text)=>{const n=document.createElement(tag);if(text)n.textContent=text;return n;};
++  const panel=node('section'),heading=node('header'),title=node('h2','平台展示'),note=node('p','仅展示 · 不绑定门店 · 不接支付；与门店商品分开保存。'),state=node('p','尚未读取平台展示'),toolbar=node('div'),readButton=node('button','读取已上架展示'),importLabel=node('label','导入四图定稿 JSON '),file=node('input'),editor=node('form'),pictures=node('div'),save=node('button','保存并上架（仅展示）');
++  panel.id='platform-showcase-editor';panel.hidden=true;panel.className='management-summary';panel.style.borderLeft='4px solid #1e6852';panel.style.padding='20px';editor.style.display='grid';editor.style.gridTemplateColumns='repeat(auto-fit,minmax(220px,1fr))';editor.style.gap='14px';heading.className='catalog-page-heading';state.setAttribute('role','status');state.setAttribute('aria-live','polite');readButton.type='button';file.type='file';file.accept='.json,application/json';file.setAttribute('aria-label','导入平台展示定稿');importLabel.append(file);toolbar.append(readButton,importLabel);heading.append(title);panel.append(heading,note,state,toolbar,editor);container.prepend(panel);
++  let reference=null,epoch=0,busy=false,draft=null;
++  const inputs={};
++  for(const [key,label,type]of [['id','商品编号','text'],['name','商品名称','text'],['description','每份规格与说明','text'],['price','单价（元/份）','text'],['quantity','数量（份）','number']]){const l=node('label',label+' '),input=node(key==='description'?'textarea':'input');if(key==='description')input.rows=3;else input.type=type;input.required=true;input.setAttribute('aria-label',label);if(key==='quantity'){input.min='0';input.step='1';}l.append(input);editor.append(l);inputs[key]=input;}
++  const publishLabel=node('label',' 本次保存：上架为纯展示'),published=node('input');published.type='checkbox';published.disabled=true;publishLabel.prepend(published);editor.append(publishLabel,pictures,save);save.type='submit';pictures.style.gridColumn='1 / -1';pictures.style.display='grid';pictures.style.gridTemplateColumns='repeat(4,minmax(0,1fr))';pictures.style.gap='12px';
++  const fields=['id','name','description','image_data','unit_minor','quantity','published','gallery'];
++  const normalized=value=>{
++   const p=value?.params||value;
++   if(!p||typeof p!=='object'||!Array.isArray(p.gallery)||p.gallery.length!==4||p.gallery.some(x=>typeof x!=='string'||x.length>165000||!new RegExp('^data:image/jpeg;base64,[A-Za-z0-9+/]+=*$').test(x))||p.gallery.reduce((n,x)=>n+x.length,0)>600000||p.image_data!==p.gallery[0]||!Number.isInteger(p.quantity)||p.quantity<0||p.quantity>100000000||!Number.isInteger(p.unit_minor)||p.unit_minor<1||p.unit_minor>100000000||typeof p.published!=='boolean'||typeof p.id!=='string'||!/^[A-Za-z0-9_-]{1,64}$/.test(p.id)||typeof p.name!=='string'||!p.name||p.name.length>120||typeof p.description!=='string'||!p.description||p.description.length>2000)throw Error('请选择含四张定稿图、单价、数量与规格的原展示定稿。');
++   return Object.fromEntries(fields.map(k=>[k,k==='gallery'?[...p[k]]:p[k]]));
++  };
++  function controls(){readButton.disabled=!reference||busy;file.disabled=!reference||busy;save.disabled=!reference||busy||!draft;}
++  function show(value){
++   if(busy)throw Error('保存正在进行，请勿更换定稿');
++   draft=normalized(value);draft.published=true;for(const k of ['id','name','description','quantity'])inputs[k].value=String(draft[k]);inputs.price.value=(draft.unit_minor/100).toFixed(2);published.checked=draft.published;
++   pictures.replaceChildren();draft.gallery.forEach((src,index)=>{const figure=node('figure'),img=node('img'),caption=node('figcaption','定稿图 '+(index+1));figure.style.margin='0';img.src=src;img.alt='平台展示定稿图 '+(index+1);img.style.width='100%';img.style.aspectRatio='4 / 3';img.style.objectFit='cover';figure.append(img,caption);pictures.append(figure);});controls();return {id:draft.id,quantity:draft.quantity,unit_minor:draft.unit_minor,published:draft.published,gallery_count:4};
++  }
++  function configure(value){const next=value&&value.display_only===true&&typeof value.workspace==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(value.workspace)?{workspace:value.workspace}:null;
++   if(next?.workspace!==reference?.workspace){epoch++;draft=null;pictures.replaceChildren();editor.reset();state.textContent='尚未读取平台展示';}reference=next;panel.hidden=!reference;controls();}
++  async function read(){if(!reference)throw Error('当前会话没有平台展示入口');const t=epoch,workspace=reference.workspace;const value=await request(workspace,'community.merchant_settings',{});if(t!==epoch)throw Error('会话已变化，请重新读取');const r=value.record;state.textContent=r?('已保存版本 '+r.version+' · '+(r.published?'已上架':'未上架')+' · '+r.quantity+' 份 · 单价 '+(r.unit_minor/100).toFixed(2)+' 元'):'平台展示尚无商品（不是门店商品列表）';return value;}
++  async function publishDraft(value){if(busy)throw Error('保存正在进行，请勿重复提交');if(!reference)throw Error('当前会话没有平台展示入口');if(value!==undefined)show(value);if(!draft)throw Error('请先导入四图定稿');
++   const price=String(inputs.price.value).trim();if(!/^[0-9]+(?:[.][0-9]{1,2})?$/.test(price))throw Error('请输入精确到分的单价');
++   const p=normalized({...draft,id:inputs.id.value,name:inputs.name.value,description:inputs.description.value,unit_minor:Math.round(Number(price)*100),quantity:Number(inputs.quantity.value),published:true});
++   const t=epoch,workspace=reference.workspace;busy=true;controls();
++   try{const current=await read();if(t!==epoch)throw Error('会话已变化，请重新读取');const old=current.record;if(old&&old.id!==p.id)throw Error('原平台商品编号不同，请先核对已有记录');
++    const version=old?old.version:0;if(!Number.isInteger(version)||version<0)throw Error('已有版本未确认，未写入');
++    const unchanged=old&&fields.every(k=>JSON.stringify(old[k])===JSON.stringify(p[k]));
++    if(!unchanged)await request(workspace,'community.item',{...p,expected_version:version});
++    if(t!==epoch)throw Error('会话已变化，请读取确认保存结果');const result=await read();state.textContent+=' · 已从原接口回读';return result;
++   }catch(error){state.textContent='保存未确认；请读取已有展示核对，不会自动重试。';throw error;}finally{busy=false;controls();}
++  }
++  readButton.onclick=()=>{void read().then(value=>{if(value.record?.gallery)show(value.record);}).catch(()=>{state.textContent='读取未确认，请稍后重试。';});};
++  file.onchange=async()=>{try{const chosen=file.files?.[0];if(!chosen)return;show(JSON.parse(await chosen.text()));state.textContent='四图定稿已载入，尚未写入；请核对规格、单价与数量。';}catch(_){state.textContent='定稿未载入，请核对原JSON与四张定稿图。';}};
++  editor.onsubmit=event=>{event.preventDefault();void publishDraft().catch(()=>{});};
++  controls();return {configure,read,loadDraft:show,publishDraft};
++ }
++ // END_PLATFORM_SHOWCASE_EDITOR
++ const showcaseEditor=kind==='MERCHANT'?createPlatformShowcaseEditor(document.getElementById('catalog-management'),async(workspace,operation,params)=>{
++  if(!csrf||adminIdentity?.kind!=='ROOT'||platformShowcase?.workspace!==workspace||!['community.merchant_settings','community.item'].includes(operation))throw Error('平台展示会话已变化');
++  const t=generation;const response=await fetch('/community-preview/community/operations',{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({workspace,operation,params})});
++  const data=await response.json();if(!current(t))throw Error('会话已变化，请读取核对');if(!response.ok)throw Error('平台展示操作未确认，请先读取核对');return data.result;
++ }):null;
++ if(showcaseEditor)window.communityPlatformShowcase=Object.freeze({read:()=>showcaseEditor.read(),loadDraft:value=>showcaseEditor.loadDraft(value),publishDraft:value=>showcaseEditor.publishDraft(value)});
++

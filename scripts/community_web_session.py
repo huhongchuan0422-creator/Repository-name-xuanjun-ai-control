@@ -126,7 +126,15 @@ class WebSession:
                 if type(api) is not CommunityAdminAuthority or api.c is not self.center:raise PermissionError('EXACT_COMMUNITY_AUTHORITY_COMPOSITION_REQUIRED')
                 value=api.authority(uid)
                 admin={k:value[k] for k in ('uid','project','tenant','kind','revision','capabilities','workspace_scopes')}
-            return {'user_id':uid,'workspaces':workspaces,'reviewer':reviewer,**({'community_admin':admin} if admin is not None else {})},None
+            showcase=getattr(self.operations,'platform_showcase',None)
+            showcase_reference=None
+            if (admin is not None and admin['kind']=='ROOT' and showcase is not None
+                    and showcase.center is self.center
+                    and (showcase.operator_uid,showcase.project,showcase.tenant)==(uid,admin['project'],admin['tenant'])
+                    and '/community/operations#'+showcase.workspace in admin['workspace_scopes']
+                    and {'/community/operations#community.item','/community/operations#community.merchant_settings'}<=set(admin['capabilities'])):
+                showcase_reference={'workspace':showcase.workspace,'display_only':True}
+            return {'user_id':uid,'workspaces':workspaces,'reviewer':reviewer,**({'community_admin':admin} if admin is not None else {}),**({'platform_showcase':showcase_reference} if showcase_reference is not None else {})},None
         if path!='/community/session/logout':raise ValueError('UNKNOWN_SESSION_ACTION')
         self.center.logout(session)
         return {'logged_out':True},COOKIE+'=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0'
