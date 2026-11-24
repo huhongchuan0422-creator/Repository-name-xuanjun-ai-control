@@ -130,3 +130,4 @@ class ExactMiniRelease(unittest.TestCase):
         self.c.db.execute("UPDATE links SET payload=? WHERE channel='WECHAT_MINI' AND subject_idx=?",(self.c.encrypt(b'{}','wechat-mini-link'),self.t.subject))
         with self.assertRaises(LoginUnavailable):self.fx.login('changed_release')
         with self.assertRaises(PermissionError):self.service.restore(self.t,self.key)
+        with self.assertRaises(PermissionError):self.service.release(self.t,self.key)

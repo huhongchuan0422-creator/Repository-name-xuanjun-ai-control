@@ -48,6 +48,7 @@ class ExactRelease:
             request=dict(application=t.application,owner=t.owner,subject=t.subject,project=t.project,version=t.version,key=key)
             if prior is not None:
                 if prior['request']!=request:raise PermissionError('RELEASE_IDEMPOTENCY_CONFLICT')
+                _validate_state(c,prior)
                 return _public(prior)
             rows=c.db.execute("SELECT * FROM links WHERE channel='WECHAT_MINI' AND subject_idx=?",(t.subject,)).fetchall()
             if len(rows)!=1:raise PermissionError('EXACT_SINGLE_PROJECT_SUBJECT_REQUIRED')
@@ -72,7 +73,9 @@ class ExactRelease:
             _ready(c);r=_receipt(c,t.subject,t.project)
             expected=dict(application=t.application,owner=t.owner,subject=t.subject,project=t.project,version=t.version,key=key)
             if r is None or r['request']!=expected:raise PermissionError('EXACT_RECEIPT_REQUIRED')
-            if r['state']=='RESTORED':return _public(r)
+            if r['state']=='RESTORED':
+                _validate_state(c,r)
+                return _public(r)
             if r['state']!='RELEASED':raise PermissionError('FRESH_LOGIN_ALREADY_CONSUMED_RELEASE')
             _released_row(c,r)
             c.db.execute("UPDATE links SET active=1 WHERE channel='WECHAT_MINI' AND subject_idx=? AND user_id=? AND project=? AND active=0",(t.subject,t.owner,t.project))
@@ -105,6 +108,15 @@ def _released_row(c,r):
     if len(rows)!=1:raise PermissionError('RELEASED_LINK_CHANGED')
     current=packed(rows[0]);old=dict(r['old_link']);old['active']=0
     if current!=old:raise PermissionError('RELEASED_LINK_CHANGED')
+
+def _validate_state(c,r):
+    if r['state']=='RELEASED':return _released_row(c,r)
+    t=r['request'];rows=c.db.execute("SELECT * FROM links WHERE channel='WECHAT_MINI' AND subject_idx=?",(t['subject'],)).fetchall()
+    if len(rows)!=1:raise PermissionError('RECEIPT_EFFECT_CHANGED')
+    row=rows[0]
+    if r['state']=='RESTORED' and packed(row)==r['old_link']:return
+    if (r['state']=='CONSUMED' and row['project']==t['project'] and row['user_id']==r['new_owner'] and row['active']==1):return
+    raise PermissionError('RECEIPT_EFFECT_CHANGED')
 
 def pending_registration(identity,subject):
     c=identity.center
