@@ -29,7 +29,7 @@ def validate_runtime_contexts(config, runtime):
     fields={'message_evidence_context':set(CONTEXT_FIELDS), 'privacy_policy_context':set(POLICY_FIELDS),
             'privacy_processing_context':{'requester_id','project_id','tenant_id','customer_id','request_id','revision','status','status_ref','actor_ref','occurred_at','outcome_ref'}}
     required={'keys','active_key','providers'}
-    if type(runtime) is not dict or not required <= set(runtime) or set(runtime)-required-set(RUNTIME_CONTEXT_DEPTH)-{'deployment_profile','identity_authorization'}:
+    if type(runtime) is not dict or not required <= set(runtime) or set(runtime)-required-set(RUNTIME_CONTEXT_DEPTH)-{'deployment_profile','identity_authorization','mail_provider_config'}:
         raise Denied('RUNTIME_CREDENTIAL_MINIMUM')
     selected=validate_pair(config,runtime)
     from scripts.pr122_customer_identity import boundary_from_config
@@ -39,6 +39,11 @@ def validate_runtime_contexts(config, runtime):
         boundary_from_config(config);boundary_from_config(runtime)
     if selected==LOGIN_ONLY and canonical(config['providers'])!=canonical(runtime['providers']):
         raise Denied('RUNTIME_PROVIDER_BINDING')
+    if 'mail_provider_config' in runtime or 'mail_provider_config' in config:
+        if selected!=FULL:raise Denied('LOGIN_ONLY_MAIL_SCOPE')
+        if (type(config.get('mail_provider_config')) is not str or
+                config.get('mail_provider_config')!=runtime.get('mail_provider_config')):
+            raise Denied('MAIL_RUNTIME_BINDING')
     def mapping(value, depth, allowed, integer_fields):
         if type(value) is not dict:raise Denied('RUNTIME_CONTEXT_MAPPING')
         if depth:
@@ -56,13 +61,25 @@ def validate_runtime_contexts(config, runtime):
     return True
 
 
-def factory(config):
+def factory(config,*,mail_configuration=None):
     selected=profile(config)
     validate_pair(config,config)
     scan=Path('/run/xuanjun-customer-scan')
     if selected==FULL and scan.exists() and scan.stat().st_uid==os.geteuid():os.chmod(scan,0o700)
     keys={k:base64.b64decode(v,validate=True) for k,v in config['keys'].items()}
-    return Center(ROOT,keys,config['active_key'],mail_ready=bool(config.get('providers',{}).get('smtp')),scanner=ClamScanner() if selected==FULL else None,secretref=SecretRefMetadata(config['providers']['secretref']['socket'],config['providers']['secretref']['peer_uid']) if selected==FULL and config.get('providers',{}).get('secretref') else None,evidence_context=(lambda uid,pid:config.get('message_evidence_context',{}).get(pid,{}).get(uid,{})) if selected==FULL else None,privacy_policy_context=(lambda uid,pid:config.get('privacy_policy_context',{}).get(pid,{})) if selected==FULL else None,privacy_processing_context=(lambda uid,pid,rid:config.get('privacy_processing_context',{}).get(pid,{}).get(uid,{}).get(rid,{})) if selected==FULL else None)
+    center=Center(ROOT,keys,config['active_key'],mail_ready=bool(config.get('providers',{}).get('smtp')),scanner=ClamScanner() if selected==FULL else None,secretref=SecretRefMetadata(config['providers']['secretref']['socket'],config['providers']['secretref']['peer_uid']) if selected==FULL and config.get('providers',{}).get('secretref') else None,evidence_context=(lambda uid,pid:config.get('message_evidence_context',{}).get(pid,{}).get(uid,{})) if selected==FULL else None,privacy_policy_context=(lambda uid,pid:config.get('privacy_policy_context',{}).get(pid,{})) if selected==FULL else None,privacy_processing_context=(lambda uid,pid,rid:config.get('privacy_processing_context',{}).get(pid,{}).get(uid,{}).get(rid,{})) if selected==FULL else None)
+
+    try:
+        from scripts.pr122_customer_identity import install as install_identity
+        install_identity(center)
+        if mail_configuration is not None:
+            from scripts.community_mail_delivery import install as install_mail
+            bindings,transports=mail_configuration
+            install_mail(center,bindings,transports)
+        return center
+    except BaseException:
+        center.db.close()
+        raise
 
 def backup(center,output,backup_key,key_ref):
     if type(backup_key) is not bytes or len(backup_key)!=32 or not key_ref:raise Denied('SEPARATE_BACKUP_KEY_REQUIRED')
@@ -207,8 +224,15 @@ def main():
         result=restore(args.input,args.output,backup_key,keys,active_key)
         print(json.dumps(result,ensure_ascii=False))
         return
-    c=factory(config)
     selected=profile(config)
+    mail_configuration=None
+    if 'mail_provider_config' in config:
+        if selected!=FULL:raise Denied('LOGIN_ONLY_MAIL_SCOPE')
+        from scripts.community_mini_host_config import load_protected
+        from scripts.community_mail_delivery import optional_mail_configuration
+        mail_configuration=optional_mail_configuration(load_protected(config['mail_provider_config']))
+    def configured_factory():return factory(config,mail_configuration=mail_configuration)
+    c=configured_factory()
     try:
         if args.action=='serve':
             from scripts.pr122_customer_http import serve
@@ -216,7 +240,7 @@ def main():
             options={'deployment_profile':selected}
             boundary=boundary_from_config(config)
             if boundary is not None:options['identity_boundary']=boundary
-            c.db.close();serve(lambda:factory(config),Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',**options);return
+            c.db.close();serve(configured_factory,Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',**options);return
         if args.action=='worker':
             p=Providers(config.get('providers',{}));result={'mail':drain_mail(c,p,'https://wenwenwenyiyiyi.work')}
             if selected==FULL:result['message']=drain_message(c,p)
