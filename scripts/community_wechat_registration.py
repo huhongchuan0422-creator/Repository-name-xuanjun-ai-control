@@ -59,8 +59,11 @@ def register_if_unknown(identity, attempt, appid, openid):
     if type(openid) is not str or not re.fullmatch('[A-Za-z0-9_-]{1,128}',openid) or appid != identity.appid:
         raise PermissionError('VERIFIED_PROVIDER_SUBJECT_REQUIRED')
     subject = identity._subject(appid,openid)
-    # Any historic binding, including revoked, prevents automatic recreation.
-    if c.db.execute("SELECT 1 FROM links WHERE channel='WECHAT_MINI' AND subject_idx=?",(subject,)).fetchone():
+    from scripts.community_mini_exact_release import pending_registration, complete_registration
+    released = pending_registration(identity, subject)
+    # Ordinary revoked/history links still fail closed. Only the protected exact
+    # release receipt permits fresh enrollment after real provider verification.
+    if released is None and c.db.execute("SELECT 1 FROM links WHERE channel='WECHAT_MINI' AND subject_idx=?",(subject,)).fetchone():
         return
     admitted = getattr(identity,'registration',None)
     if not admitted:
@@ -69,16 +72,20 @@ def register_if_unknown(identity, attempt, appid, openid):
     if current != admitted:
         raise PermissionError('REGISTRATION_MAPPING_CHANGED')
     uid = 'u_'+secrets.token_hex(12)
+    generation = ':'+released['request']['key'] if released else ''
+    marker_subject = c.idx('community-wechat-generation:'+subject+generation) if released else subject
     # Original accounts schema requires these slots. A namespace index and
     # encrypted EMPTY email represent no email, never a fictional address.
     # Random unusable password material and a non-email index keep the original
     # email/password login/reset from authenticating this provider-only account.
     c.db.execute('INSERT INTO accounts(id,email_idx,email_enc,salt,password,verified) VALUES(?,?,?,?,?,1)',
-        (uid,c.idx('community-wechat-account:'+subject),c.encrypt(b'',uid),secrets.token_bytes(16),secrets.token_bytes(32)))
+        (uid,c.idx('community-wechat-account:'+subject+generation),c.encrypt(b'',uid),secrets.token_bytes(16),secrets.token_bytes(32)))
     metadata = dict(appid=appid,identity_verified=True,email_verified=False,
                     authentication='WECHAT_MINIPROGRAM',tenant=next(iter(current.values()))['scope']['tenant_id'])
     c.db.execute('INSERT INTO links VALUES(?,?,?,?,?,1)',
-        (ACCOUNT,subject,uid,'',c.encrypt(canonical(metadata),'community-wechat-account')))
+        (ACCOUNT,marker_subject,uid,'',c.encrypt(canonical(metadata),'community-wechat-account')))
+    if released:
+        complete_registration(identity, released, uid, appid)
     for scene, value in current.items():
         pid = value['project']
         grant_key = c.idx('community-consumer:'+uid+':'+scene)
