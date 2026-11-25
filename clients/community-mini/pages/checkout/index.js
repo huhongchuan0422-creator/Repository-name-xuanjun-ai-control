@@ -761,27 +761,28 @@ Page({
   },
   async requestRefund() {return this.refundAction(true);},
   async refundStatus() {return this.refundAction(false);},
-  inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.clearReceiptAd();this.setData({amount:e.detail.value});},
-  inputReference(e) {if(this.data.pending&&!this._purchaseRecoveryRequest&&!this.cancelConsumerRead('refund'))return;this.resetOrderDetails();if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.clearReceiptAd();this.setData({reference:e.detail.value});},
+  inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.clearReceiptAd(true);this.setData({amount:e.detail.value});},
+  inputReference(e) {if(this.data.pending&&!this._purchaseRecoveryRequest&&!this.cancelConsumerRead('refund'))return;this.resetOrderDetails();if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.clearReceiptAd(true);this.setData({reference:e.detail.value});},
   async checkout() {
     if (this.data.pending||this.data.productsPending) return;
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
+    this.clearReceiptAd(true);
     this.setData({pending:true,afterAd:'',afterAdVerified:false,status:this.data.commerceEnabled?'正在创建订单':'正在创建模拟订单'});
     try {if(this.data.commerceEnabled){const lines=this.data.products.filter(p=>p.quantity>0).map(p=>({item_id:p.item_id,revision:p.revision,quantity:p.quantity}));const r=await this.session.commerce(this.scene,'purchase',{reference:this.data.reference,lines});this.setData({amount:yuanAmount(r.amount_minor)});}else{const amount=minorAmount(this.data.amount);if(amount===null)throw Error('金额请输入最多两位小数的元金额');await this.client.checkout(String(amount),this.data.reference);}this.setData({status:this.data.paymentsEnabled?'订单已建立，请点击微信支付':(this.data.commerceEnabled?'订单已建立，支付尚未开放；未发生扣款':'模拟待支付；不发起微信扣款')});}
     catch(e) {this.setData({status:e.message});}
     finally {this.setData({pending:false});}
   },
   async cancelOrder() {
-    if(this.data.pending||!this.session)return;this.setData({pending:true,afterAd:'',afterAdVerified:false});
+    if(this.data.pending||!this.session)return;this.clearReceiptAd(true);this.setData({pending:true,afterAd:'',afterAdVerified:false});
     try{const r=await this.session.payment(this.scene,'cancel',this.data.reference);if(this.paymentFlow)this.paymentFlow.reset();this.setData({status:r.order_state==='CANCELLED'?'订单已取消，库存已恢复或可按原订单恢复处理':r.order_state+'；以服务端确认状态为准'});}
     catch(e){this.setData({status:e.message+'；请查询原订单，不要重新提交资金操作'});}finally{this.setData({pending:false});}
   },
   async pay() {return this.runPayment(false);},
   async recoverPayment() {return this.runPayment(true);},
-  checkoutReadToken(){return {...this.customerReadToken(),scene:this.scene,reference:this.data.reference};},
-  checkoutReadCurrent(request){return !this._sceneStale&&this.scene===request.scene&&this.data.reference===request.reference&&
+  checkoutReadToken(){return {...this.customerReadToken(),scene:this.scene,reference:this.data.reference,checkoutGeneration:this._checkoutReadGeneration||0};},
+  checkoutReadCurrent(request){return request.checkoutGeneration===(this._checkoutReadGeneration||0)&&!this._sceneStale&&this.scene===request.scene&&this.data.reference===request.reference&&
     (request.session?this.customerReadCurrent(request)&&(!request.session.isAuthenticated||request.session.isAuthenticated()):!this.session&&!this._pageUnloaded&&this._pageGeneration===request.generation);},
-  clearReceiptAd(){this._receiptAdRequest=null;this.setData({afterAd:'',afterAdImage:'',afterAdVerified:false});},
+  clearReceiptAd(cancelRead=false){if(cancelRead)this._checkoutReadGeneration=(this._checkoutReadGeneration||0)+1;this._receiptAdRequest=null;this.setData({afterAd:'',afterAdImage:'',afterAdVerified:false});},
   async loadReceiptAd(request){
     if(!this.checkoutReadCurrent(request)||!this.data.commerceEnabled||!request.session)return false;
     this.clearReceiptAd();this._receiptAdRequest=request;
@@ -798,12 +799,13 @@ Page({
   },
   async runPayment(recover) {
     if(this.data.pending||!this.paymentFlow)return;
+    this.clearReceiptAd(true);
     const request=this.checkoutReadToken(),flow=this.paymentFlow;
     const current=()=>this.checkoutReadCurrent(request)&&this.paymentFlow===flow;
-    this.clearReceiptAd();this.setData({pending:true,status:recover?'正在恢复原支付单':'正在准备微信支付'});
+    this.setData({pending:true,status:recover?'正在恢复原支付单':'正在准备微信支付'});
     try {const r=await flow.pay(request.reference,recover);if(current())await this.showPayment(r,request);}
     catch(e){if(current())this.setData({status:e.message+'；请查询原订单，勿重新创建支付单'});}
-    finally{if(current())this.setData({pending:false});}
+    finally{if(this.customerReadCurrent(request)&&this.scene===request.scene&&this.paymentFlow===flow)this.setData({pending:false});}
   },
   async showPayment(r,request=this.checkoutReadToken()) {
     if(!this.checkoutReadCurrent(request))return;
@@ -814,18 +816,19 @@ Page({
   },
   async queryPayment() {
     if(this.data.pending||!this.paymentFlow)return;
+    this.clearReceiptAd(true);
     const request=this.checkoutReadToken(),flow=this.paymentFlow;
     const current=()=>this.checkoutReadCurrent(request)&&this.paymentFlow===flow;
-    this.clearReceiptAd();this.setData({pending:true});
+    this.setData({pending:true});
     try{const result=await flow.query(request.reference);if(current())await this.showPayment(result,request);}
     catch(e){if(current())this.setData({status:e.message+'；支付结果未知'});}
-    finally{if(current())this.setData({pending:false});}
+    finally{if(this.customerReadCurrent(request)&&this.scene===request.scene&&this.paymentFlow===flow)this.setData({pending:false});}
   },
   async refresh() {
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
+    this.clearReceiptAd(true);
     const request=this.checkoutReadToken(),client=this.client;
     const current=()=>this.checkoutReadCurrent(request)&&this.client===client;
-    this.clearReceiptAd();
     try {
       if(this.data.commerceEnabled){
         const result=await request.session.commerce(request.scene,'purchase_read',{reference:request.reference});

@@ -99,3 +99,42 @@ test('qr ad: mismatched signed-query reference cannot claim the current order pa
  const h=harness({commerce:true});await assert.rejects(h.page.showPayment(signedQuery({reference:'other-order'})),/UNTRUSTED_PAYMENT_QUERY/);
  assert.equal(h.calls.length,0);assert.equal(h.page.data.afterAd,'');assert.doesNotMatch(h.page.data.status,/已支付/);
 });
+
+function holdPurchaseRead(h){
+ const release=deferred(),entered=deferred(),original=h.page.session.commerce;
+ h.page.session.commerce=async(scene,operation,params)=>{
+  const reply=await original(scene,operation,params);
+  if(operation==='purchase_read'){entered.resolve();await release.promise;}
+  return reply;
+ };
+ return {release,entered};
+}
+test('qr ad F-QR-01: amount edit while purchase_read waits cancels the entire old chain',async()=>{
+ const h=harness({commerce:true}),hold=holdPurchaseRead(h);h.page.data.amount='1.20';
+ const reading=h.page.refresh();await hold.entered.promise;h.page.inputAmount({detail:{value:'8.00'}});
+ hold.release.resolve();await reading;
+ assert.equal(h.page.data.amount,'8.00');assert.equal(h.page.data.afterAd,'');assert.equal(h.page.data.afterAdVerified,false);
+ assert.equal(h.calls.filter(x=>x.operation==='receipt_ad').length,0);
+});
+test('qr ad F-QR-01: same-reference edit also invalidates an earlier pending purchase read',async()=>{
+ const h=harness({commerce:true}),hold=holdPurchaseRead(h);h.page.data.amount='8.00';
+ const reading=h.page.refresh();await hold.entered.promise;h.page.inputReference({detail:{value:'order-a'}});
+ hold.release.resolve();await reading;
+ assert.equal(h.page.data.amount,'8.00');assert.equal(h.page.data.afterAdVerified,false);assert.equal(h.calls.filter(x=>x.operation==='receipt_ad').length,0);
+});
+test('qr ad F-QR-01: a new refresh supersedes an older same-order read intent',async()=>{
+ const h=harness({commerce:true}),pending=deferred(),entered=deferred(),original=h.page.session.commerce;let count=0;
+ h.page.session.commerce=async(scene,operation,params)=>{
+  if(operation==='purchase_read'&&++count===1){entered.resolve();return pending.promise;}
+  return original(scene,operation,params);
+ };
+ const old=h.page.refresh();await entered.promise;await h.page.refresh();assert.equal(h.page.data.afterAdVerified,true);
+ pending.resolve({reference:'order-a',amount_minor:120,order:{state:'PENDING',amount_minor:120,currency:'CNY'}});await old;
+ assert.equal(h.page.data.afterAdVerified,true);assert.match(h.page.data.status,/核验已支付/);assert.equal(h.calls.filter(x=>x.operation==='receipt_ad').length,1);
+});
+test('qr ad F-QR-01: cancelled readonly query releases only its own same-context spinner',async()=>{
+ const h=harness({commerce:true}),pending=deferred();h.page.paymentFlow={reset(){},query:()=>pending.promise};
+ const reading=h.page.queryPayment();assert.equal(h.page.data.pending,true);h.page.inputAmount({detail:{value:'8.00'}});
+ pending.resolve(signedQuery());await reading;
+ assert.equal(h.page.data.pending,false);assert.equal(h.page.data.amount,'8.00');assert.equal(h.page.data.afterAdVerified,false);assert.equal(h.calls.length,0);
+});
