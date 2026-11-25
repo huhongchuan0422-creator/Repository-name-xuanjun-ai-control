@@ -196,8 +196,10 @@ class OwnerCalls:
 
 
 class HostOcr:
-    def __init__(self, merchant, scene, api, store, *, applicant_mode=False):
+    def __init__(self, merchant, scene, api, store, *, applicant_mode=False, bank_card_infer=None):
         from scripts.community_ocr_bridge import compose
+        if bank_card_infer is not None and not callable(bank_card_infer):
+            raise ValueError('BANK_CARD_INFERENCE_CALLABLE_REQUIRED')
         self.owner=OwnerCalls();self.merchant=merchant;self.scene=scene;self.applicant_mode=applicant_mode
         from scripts.community_license_inference import run_license_layout_ocr
         @functools.wraps(run_license_layout_ocr)
@@ -205,7 +207,11 @@ class HostOcr:
             context=current_diagnostic()
             if context:
                 context.phase('EXECUTION');context.durable_job_retained=True
-            try:return run_license_layout_ocr(*args, **kwargs)
+            # Only the protected Python caller can supply the existing provider.
+            # A bank-provider failure never falls back to local inference.
+            kind=kwargs.get('document_type',args[1] if len(args)>1 else None)
+            infer=bank_card_infer if kind=='bank_card' and bank_card_infer is not None else run_license_layout_ocr
+            try:return infer(*args, **kwargs)
             except BaseException as error:
                 _attach_failure(error,context,stage='EXECUTION');raise
         self.bridge,self.app=compose(merchant,scene,api,store,self.owner,

@@ -6,7 +6,6 @@ A paid observation is not Finance settlement or a fiscal receipt.
 """
 import hashlib
 import json
-from scripts.pr122_customer_core import canonical
 from scripts.community_merchant_contract import scope,valid_id
 from scripts.community_order_store import state
 
@@ -28,6 +27,7 @@ def provider_evidence(db,identity,reference):
 
 def project_verified_query(db,identity,reference,expected,observation,at,key_id):
     """Internal writer: observation must be returned by the bound reader call."""
+    from scripts.pr122_customer_core import canonical
     t,m,s=scope(identity)
     if not valid_id(reference) or type(at) is not int or at<0:raise ValueError('INVALID_PROVIDER_PROJECTION')
     if (type(expected) is not dict or type(observation) is not dict
@@ -81,6 +81,7 @@ def project_verified_query(db,identity,reference,expected,observation,at,key_id)
 
 def project_verified_refund(db,identity,reference,out_refund_no,amount_minor,total_minor,body_sha256,at):
     """Internal caller supplies an already RSA-verified SUCCESS refund result."""
+    from scripts.pr122_customer_core import canonical
     t,m,s=scope(identity)
     if (not valid_id(reference) or not valid_id(out_refund_no) or type(amount_minor) is not int
             or type(total_minor) is not int or not 1<=amount_minor<=total_minor
