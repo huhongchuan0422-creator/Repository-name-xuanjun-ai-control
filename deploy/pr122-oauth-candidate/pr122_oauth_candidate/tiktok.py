@@ -2,7 +2,7 @@
 
 This module covers only the Sandbox/Login Kit read-only account connection
 path: OAuth state, authorization URL construction, token lifecycle metadata,
-token exchange, secure token metadata, and user.info.basic canary calls.
+token exchange and refresh, secure token metadata, and user.info.basic canary calls.
 Content Posting API, uploads, direct posts, comments, messages, and account
 control are outside this contract.
 """
@@ -16,6 +16,7 @@ import json
 import os
 import secrets
 import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -275,6 +276,24 @@ class TikTokOpenApiClient:
                 "redirect_uri": redirect_uri,
             },
         )
+
+    def refresh_access_token(
+        self, *, client_key: str, client_secret: str, refresh_token: str
+    ) -> dict[str, Any]:
+        try:
+            return self._post_form(TIKTOK_ACCESS_TOKEN_URL, {
+                "grant_type": "refresh_token",
+                "client_key": client_key,
+                "client_secret": client_secret,
+                "refresh_token": refresh_token,
+            })
+        except urllib.error.HTTPError as error:
+            with error:
+                if error.code == 400:
+                    payload = json.load(error)
+                    if isinstance(payload, dict) and payload.get("error") == "invalid_grant":
+                        return {"error": "invalid_grant"}
+            raise
 
     def user_info(self, *, access_token: str) -> dict[str, Any]:
         fields = ",".join(USER_INFO_BASIC_FIELDS)

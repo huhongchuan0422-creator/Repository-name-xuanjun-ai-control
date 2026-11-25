@@ -262,6 +262,9 @@ class HttpTests(unittest.TestCase):
 
     def test_provider_calls_disabled_by_default(self):
         with patch.object(oauth.TikTokOpenApiClient,'exchange_access_token') as exchange:
+            status, _, body = self.request('GET','/integrations/tiktok/oauth/start')
+            self.assertEqual(status,503)
+            self.assertEqual(json.loads(body)['reason'],'PROVIDER_CALLS_NOT_RELEASED')
             self.assertEqual(self.request('GET',oauth.TIKTOK_REDIRECT_PATH+'?state=x&code=x')[0],503)
             exchange.assert_not_called()
 

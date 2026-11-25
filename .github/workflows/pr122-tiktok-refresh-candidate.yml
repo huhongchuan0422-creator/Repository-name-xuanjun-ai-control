@@ -1,0 +1,30 @@
+name: PR122 TikTok Refresh Candidate
+
+on:
+  push:
+    branches: [codex/media-tiktok-refresh-20261125]
+  pull_request:
+    branches: [feature/stage5-next25-integration-20261015]
+    paths:
+      - 'deploy/pr122-oauth-candidate/**'
+      - 'tests/test_pr122_tiktok_refresh_contract.py'
+      - '.github/workflows/pr122-tiktok-refresh-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-oauth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Candidate OAuth regression
+        run: python -B -m unittest discover -s tests -p test_pr122_oauth_candidate.py -v
+      - name: TikTok refresh contract
+        run: python -B -m unittest discover -s tests -p test_pr122_tiktok_refresh_contract.py -v

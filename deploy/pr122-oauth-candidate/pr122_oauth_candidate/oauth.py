@@ -4,6 +4,7 @@ from datetime import datetime
 import argparse
 import json
 import os
+import secrets
 import sys
 import urllib.parse
 from http import HTTPStatus
@@ -16,7 +17,10 @@ from .core import DOUYIN_ACCESS_TOKEN_REF, DOUYIN_CLIENT_KEY_REF, DOUYIN_CLIENT_
 
 DOUYIN_REDIRECT_PATH = '/integrations/douyin/oauth/callback'
 
+TIKTOK_OAUTH_START_PATH = '/integrations/tiktok/oauth/start'
 TIKTOK_REDIRECT_PATH = '/integrations/tiktok/oauth/callback'
+
+TIKTOK_REFRESH_ATTEMPT_KEY = 'refresh:tiktok'
 
 TIKTOK_URL_PROPERTY_VERIFICATION_FILENAME = 'tiktokseZDn0fzmn8v7H8YWGlgzuT7PvLBQavc.txt'
 
@@ -100,6 +104,113 @@ def handle_tiktok_oauth_start(service, origin):
 
 def handle_tiktok_oauth_callback(service, origin, query):
     return _handle_callback(service, 'tiktok', origin, query)
+
+
+def _refresh_result(status, reason=None):
+    result = {'status': status, 'secret_value_exposed': False}
+    if reason:
+        result['sanitized_error_code'] = reason
+    return result
+
+
+def refresh_tiktok_credentials(service, *, client=None, now=None):
+    """Refresh the verified read-only account after its access token expires.
+
+    The SQLite reservation is durable before the provider request. It stays
+    unresolved after a lost response or write until a verified OAuth callback
+    activates a new pair. Credentials and lifecycle move together on success.
+    """
+    current = now or utc_now()
+    database = service.database
+    store = service.operations_store
+    attempt = {'id': secrets.token_hex(16), 'status': 'UNKNOWN'}
+    try:
+        with database.transaction():
+            previous = database.get(TIKTOK_REFRESH_ATTEMPT_KEY)
+            if previous:
+                if previous['status'] == 'REAUTHORIZATION_REQUIRED':
+                    return _refresh_result('REAUTHORIZATION_REQUIRED', 'TIKTOK_REFRESH_INVALID_GRANT')
+                return _refresh_result('UNKNOWN', 'TIKTOK_REFRESH_UNRESOLVED')
+
+            binding = database.get('binding:tiktok')
+            if not binding or not binding.get('verified') or not binding.get('identity_hash'):
+                return _refresh_result('REJECTED', 'TIKTOK_BINDING_MISSING')
+            client_key = store.read_secret(TIKTOK_CLIENT_KEY_REF)
+            client_secret = store.read_secret(TIKTOK_CLIENT_SECRET_REF)
+            refresh_token = store.read_secret(TIKTOK_REFRESH_TOKEN_REF)
+            if not client_key or not client_secret or not refresh_token:
+                return _refresh_result('REAUTHORIZATION_REQUIRED', 'TIKTOK_REFRESH_CREDENTIALS_MISSING')
+            lifecycle = binding['lifecycle']
+            if (binding.get('client_key_fingerprint') != tiktok_fingerprint(client_key)
+                    or lifecycle.get('granted_scopes') != list(TIKTOK_MINIMUM_READONLY_SCOPES)
+                    or lifecycle.get('revoked') or lifecycle.get('reauthorization_required')):
+                return _refresh_result('REAUTHORIZATION_REQUIRED', 'TIKTOK_REFRESH_BINDING_CHANGED')
+            if datetime.fromisoformat(lifecycle['access_token_expires_at']) > current:
+                return _refresh_result('CURRENT')
+            refresh_expiry = lifecycle.get('refresh_token_expires_at')
+            if refresh_expiry and datetime.fromisoformat(refresh_expiry) <= current:
+                return _refresh_result('REAUTHORIZATION_REQUIRED', 'TIKTOK_REFRESH_EXPIRED')
+            database.put(TIKTOK_REFRESH_ATTEMPT_KEY, attempt)
+    except Exception:
+        return _refresh_result('UNKNOWN', 'TIKTOK_REFRESH_RESERVATION_UNKNOWN')
+
+    try:
+        provider = client if client is not None else TikTokOpenApiClient()
+        payload = provider.refresh_access_token(client_key=client_key, client_secret=client_secret,
+                                                refresh_token=refresh_token)
+        received_at = now or utc_now()
+    except Exception:
+        return _refresh_result('UNKNOWN', 'TIKTOK_REFRESH_RESPONSE_UNKNOWN')
+
+    try:
+        with database.transaction():
+            if (database.get(TIKTOK_REFRESH_ATTEMPT_KEY) != attempt
+                    or database.get('binding:tiktok') != binding
+                    or store.read_secret(TIKTOK_CLIENT_KEY_REF) != client_key
+                    or store.read_secret(TIKTOK_CLIENT_SECRET_REF) != client_secret
+                    or store.read_secret(TIKTOK_REFRESH_TOKEN_REF) != refresh_token):
+                return _refresh_result('UNKNOWN', 'TIKTOK_REFRESH_BINDING_SUPERSEDED')
+            if isinstance(payload, dict) and payload.get('error') == 'invalid_grant':
+                database.put(TIKTOK_REFRESH_ATTEMPT_KEY,
+                             {**attempt, 'status': 'REAUTHORIZATION_REQUIRED'})
+                return _refresh_result('REAUTHORIZATION_REQUIRED', 'TIKTOK_REFRESH_INVALID_GRANT')
+
+            updated = _parse_tiktok_refresh(payload, client_key, binding['identity_hash'], received_at)
+            if updated is None:
+                return _refresh_result('UNKNOWN', 'TIKTOK_REFRESH_RESPONSE_INVALID')
+            lifecycle = updated['lifecycle'].as_public_dict()
+            for ref, field in ((TIKTOK_ACCESS_TOKEN_REF, 'access_token'),
+                               (TIKTOK_REFRESH_TOKEN_REF, 'refresh_token')):
+                stored = store.store_secret(ref, updated[field], 'tiktok', 'readonly_oauth',
+                    'verified account refresh', actor='TIKTOK_OAUTH_REFRESH', metadata=lifecycle)
+                if stored.get('status') != 'CONFIGURED':
+                    raise RuntimeError('TOKEN_STORAGE_FAILED')
+            database.put('binding:tiktok', {**binding, 'lifecycle': lifecycle})
+            database.put('lifecycle:tiktok', lifecycle)
+            database.put(TIKTOK_REFRESH_ATTEMPT_KEY, None)
+    except Exception:
+        return _refresh_result('UNKNOWN', 'TIKTOK_REFRESH_ACTIVATION_UNKNOWN')
+    return _refresh_result('PASS')
+
+
+def _parse_tiktok_refresh(payload, client_key, identity_hash, received_at):
+    if not isinstance(payload, dict):
+        return None
+    for field in ('expires_in', 'refresh_expires_in'):
+        seconds = payload.get(field)
+        if type(seconds) is not int or seconds <= 0:
+            return None
+    for field in ('access_token', 'refresh_token', 'scope', 'open_id'):
+        if not isinstance(payload.get(field), str) or not payload[field].strip():
+            return None
+    try:
+        parsed = parse_tiktok_token_response(payload, client_key=client_key, now=received_at)
+    except OverflowError:
+        return None
+    if (parsed.get('status') != 'PASS' or _sha(parsed['open_id']) != identity_hash
+            or parsed['lifecycle'].granted_scopes != TIKTOK_MINIMUM_READONLY_SCOPES):
+        return None
+    return parsed
 
 
 def tiktok_connection_status():
@@ -227,6 +338,8 @@ def _handle_callback(service, provider, origin, query):
                 'identity_hash': identity_hash, 'account': sanitized, 'lifecycle': lifecycle,
                 'client_key_fingerprint': _sha(client_key)[:12]})
             service.database.put('lifecycle:' + provider, lifecycle)
+            if provider == 'tiktok':
+                service.database.put(TIKTOK_REFRESH_ATTEMPT_KEY, None)
         # Return PASS only AFTER durable commit acknowledgement.
         return finish(service, {'status': 'PASS', 'oauth_callback': 'PASS',
             'access_token_exchange': 'PASS', 'token_stored_securely': 'PASS',
