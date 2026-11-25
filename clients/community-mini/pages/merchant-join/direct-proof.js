@@ -26,17 +26,18 @@ function sha256(original){
 }
 let serial=0;
 const intent=()=> 'mini-ocr-direct-'+Date.now().toString(36)+'-'+(++serial).toString(36)+'-'+Math.random().toString(36).slice(2);
-function directProof(request,application,revision){
+function directProof(request,application,revision,provider_version=0){
  if(typeof request!=='function'||typeof application!=='string'||!application||
-    !Number.isSafeInteger(revision)||revision<0)throw Error('DIRECT_OCR_BINDING_INVALID');
+    !Number.isSafeInteger(revision)||revision<0||!Number.isSafeInteger(provider_version)||provider_version<0)throw Error('DIRECT_OCR_BINDING_INVALID');
  const intent_key=intent();
+ const binding=(kind,digest,size)=>({application,revision,provider_version,kind,digest,size,intent_key});
  let taken=false;
- return {sha256,async signDigest({kind,digest,size}){
+ return {sha256,binding,async signDigest({kind,digest,size}){
   if(taken||!Object.prototype.hasOwnProperty.call(ACTION,kind)||
      typeof digest!=='string'||!/^[0-9a-f]{64}$/.test(digest)||!Number.isSafeInteger(size)||size<1||size>10_000_000)
    throw Error('DIRECT_OCR_BINDING_INVALID');
   taken=true;
-  const result=await request('direct_ocr_sign',{application,revision,kind,digest,size,intent_key});
+  const result=await request('direct_ocr_sign',binding(kind,digest,size));
   if(!result||Object.keys(result).join(',')!=='headers'||!result.headers||typeof result.headers!=='object'||Array.isArray(result.headers))
    throw Error('DIRECT_OCR_PROOF_UNAVAILABLE');
   return result.headers;

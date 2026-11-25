@@ -354,6 +354,17 @@ class PlatformHost:
         except BaseException:
             os.close(lock);raise
 
+    def configure_applicant_direct_ocr_signer(self, signer):
+        """Original trusted Python startup only; no env/HTTP credential injection."""
+        if (self.application is None or self.application.server is not None
+                or self.application.onboarding is None):
+            raise PermissionError('DIRECT_OCR_HOST_CONFIGURATION_DENIED')
+        _require_nonroot()
+        if not callable(signer) or getattr(self.application.onboarding, 'direct_ocr_signer', None) is not None:
+            raise ValueError('ORIGINAL_DIRECT_OCR_SIGNER_REQUIRED')
+        self.application.onboarding.direct_ocr_signer = signer
+        return 'APPLICANT_DIRECT_OCR_SIGNER_CONFIGURED'
+
     def configure_applicant_image_scanner(self):
         """Opt in to the bundled image-only decode/sanitize/scan boundary."""
         if self.application is None or self.application.server is not None or self.center.scanner is not None:

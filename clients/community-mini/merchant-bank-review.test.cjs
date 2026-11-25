@@ -4,7 +4,8 @@ const prefix=original.split("const test=require('node:test');")[0],source=fs.rea
 function make(fullSave=false){const code=fullSave?prefix.replace(",'finishConfirmedOcrSave'",''):prefix;return new Function('require','__dirname',code+';return fixture;')(createRequire(file),root)(source);}
 const event={currentTarget:{dataset:{kind:'bank_card'}}};
 const outcome=(status='needs_review')=>({job_id:'synthetic-job',document_type:'bank_card',application_revision:'8',provider_version:3,status,fields:{account_number:{value:'SYNTHETIC ACCOUNT'},account_bank:{value:'SYNTHETIC BANK'}}});
-async function uploaded(f){const p=f.page.upload(event);f.pick();await p;}
+// Explicit synthetic legacy job for unchanged persisted-job confirmation/recovery guards.
+async function uploaded(f){const p=f.page.upload(event);f.pick();await p;await f.page.recognizeCurrentDocument('bank_card',{newIntent:true,uploadedMaterial:true});}
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 test('review bank: current-material restoration must reach existing recover_view without creating or reuploading',async()=>{
  const f=make();f.page.data.application.materials.bank_card={object_id:'synthetic-object'};

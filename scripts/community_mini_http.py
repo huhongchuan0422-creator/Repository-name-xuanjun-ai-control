@@ -131,6 +131,10 @@ def make_handler(gateway,*,proxy_origin=None,trusted_proxy=None,operations=None,
                         db.execute('SELECT 1').fetchone()
                 except Exception:return self.answer(503,{'status':'UNAVAILABLE'})
                 health={'status':'MAINTENANCE' if maintenance else 'READY','scope':'PROCESS_AND_DATABASE_CONNECTIVITY','production_acceptance':False}
+                if onboarding is not None:
+                    # Configuration presence only, never a provider permission or inference PASS.
+                    health.update(mini_direct_ocr_contract='ORIGINAL_SELECTION_DIGEST_V1',
+                        mini_direct_ocr_signer_configured=callable(getattr(onboarding,'direct_ocr_signer',None)))
                 if source_sha is not None:
                     health.update(runtime_source_sha=source_sha,version_source='IMAGE_BUILD_STAMP',
                                   observed_at=int(time.time()))
