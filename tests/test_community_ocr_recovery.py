@@ -123,7 +123,7 @@ class DurableRecovery(unittest.TestCase):
   fn=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='configure_applicant_ocr')
   source=ast.get_source_segment(Path('scripts/community_platform_host.py').read_text(),fn)
   self.assertLess(source.index('fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)'),source.index('store.recover_interrupted()'))
-  self.assertLess(source.index('store.recover_interrupted()'),source.index("self.configure_ocr('',api,store,applicant_mode=True)"))
+  self.assertLess(source.index('store.recover_interrupted()'),source.index("self.configure_ocr('',api,store,applicant_mode=True,bank_card_infer=bank_card_infer)"))
 
 
 class SafeReadDiagnostics(unittest.TestCase):
