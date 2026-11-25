@@ -2,9 +2,9 @@
   "runtime_source_sha": "17ecb128e8e0407e0a99259959babd0fbeea6085",
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
-  "startup_source_manifest_sha256": "35c1b71eb942d86ff54228bd41a6b5ae3438ea3fa55653952ac756271d213a6d",
-  "frontend_manifest_sha256": "d344ddf941e6fbf092097e3f98300aa328cdcc6af5bb34d4bcbbc3a4d28da7d1",
-  "frontend_archive_sha256": "19343328fc44b7b7b404d742fa3db2d107bf6a6d871cfa0b89a570db3c9d7333",
+  "startup_source_manifest_sha256": "91306bd09f8966eedda79d1823feaff320b48e988e6ff950c8db31805850641d",
+  "frontend_manifest_sha256": "f8a554c458662a9a5181ee1cbdecc4e2d3a00809aedc86e4d478446eaa9795b5",
+  "frontend_archive_sha256": "16f4448df51b7b27e7bd9797a641f6ef437da43625f3172c589e57fbeed009f5",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
-  "evidence": "Assembly trio d344ddf9 bound; live backend startup manifest 35c1b71e verified via pins hash recomputation 2026-11-25; runtime 17ecb128 unchanged; payment remains disabled"
+  "evidence": "Assembly trio rebound to c741-reviewed 57-file snapshot; live backend baseline 17ecb128 unchanged; startup manifest 91306bd0 derived from pinned 35c1b71e set plus single-file host delta 952b->4baf byte-verified on host (one-line 3578 onboarding reader activation); 208 other pins identical; payments untouched. Independent review of host delta pending at carrier staging."
 }
