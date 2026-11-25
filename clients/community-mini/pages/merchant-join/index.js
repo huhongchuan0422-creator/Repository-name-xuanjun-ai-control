@@ -231,6 +231,7 @@ function directOcrHint(page,kind,key,hasStored,row,field,savedRow,freshRow,activ
  const has=(object,key)=>object!=null&&Object.prototype.hasOwnProperty.call(object,key);
  const touched=has(page.ocrExplicitEmptyFields,field.path)||(active&&has(page.ocrSuggestionEdits,key))||(held&&held.local_state&&has(held.local_state.edits,key));
  const blankLegacy=row&&!savedRow&&!freshRow&&row.value==='';
+ if(kind==='bank_card'&&hasStored&&typeof value==='string'&&value&&value!==form.get(page.profile,field.path))return {ocrDirect:'',ocrDirectCompare:kind,ocrHint:'识别建议：'+value+'；已填写内容保留，请人工核对。'};
  if(hasStored||touched||(row&&!blankLegacy)||typeof value!=='string'||!value)return {ocrDirect:''};
  const display={value,ocrDirect:kind,ocrHint:'识别建议，请人工核对',ocrKey:'',ocrRetained:false,ocrPrivateDraft:false,ocrSuggestion:false,ocrConflict:false,ocrInReview:false,ocrResultPresent:kind!=='bank_card'};
  if(kind==='bank_card'&&key==='account_bank'&&Array.isArray(field.choices)){
@@ -754,7 +755,7 @@ Page({
      if(Number.isFinite(n)&&n>=0)row[key]=Math.round(n);
     }
     row.photo_state=uploadConfirmed?'SAVED':savePreparationFailed?'FAILED':'NOT_CONFIRMED';
-    row.ocr_state=this.directOcrHints[ocrKind]?.active()?'SUGGESTION_VISIBLE':'NO_CURRENT_SUGGESTION';
+    row.ocr_state=Number.isFinite(previous.pick_to_front_filled_ms)?'SUGGESTION_VISIBLE':this.directOcrHints[ocrKind]?.active()?'RECEIVED_NOT_RENDER_CONFIRMED':'NO_CURRENT_SUGGESTION';
     if(typeof previous.request_id_present==='boolean')row.request_id_present=previous.request_id_present;
     if(typeof previous.request_id_sha256==='string'&&/^[a-f0-9]{64}$/.test(previous.request_id_sha256))row.request_id_sha256=previous.request_id_sha256;
     this.directOcrTimings[ocrKind]=row;
@@ -836,8 +837,8 @@ Page({
      this.setDirectOcrHint(ocrKind,result.fields,active,uploadConfirmed);
      return new Promise(resolve=>this.updateOcrView({ocrStatus:'识别建议，请人工核对'},()=>{
       const visible=(this.data.materialGroups||[]).some(g=>(g.fields||[]).some(field=>{
-       const k=field.ocrDirect===ocrKind&&this.ocrPathKey(field.path,ocrKind);
-       return !!k&&typeof result.fields[k]==='string'&&!!result.fields[k]&&!!field.value;
+       const k=(field.ocrDirect===ocrKind||field.ocrDirectCompare===ocrKind)&&this.ocrPathKey(field.path,ocrKind);
+       return !!k&&typeof result.fields[k]==='string'&&!!result.fields[k]&&(field.ocrDirectCompare===ocrKind?typeof field.ocrHint==='string'&&field.ocrHint.includes(result.fields[k]):!!field.value);
       }));
       resolve(active()&&visible);
      }));
