@@ -61,7 +61,7 @@ Page({
   async retryStoreDetail(){
     if(this.data.detailState==='LOADING'||this._pageUnloaded||this._sceneStale)return;
     const id=this._detailRequest&&this._detailRequest.id;
-    if(!this.data.sessionReady)return this.onLoad({scene:this.scene,view:id||!this.scene?'recommendations':'store-detail'});
+    if(!this.data.sessionReady)return this.onLoad({scene:this.scene,view:'recommendations'});
     if(id)return this.openRecommendation({currentTarget:{dataset:{id}}});
     if(this.scene)return this.loadSceneStorefront();
     return this.backRecommendations();

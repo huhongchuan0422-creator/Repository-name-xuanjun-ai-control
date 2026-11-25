@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const originalStore={name:'Original authorized store',description:'Original scene-authorized description',contact:'Fixture contact'};
 const publicStore={id:'a'.repeat(64),name:'Public directory store',description:'Published description',storefront_photo:null,photo_state:'NOT_CONNECTED'};
-function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,denied=false,network=false,unavailable=false,rejected=false,empty=false,publicNetwork=false,directoryNetwork=false,loginDenied=false}={}){
+function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,denied=false,network=false,unavailable=false,rejected=false,empty=false,publicNetwork=false,directoryNetwork=false,loginDenied=false,publicDenied=false}={}){
   const calls=[],held=[],heldPublic=[],app={globalData:{baseUrl:'https://fixture.invalid',mode:'WECHAT_LOGIN',commerce:true,payments:false,...(scene?{scene}:{})}};let navigation='';
   const reply=(o,result)=>o.success({statusCode:200,data:{payment_enabled:false,result}});
   const storefront=o=>unavailable||rejected?o.success({statusCode:400,data:{error:unavailable?'STOREFRONT_UNAVAILABLE':'INVALID_REQUEST',message:'PRIVATE_DETAIL_NOT_FOR_DISPLAY'}}):reply(o,{merchant:store,ads:{},payment_started:false,provider_settlement_verified:false});
@@ -20,7 +20,7 @@ function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,
     }
     if(o.data.operation==='customer.directory'&&directoryNetwork)return o.fail({errMsg:'synthetic network failure'});
     if(o.data.operation==='customer.directory')return reply(o,{records:empty?[]:[publicStore],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false});
-    if(o.data.operation==='customer.store'){if(publicNetwork)return o.fail({errMsg:'synthetic network failure'});if(holdPublic){heldPublic.push(o);return;}return reply(o,publicStore);}
+    if(o.data.operation==='customer.store'){if(publicDenied)return o.success({statusCode:403,data:{error:'ACCESS_DENIED'}});if(publicNetwork)return o.fail({errMsg:'synthetic network failure'});if(holdPublic){heldPublic.push(o);return;}return reply(o,publicStore);}
     throw Error('UNPLANNED_REQUEST:'+o.data.operation);
   }};
   function page(name='checkout'){
@@ -28,7 +28,7 @@ function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,
     vm.runInNewContext(fs.readFileSync(filename,'utf8'),{Page:value=>definition=value,require:p=>require(path.resolve(path.dirname(filename),p)),wx,getApp:()=>app,getCurrentPages:()=>[],encodeURIComponent});
     return {...definition,data:structuredClone(definition.data),setData(update,callback){Object.assign(this.data,update);callback?.();}};
   }
-  return {app,calls,held,heldPublic,page,get navigation(){return navigation;},deny(){denied=true;},setUnavailable(value){unavailable=value;},setPublicNetwork(value){publicNetwork=value;},setDirectoryNetwork(value){directoryNetwork=value;},setLoginDenied(value){loginDenied=value;},releasePublic(){for(const o of heldPublic.splice(0))reply(o,publicStore);},release(){const waiting=held.splice(0);for(const o of waiting)storefront(o);},async waitHeld(){for(let n=0;n<30&&!held.length;n++)await tick();assert.ok(held.length,'original storefront request was issued');}};
+  return {app,calls,held,heldPublic,page,get navigation(){return navigation;},deny(){denied=true;},setUnavailable(value){unavailable=value;},setPublicNetwork(value){publicNetwork=value;},setPublicDenied(value){publicDenied=value;},setDirectoryNetwork(value){directoryNetwork=value;},setLoginDenied(value){loginDenied=value;},releasePublic(){for(const o of heldPublic.splice(0))reply(o,publicStore);},release(){const waiting=held.splice(0);for(const o of waiting)storefront(o);},async waitHeld(){for(let n=0;n<30&&!held.length;n++)await tick();assert.ok(held.length,'original storefront request was issued');}};
 }
 const event=dataset=>({currentTarget:{dataset}});
 test('home current-store route reads original scene storefront with one identity and no invented directory id',async()=>{
@@ -183,4 +183,13 @@ test('invalid scene and unknown detail id never become a default merchant or aut
 });
 test('retry button is bound to actual detail retry handler',()=>{
   const text=fs.readFileSync(path.join(__dirname,'pages/checkout/index.wxml'),'utf8');assert.ok(text.includes('bindtap="retryStoreDetail"'));
+});
+test('revoked public detail retry restores directory identity, never substitutes ambient current store',async()=>{
+  const f=fixture({publicDenied:true}),p=f.page();await p.onLoad({scene:'shop1',view:'recommendations'});await tick();
+  await p.openRecommendation(event({id:publicStore.id}));assert.equal(p.data.sessionReady,false);
+  const originalReads=f.calls.filter(x=>x.operation==='community.storefront').length;
+  f.setPublicDenied(false);await p.retryStoreDetail();assert.equal(p.data.viewMode,'recommendations');assert.equal(p.data.directoryState,'READY');
+  assert.equal(p.data.sceneStorefront,null);assert.equal(p.data.selectedRecommendation,null);assert.equal(f.calls.filter(x=>x.operation==='community.storefront').length,originalReads+1);
+  // The normal recommendations page reads its scene's header, not a rendered store-detail projection.
+  assert.equal(p.data.detailState,'NOT_QUERIED');
 });
