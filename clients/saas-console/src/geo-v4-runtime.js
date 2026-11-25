@@ -1,4 +1,5 @@
 import {makeApi} from './api.js';
+import {makeGeoHttpService} from './geo-v4-http-service.js';
 import {assertTenant,geoCustomerState,geoCanExecute,geoNoGuaranteeText} from './geo.js';
 
 export const GEO_SERVICE_HOOK='__XJ_GEO_CUSTOMER_SERVICE__';
@@ -141,7 +142,7 @@ function canAction(runtime,type){if(runtime?.mode!=='CONNECTED'||typeof runtime.
 export function installGeoActionGuards(window,document,getRuntime,refresh){
  let epoch=0;
  const blocked=()=>window.toast?.(geoRuntimeNotice(getRuntime())+'；该操作真实接口未接通或当前无执行权限');
- const run=type=>async(...args)=>{const r=getRuntime();if(!canAction(r,type))return blocked();const mine=++epoch;const payload={type,project_id:r.project.id,tenant_id:r.project.tenant,args};if(type==='SAVE_BRAND')payload.form={name:document.querySelector('#brandname')?.value||'',website:document.querySelector('#brandurl')?.value||''};if(type==='ADD_VERSION_COMMENT')payload.comment=document.querySelector('#commentinput')?.value||'';try{await r.service.command(payload);if(mine!==epoch)return;await refresh()}catch(e){if(mine!==epoch)return;if(e?.uncertain){window.toast?.('结果未知，正在查询当前状态；不会自动重试');await refresh()}else{window.toast?.(e?.message||'操作失败')}}};
+ const run=type=>async(...args)=>{const r=getRuntime();if(!canAction(r,type))return blocked();const mine=++epoch;const payload={type,project_id:r.project.id,tenant_id:r.project.tenant,args};if(type==='SAVE_BRAND')payload.form={name:document.querySelector('#brandname')?.value||'',website:document.querySelector('#brandurl')?.value||''};if(type==='ADD_VERSION_COMMENT')payload.comment=document.querySelector('#commentinput')?.value||'';try{await r.service.command(payload);if(mine!==epoch)return;await refresh()}catch(e){if(mine!==epoch)return;if(e?.uncertain){window.toast?.('结果未知，正在查询当前状态；不会自动重试');await refresh()}else{window.toast?.(e?.message||'操作失败');if(e?.status===401||e?.status===403)await refresh()}}};
  for(const [name,type] of Object.entries(ACTIONS))window[name]=run(type);
  window.issueDetail=i=>{const r=getRuntime(),x=buildGeoView(r).diagnosis?.items?.[i];if(!x||typeof window.drawer!=='function')return blocked();window.drawer('<div class="eyebrow">诊断详情</div><h1>'+safe(x.title||'诊断项')+'</h1><div class="evidencebox"><h3>为什么值得处理</h3><p>'+safe(x.cause||'诊断依据未接入')+'</p><p>'+safe(x.evidence||'证据数据未接入')+'</p></div><h3>用户会怎样问</h3><div class="quotebox">'+safe(x.question||'问题样本未接入')+'</div><h3>对应页面</h3><div class="evidencebox">'+safe(x.page||'页面未接入')+'</div>');};
  window.sampleScope=()=>{const x=buildGeoView(getRuntime()).scope;if(!x||typeof window.drawer!=='function')return blocked();window.drawer('<div class="eyebrow">数据范围与口径</div><h1>同范围，才比较。</h1><div class="evidencebox">'+safe(x.summary||'范围说明未接入')+'</div>')};
@@ -161,4 +162,4 @@ export async function installGeoV4Runtime({window=globalThis.window,document=glo
  return current;
 }
 
-if(typeof window!=='undefined'&&typeof document!=='undefined')installGeoV4Runtime().catch(error=>{try{applyGeoRuntimeView(document,closed('INTEGRITY_ERROR',null,null,error))}catch{}});
+if(typeof window!=='undefined'&&typeof document!=='undefined')installGeoV4Runtime({service:globalThis[GEO_SERVICE_HOOK]||makeGeoHttpService()}).catch(error=>{try{applyGeoRuntimeView(document,closed('INTEGRITY_ERROR',null,null,error))}catch{}});
