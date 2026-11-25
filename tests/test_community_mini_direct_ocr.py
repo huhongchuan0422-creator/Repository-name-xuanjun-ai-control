@@ -102,6 +102,13 @@ class DirectBankProof(unittest.TestCase):
         self.service.direct_ocr_signer=wrong
         with self.assertRaisesRegex(ValueError,'PROOF_INVALID'):self.call('direct_ocr_sign',self.p)
         self.assertIn('bank_card',self.upload()['materials'])
+    def test_revoked_selection_record_cannot_be_recreated_or_resigned(self):
+        self.call('direct_ocr_sign',self.p)
+        self.fx.fx.center.db.execute('UPDATE links SET active=0 WHERE channel=? AND project=?',(CHANNEL,self.p['application']))
+        with self.assertRaisesRegex(DirectOcrSelectionChanged,'REVOKED'):self.call('direct_ocr_sign',self.p)
+        with self.assertRaisesRegex(DirectOcrSelectionChanged,'REVOKED'):self.upload()
+        self.assertEqual(len(self.calls),1)
+
     def test_expired_proof_does_not_block_photo_or_extend_signing_authority(self):
         self.call('direct_ocr_sign',self.p)
         self.fx.fx.stage.now+=61

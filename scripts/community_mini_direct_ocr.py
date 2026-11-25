@@ -51,9 +51,11 @@ class DirectOcrSelection:
 
     def read(self, uid, p):
         key = self.key(uid, p)
-        row = self.center.db.execute('SELECT payload FROM links WHERE channel=? AND subject_idx=? AND project=? AND user_id=? AND active=1',
+        row = self.center.db.execute('SELECT active,payload FROM links WHERE channel=? AND subject_idx=? AND project=? AND user_id=?',
             (CHANNEL, key, p['application'], uid)).fetchone()
-        return json.loads(self.center.decrypt(row[0], 'mini-direct-ocr:' + key)) if row else None
+        if row is not None and row['active'] != 1:
+            raise DirectOcrSelectionChanged('DIRECT_OCR_SELECTION_REVOKED')
+        return json.loads(self.center.decrypt(row['payload'], 'mini-direct-ocr:' + key)) if row else None
 
     def write(self, uid, p, record):
         key = self.key(uid, p)
