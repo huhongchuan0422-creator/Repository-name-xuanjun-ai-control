@@ -9,6 +9,23 @@ from pathlib import Path
 from http.server import HTTPServer
 ROOT=Path(__file__).resolve().parents[1]
 
+def native_review_sources():
+    """Existing review sources plus the literal dependencies of its Pages."""
+    root = ROOT / 'clients/community-mini'
+    names = {'app.wxss', 'session.js', 'submission-diagnostic.js', 'chain-telemetry.js',
+             'client.js', 'payment.js', 'customer-auth.js', 'merchant-form.js',
+             'merchant-license-region.js', 'material-private-preview.js', 'merchant-fields.json',
+             'merchant-submit.js', 'merchant-official-fields.js', 'merchant-official-areas.json',
+             'merchant-official-industries.json', 'merchant-platform-reference.json',
+             'merchant-fields-data.js', 'merchant-official-areas-data.js',
+             'merchant-official-industries-data.js', 'merchant-platform-reference-data.js'}
+    names.update(p.relative_to(root).as_posix() for p in (root / 'pages').glob('*/index.*')
+                 if p.suffix in ('.js', '.wxml', '.wxss'))
+    names.update({'pages/merchant-join/direct-ocr.js', 'pages/merchant-join/direct-proof.js',
+                  'pages/user-agreement/content.js'})
+    return {name: (root / name).read_text() for name in sorted(names)}
+
+
 class ReviewRuntime:
     def __init__(self,port=0):
         sys.path.insert(0,str(ROOT))
@@ -67,11 +84,7 @@ class ReviewRuntime:
                     if not self._local():return self.answer(403,{'error':'LOOPBACK_REVIEW_ONLY'})
                     parsed=urllib.parse.urlsplit(self.path)
                     if parsed.path=='/review/sources':
-                        names={'app.wxss','session.js','submission-diagnostic.js','chain-telemetry.js','client.js','payment.js','customer-auth.js','merchant-form.js','merchant-license-region.js','material-private-preview.js','merchant-fields.json','merchant-submit.js','merchant-official-fields.js','merchant-official-areas.json','merchant-official-industries.json','merchant-platform-reference.json'}
-                        names.update({'merchant-fields-data.js','merchant-official-areas-data.js',
-                                      'merchant-official-industries-data.js','merchant-platform-reference-data.js'})
-                        names.update(p.relative_to(ROOT/'clients/community-mini').as_posix() for p in (ROOT/'clients/community-mini/pages').glob('*/index.*') if p.suffix in ('.js','.wxml','.wxss'))
-                        return self.answer(200,{'sources':{n:(ROOT/'clients/community-mini'/n).read_text() for n in sorted(names)},'isolated':True})
+                        return self.answer(200,{'sources':native_review_sources(),'isolated':True})
                     assets={'/':('review-runtime.html','text/html; charset=utf-8'),'/review/native.js':('review-native.js','application/javascript; charset=utf-8')}
                     if parsed.path in assets:
                         name,mime=assets[parsed.path];return self._asset((ROOT/'demos/community-stage'/name).read_bytes(),mime)

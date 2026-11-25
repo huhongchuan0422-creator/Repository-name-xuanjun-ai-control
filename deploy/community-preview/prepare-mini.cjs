@@ -31,9 +31,10 @@ for(const page of pages){
 for(const name of required)if(!fs.lstatSync(path.join(SOURCE,name)).isFile())throw Error('REQUIRED_MINI_FILE_MISSING');
 const original=fs.readFileSync(path.join(SOURCE,'app.js'),'utf8');
 const needle="App({\n  globalData: {baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false},";
-if(!identity.snapshot_binding&&!original.includes(needle))throw Error('EXPECTED_APP_BASELINE_REQUIRED');
+const current="baseUrl: 'https://uk.wenwenwenyiyiyi.work/community-preview', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: ''";
+if(!identity.snapshot_binding&&!original.includes(needle)&&original.split(current).length!==2)throw Error('EXPECTED_APP_BASELINE_REQUIRED');
 const replacement="App({\n  globalData: {baseUrl: '"+HOST+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true},";
-const updated=identity.snapshot_binding?original:original.replace(needle,replacement);
+const updated=identity.snapshot_binding?original:original.includes(needle)?original.replace(needle,replacement):original.replace(current,"baseUrl: '"+HOST+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: ''");
 const receipt={
  status:'CONNECTED_PREVIEW_SOURCE_PREPARED_NOT_UPLOADED',
  ...target,commerce:true,payments:false,scene:null,entry_page:'pages/home/index',search_query:'',

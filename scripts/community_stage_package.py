@@ -57,6 +57,7 @@ def build(root):
                 'clients/community-mini/pages/merchant/*',
                 'clients/community-mini/pages/merchant-join/*',
                 'clients/community-mini/pages/h5-confirm/*',
+                'clients/community-mini/pages/user-agreement/*',
                 'deploy/community-preview/Dockerfile',
                 'deploy/community-preview/Dockerfile.ui-successor',
                 'deploy/community-preview/COMMUNITY_SOURCE_SHA.successor',
