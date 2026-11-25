@@ -429,7 +429,7 @@ class PlatformHost:
         self.close()
 
 
-def main(argv=None, *, bank_card_infer=None):
+def main(argv=None, *, bank_card_infer=None, direct_ocr_signer=None):
     parser = argparse.ArgumentParser(description='Admitted original community platform host')
     parser.add_argument('--plan',required=True)
     parser.add_argument('--center-keys',required=True)
@@ -446,6 +446,8 @@ def main(argv=None, *, bank_card_infer=None):
             parser.error('BANK_CARD_INFERENCE_CALLABLE_REQUIRED')
         if not args.applicant_ocr_key_reference:
             parser.error('EXISTING_APPLICANT_OCR_REFERENCES_REQUIRED')
+    if direct_ocr_signer is not None and not callable(direct_ocr_signer):
+        parser.error('ORIGINAL_DIRECT_OCR_SIGNER_REQUIRED')
     def stop(signum,frame):
         raise KeyboardInterrupt()
     previous = signal.signal(signal.SIGTERM,stop)
@@ -456,6 +458,8 @@ def main(argv=None, *, bank_card_infer=None):
                 print(result, flush=True)
                 return 0
         with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret) as host:
+            if direct_ocr_signer is not None:
+                host.configure_applicant_direct_ocr_signer(direct_ocr_signer)
             if args.applicant_image_scanner:
                 host.configure_applicant_image_scanner()
             if args.applicant_ocr_key_reference:

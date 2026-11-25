@@ -146,6 +146,24 @@ class DirectBankProof(unittest.TestCase):
         host.application.server=object()
         with self.assertRaises(PermissionError):host.configure_applicant_direct_ocr_signer(signer)
 
+    def test_original_main_passes_existing_signer_without_server_ocr_dependency_or_execution(self):
+        from unittest.mock import Mock,patch
+        from scripts.community_platform_host import PlatformHost,main
+        signer=Mock();host=Mock();host.__enter__=Mock(return_value=host);host.__exit__=Mock(return_value=False)
+        args=['--plan','/synthetic/plan','--center-keys','/synthetic/keys','--wechat-secret','/synthetic/wechat']
+        with patch.object(PlatformHost,'open',return_value=host):self.assertEqual(main(args,direct_ocr_signer=signer),0)
+        host.configure_applicant_direct_ocr_signer.assert_called_once_with(signer)
+        host.configure_applicant_ocr.assert_not_called();host.serve.assert_called_once();signer.assert_not_called()
+
+    def test_original_main_rejects_string_signer_before_any_host_or_key_load(self):
+        from unittest.mock import patch
+        from scripts.community_platform_host import PlatformHost,main
+        import contextlib,io
+        args=['--plan','/synthetic/plan','--center-keys','/synthetic/keys','--wechat-secret','/synthetic/wechat']
+        with patch.object(PlatformHost,'open') as opening,contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):main(args,direct_ocr_signer='module:signer')
+        opening.assert_not_called()
+
     def test_original_http_binding_failure_is_local_400_not_account_revocation(self):
         import json,urllib.request,urllib.error
         from concurrent.futures import ThreadPoolExecutor
