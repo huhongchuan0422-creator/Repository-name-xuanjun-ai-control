@@ -20,7 +20,7 @@ Page({
   openMerchantJoin(){return auth.navigate(this,'join',wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   scanStore(){return auth.scanStore(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   goBack(){return auth.back(this,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
-  data: {nativeCollectionEntry:false,sceneStorefront:null,demoStore:null,demoImagePath:DEMO_PHOTO_ASSET,demoPhotoFailed:false,demoState:'UNKNOWN',directory:[],categories:LOCAL_CATEGORIES,categoryId:'',visibleDirectoryCount:0,directoryState:'NOT_QUERIED',directoryError:'',directoryMore:false,directoryCursor:null,contexts:[],contextsState:'NOT_QUERIED',contextsError:'',ordersState:'NOT_QUERIED',ordersError:'',detailState:'NOT_QUERIED',detailError:'',serviceView:'home',serviceTitles:{home:'更多门店服务',community:'我的社区','community-list':'发现社区','community-detail':'社区详情','community-code':'通过推广码加入',referral:'推荐关系',products:'门店商品与服务',checkout:'核对订单',payment:'支付与订单恢复',refund:'申请售后','refund-detail':'售后进度','legacy-profile':'个人资料','legacy-notices':'我的通知'},selectedCommunity:null,communityRelation:null,orderFilter:'all',visibleOrderCount:0,needsScene:true,viewMode:'recommendations',activeSection:'recommendations',sessionReady:false,detailsCollapsed:false,selectedRecommendation:null,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'', afterAd:'',afterAdVerified:false, status:'', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',ownReferralCode:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
+  data: {nativeCollectionEntry:false,sceneStorefront:null,demoStore:null,demoImagePath:DEMO_PHOTO_ASSET,demoPhotoFailed:false,demoState:'UNKNOWN',directory:[],categories:LOCAL_CATEGORIES,categoryId:'',visibleDirectoryCount:0,directoryState:'NOT_QUERIED',directoryError:'',directoryMore:false,directoryCursor:null,contexts:[],contextsState:'NOT_QUERIED',contextsError:'',ordersState:'NOT_QUERIED',ordersError:'',detailState:'NOT_QUERIED',detailError:'',serviceView:'home',serviceTitles:{home:'更多门店服务',community:'我的社区','community-list':'发现社区','community-detail':'社区详情','community-code':'通过推广码加入',referral:'推荐关系',products:'门店商品与服务',checkout:'核对订单',payment:'支付与订单恢复',refund:'申请售后','refund-detail':'售后进度','legacy-profile':'个人资料','legacy-notices':'我的通知'},selectedCommunity:null,communityRelation:null,orderFilter:'all',visibleOrderCount:0,needsScene:true,viewMode:'recommendations',activeSection:'recommendations',sessionReady:false,detailsCollapsed:false,selectedRecommendation:null,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',amount:'', reference:'', merchant:'', beforeAd:'',beforeAdImage:'', afterAd:'',afterAdImage:'',afterAdVerified:false, status:'', pending:false,paymentsEnabled:false,commerceEnabled:false,profileVersion:null,nickname:'',profileContact:'',ownReferralCode:'',referralCode:'',projectCustomerId:'',userId:'',notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',products:[],productCursor:null,productsMore:false,productsPending:false,productsStatus:'',orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:"",refundAmount:"",refundReason:"",projectTitle:"",projectRole:"",projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',projectFeedback:"",projectReference:"",projectReferenceKind:"SECRETREF",projectReferenceItem:"",projectReferenceRevision:0,projectState:""},
   openMerchant(){return auth.navigate(this,'merchant',wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   navigateSection(e){return auth.navigate(this,e.currentTarget.dataset.section,wx,getApp(),typeof getCurrentPages==='function'?getCurrentPages():[]);},
   onShow(){const activeScene=getApp().globalData.scene;if(this.scene&&activeScene&&this.scene!==activeScene&&!this._sceneStale){this._sceneStale=true;this.customerSessionRevoked('授权场景已切换，当前订单和客户资料已清除，请重新进入对应门店',false);return;}if(this._sceneStale)return;const mode=getApp().globalData.checkoutMode;getApp().globalData.checkoutMode='';const view=mode||this.data.viewMode||'recommendations';const selectedRecommendation=view==='store-detail'?this.data.selectedRecommendation:null;this.setData({viewMode:view,activeSection:view==='orders'?'orders':view==='services'||view==='profile'?'profile':'recommendations',selectedRecommendation,sceneStorefront:view==='store-detail'?this.data.sceneStorefront:null});if((mode||this.data.demoStore)&&this.data.sessionReady){if(view==='recommendations')this.loadDirectory();else if(view==='orders')this.loadOrders();else if(view==='services'&&!this.scene)this.loadContexts();}if(!mode&&this.data.sessionReady&&this.data.selectedRecommendation&&this.data.selectedRecommendation.is_demo)this.openRecommendation({currentTarget:{dataset:{id:this.data.selectedRecommendation.id}}});if(this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated()&&!this.data.pending&&!this._sceneStale){this.onLoad({scene:this.scene,view:this.data.viewMode});}},
@@ -229,15 +229,16 @@ Page({
       .catch(e=>{if(current())this.setData({status:customerError(e)});});
     } catch(e) {if(current())this.setData({status:customerError(e)});}
   },
-  onUnload() {this.clearShowcaseCovers();this._detailRequest=null;this.setData({sessionReady:false,sceneStorefront:null,detailState:'NOT_QUERIED',detailError:''});this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
+  onUnload() {this._receiptAdRequest=null;this.clearShowcaseCovers();this._detailRequest=null;this.setData({sessionReady:false,sceneStorefront:null,detailState:'NOT_QUERIED',detailError:''});this._consumerRequest=null;this._productRequest=null;this._pageUnloaded=true;this._pageGeneration=(this._pageGeneration||0)+1;this._projectRequest=null;this._noticeRequest=null;if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(this.session&&this.session.detachPage)this.session.detachPage(this);this.session=null;},
   customerSessionRevoked(status='登录已退出，请重新登录',revokeIdentity=true){
+    this._receiptAdRequest=null;
     this._directoryRequest=null;this._contextRequest=null;this._allOrdersRequest=null;this._detailRequest=null;this._orderScopes=null;this._pageGeneration=(this._pageGeneration||0)+1;this._consumerRequest=null;this._productRequest=null;this._projectRequest=null;this._noticeRequest=null;this._profileRequest=null;
     if(this.client)this.client.reset();if(this.paymentFlow)this.paymentFlow.reset();if(revokeIdentity&&this.session)this.session.clear();
     this.session=null;this.client=null;this.paymentFlow=null;
     if(!this._pageUnloaded)this.setData({sceneStorefront:null,detailState:'NOT_QUERIED',detailError:'',demoStore:null,demoState:'UNKNOWN',demoPhotoFailed:false,directory:[],categories:[],directoryState:'NOT_QUERIED',contexts:[],contextsState:'NOT_QUERIED',ordersState:'NOT_QUERIED',selectedRecommendation:null,serviceView:'home',selectedCommunity:null,communityRelation:null,orderFilter:'all',visibleOrderCount:0,sessionReady:false,commerceEnabled:false,paymentsEnabled:false,communities:[],communityCursor:null,communitiesMore:false,communityId:'',promotionCode:'',profileVersion:null,nickname:'',profileContact:'',ownReferralCode:'',referralCode:'',projectCustomerId:'',userId:'',
       notices:[],noticeCursor:null,noticesMore:false,noticesLoaded:false,noticePending:false,noticeStatus:'',
       orders:[],orderCursor:null,ordersMore:false,orderDetails:null,orderDetailsPending:false,orderDetailsStatus:'',
-      reference:'',amount:'',afterAd:'',afterAdVerified:false,
+      reference:'',amount:'',merchant:'',beforeAd:'',beforeAdImage:'',afterAd:'',afterAdImage:'',afterAdVerified:false,
       refundCurrent:null,refundRecoveryLoaded:false,refundRecoveryPending:false,refundRecoveryStatus:'',refundApplication:'',refundAmount:'',refundReason:'',
       projectTitle:'',projectRole:'',projectChecklist:[],projectMessages:[],projectMessagesCursor:null,projectMessagesMore:false,projectMessagesLoaded:false,projectMessagesStatus:'',
       projectFeedback:'',projectReference:'',projectReferenceItem:'',projectReferenceRevision:0,projectState:'',pending:false,status});
@@ -760,8 +761,8 @@ Page({
   },
   async requestRefund() {return this.refundAction(true);},
   async refundStatus() {return this.refundAction(false);},
-  inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({amount:e.detail.value,afterAd:'',afterAdVerified:false});},
-  inputReference(e) {if(this.data.pending&&!this._purchaseRecoveryRequest&&!this.cancelConsumerRead('refund'))return;this.resetOrderDetails();if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.setData({reference:e.detail.value,afterAd:'',afterAdVerified:false});},
+  inputAmount(e) {if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.clearReceiptAd();this.setData({amount:e.detail.value});},
+  inputReference(e) {if(this.data.pending&&!this._purchaseRecoveryRequest&&!this.cancelConsumerRead('refund'))return;this.resetOrderDetails();if(this.paymentFlow)this.paymentFlow.reset();if(this.client)this.client.reset();this.clearReceiptAd();this.setData({reference:e.detail.value});},
   async checkout() {
     if (this.data.pending||this.data.productsPending) return;
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
@@ -777,36 +778,72 @@ Page({
   },
   async pay() {return this.runPayment(false);},
   async recoverPayment() {return this.runPayment(true);},
+  checkoutReadToken(){return {...this.customerReadToken(),scene:this.scene,reference:this.data.reference};},
+  checkoutReadCurrent(request){return !this._sceneStale&&this.scene===request.scene&&this.data.reference===request.reference&&
+    (request.session?this.customerReadCurrent(request)&&(!request.session.isAuthenticated||request.session.isAuthenticated()):!this.session&&!this._pageUnloaded&&this._pageGeneration===request.generation);},
+  clearReceiptAd(){this._receiptAdRequest=null;this.setData({afterAd:'',afterAdImage:'',afterAdVerified:false});},
+  async loadReceiptAd(request){
+    if(!this.checkoutReadCurrent(request)||!this.data.commerceEnabled||!request.session)return false;
+    this.clearReceiptAd();this._receiptAdRequest=request;
+    const current=()=>this._receiptAdRequest===request&&this.checkoutReadCurrent(request);
+    try{
+      const reply=await request.session.commerce(request.scene,'receipt_ad',{reference:request.reference});
+      if(!current()||!reply||reply.payment_success_verified!==true)return false;
+      const ad=reply.creative;
+      if(ad&&ad.slot==='AD_SLOT_PAYMENT_SUCCESS'&&typeof ad.title==='string'&&ad.title.trim())
+        this.setData({afterAd:ad.title,afterAdImage:typeof ad.image_data==='string'?ad.image_data:'',afterAdVerified:true});
+      return true;
+    }catch(_){return false;} // Optional advertising never changes the payment result.
+    finally{if(this._receiptAdRequest===request)this._receiptAdRequest=null;}
+  },
   async runPayment(recover) {
     if(this.data.pending||!this.paymentFlow)return;
-    this.setData({pending:true,afterAd:'',afterAdVerified:false,status:recover?'正在恢复原支付单':'正在准备微信支付'});
-    try {const r=await this.paymentFlow.pay(this.data.reference,recover);await this.showPayment(r);}
-    catch(e){this.setData({status:e.message+'；请查询原订单，勿重新创建支付单'});}
-    finally{this.setData({pending:false});}
+    const request=this.checkoutReadToken(),flow=this.paymentFlow;
+    const current=()=>this.checkoutReadCurrent(request)&&this.paymentFlow===flow;
+    this.clearReceiptAd();this.setData({pending:true,status:recover?'正在恢复原支付单':'正在准备微信支付'});
+    try {const r=await flow.pay(request.reference,recover);if(current())await this.showPayment(r,request);}
+    catch(e){if(current())this.setData({status:e.message+'；请查询原订单，勿重新创建支付单'});}
+    finally{if(current())this.setData({pending:false});}
   },
-  async showPayment(r) {
-    const reference=this.data.reference;
-    this.setData({amount:yuanAmount(r.amount_minor),status:r.provider_state==='SUCCESS'?'微信查单已支付；财务尚未核销':r.provider_state+'；财务尚未核销',afterAd:'',afterAdVerified:false});
-    if(r.provider_state!=='SUCCESS'||!this.data.commerceEnabled||!this.session)return;
-    try {
-      const reply=await this.session.commerce(this.scene,'receipt_ad',{reference});
-      if(this.data.reference!==reference)return;
-      if(reply.payment_success_verified===true&&reply.creative&&typeof reply.creative.title==='string')
-        this.setData({afterAd:reply.creative.title,afterAdImage:reply.creative.image_data||'',afterAdVerified:true});
-    } catch(_) { /* Advertisement failure never changes payment status. */ }
+  async showPayment(r,request=this.checkoutReadToken()) {
+    if(!this.checkoutReadCurrent(request))return;
+    this.clearReceiptAd();
+    if(!r||r.reference!==request.reference||r.provider_signature_verified!==true)throw Error('UNTRUSTED_PAYMENT_QUERY');
+    this.setData({amount:yuanAmount(r.amount_minor),status:r.provider_state==='SUCCESS'?'微信查单已支付；财务尚未核销':r.provider_state+'；财务尚未核销'});
+    if(r.provider_state==='SUCCESS')await this.loadReceiptAd(request);
   },
   async queryPayment() {
     if(this.data.pending||!this.paymentFlow)return;
-    this.setData({pending:true,afterAd:'',afterAdVerified:false});
-    try{await this.showPayment(await this.paymentFlow.query(this.data.reference));}
-    catch(e){this.setData({status:e.message+'；支付结果未知'});}
-    finally{this.setData({pending:false});}
+    const request=this.checkoutReadToken(),flow=this.paymentFlow;
+    const current=()=>this.checkoutReadCurrent(request)&&this.paymentFlow===flow;
+    this.clearReceiptAd();this.setData({pending:true});
+    try{const result=await flow.query(request.reference);if(current())await this.showPayment(result,request);}
+    catch(e){if(current())this.setData({status:e.message+'；支付结果未知'});}
+    finally{if(current())this.setData({pending:false});}
   },
   async refresh() {
     if (!this.client) return this.setData({status:'请先完成登录与门店绑定'});
-    this.setData({afterAd:'',afterAdVerified:false});
-    try {if(this.data.commerceEnabled){const r=await this.session.commerce(this.scene,'purchase_read',{reference:this.data.reference});this.setData({amount:yuanAmount(r.amount_minor),status:r.order.state+'；金额来自服务端商品快照'});return;}const r=await this.client.resume(this.data.reference);this.setData({amount:yuanAmount(r.order.amount_minor),status:r.payment_state+'（模拟，非收款凭证）',
-      afterAd:r.ads.AD_SLOT_PAYMENT_SUCCESS ? r.ads.AD_SLOT_PAYMENT_SUCCESS.title : ''});}
-    catch(e) {this.setData({status:e.message});}
+    const request=this.checkoutReadToken(),client=this.client;
+    const current=()=>this.checkoutReadCurrent(request)&&this.client===client;
+    this.clearReceiptAd();
+    try {
+      if(this.data.commerceEnabled){
+        const result=await request.session.commerce(request.scene,'purchase_read',{reference:request.reference});
+        if(!current())return;
+        if(!result||result.reference!==request.reference||!result.order||!Number.isSafeInteger(result.amount_minor)||result.amount_minor<1||result.amount_minor!==result.order.amount_minor||result.order.currency!=='CNY')throw Error('UNTRUSTED_ORDER_READ');
+        this.setData({amount:yuanAmount(result.amount_minor),status:result.order.state+'；金额来自服务端商品快照'});
+        if(result.order.state==='SUCCESS'&&await this.loadReceiptAd(request)&&current())
+          this.setData({status:'服务端核验已支付；财务尚未核销'});
+        return;
+      }
+      const result=await client.resume(request.reference);if(!current())return;
+      const verified=result.simulation_only===false&&result.provider_order_verified===true&&
+        result.provider_payment_verified===true&&result.order.state==='SUCCESS';
+      const creative=verified&&result.ads.AD_SLOT_PAYMENT_SUCCESS;
+      const ad=creative&&creative.slot==='AD_SLOT_PAYMENT_SUCCESS'&&typeof creative.title==='string'?creative:null;
+      this.setData({amount:yuanAmount(result.order.amount_minor),
+        status:verified?'服务端核验已支付；财务尚未核销':result.payment_state+(result.simulation_only?'（模拟，非收款凭证）':'；财务尚未核销'),
+        afterAd:ad?ad.title:'',afterAdImage:ad&&typeof ad.image_data==='string'?ad.image_data:'',afterAdVerified:!!ad});
+    }catch(e){if(current())this.setData({status:e.message});}
   }
 });

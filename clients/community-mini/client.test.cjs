@@ -9,7 +9,7 @@ function fixture(transform=x=>x) {
   if(body.operation==='community.qr')result={token:{payload:{},signature:'signed'}};
   else if(body.operation==='community.checkout')result={reference:'order1',state:'PENDING',provider_payment_started:false,provider_settlement_verified:false};
   else result={simulation_only:true,provider_settlement_verified:false,financial_receipt_issued:false,finance_effect:'NONE',
-   order:{reference:'order1',amount_minor:101,currency:'CNY',state:'SUCCESS',provider_settlement_verified:false},payment_state:'MOCK_PAID_SIMULATED',ads:{AD_SLOT_PAYMENT_SUCCESS:{title:'模拟广告'}}};
+   order:{reference:'order1',amount_minor:101,currency:'CNY',state:'SUCCESS',provider_settlement_verified:false},payment_state:'MOCK_PAID_SIMULATED',ads:{AD_SLOT_PAYMENT_SUCCESS:null}};
   return {offline_only:true,result:transform(result)};
  };
  return {client:makeClient(transport),calls};
@@ -25,12 +25,12 @@ test('amount validation happens before any request',async()=>{
  for(const a of ['0','-1','1.2','1e2','100000001',' 10'])await assert.rejects(client.checkout(a,'order1'));
  assert.equal(calls.length,0);
 });
-test('client never accepts verified real receipt',async()=>{
+test('client never accepts financial settlement or fiscal receipt claims',async()=>{
  const {client}=fixture(r=>r.order?{...r,provider_settlement_verified:true}:r);
  await client.checkout('101','order1');await assert.rejects(client.receipt(),/UNTRUSTED_RECEIPT/);
 });
 test('success creative rejected on pending server order',async()=>{
- const {client}=fixture(r=>r.order?{...r,order:{...r.order,state:'PENDING'}}:r);
+ const {client}=fixture(r=>r.order?{...r,order:{...r.order,state:'PENDING'},ads:{AD_SLOT_PAYMENT_SUCCESS:{slot:'AD_SLOT_PAYMENT_SUCCESS',title:'forged'}}}:r);
  await client.checkout('101','order1');await assert.rejects(client.receipt(),/UNTRUSTED_SUCCESS_AD/);
 });
 test('reset clears receipt and rejects late async checkout',async()=>{

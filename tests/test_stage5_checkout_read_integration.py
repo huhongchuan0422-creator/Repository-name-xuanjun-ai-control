@@ -59,4 +59,31 @@ class IntegratedReadTests(unittest.TestCase):
   x=self.view(OTHER)
   self.assertEqual(x["order"]["reference"],"ref1")
   self.assertIsNone(x["ads"][SUCCESS])
+ def verify_payment(self,identity=S):
+  # Synthetic in-memory durable evidence fixture, not a real provider signature.
+  # Reader must consume the original provider_evidence predicate, not paid=True.
+  import json
+  t,m,store=identity['tenant_id'],identity['merchant_id'],identity['store_id']
+  with self.o:
+   self.o.execute("UPDATE orders SET state='SUCCESS',provider_transaction_id='420000000000000001' WHERE tenant_id=? AND merchant_id=? AND store_id=? AND reference='ref1'",(t,m,store))
+   proof=json.dumps(dict(source='WECHAT_SIGNED_ORDER_QUERY',body_sha256='a'*64,transaction_id='420000000000000001',provider_state='SUCCESS',observed_at=150))
+   self.o.execute("INSERT INTO order_events VALUES('synthetic-proof',?,?,?,'ref1','PENDING','SUCCESS',?)",(t,m,store,proof))
+ def test_signed_provider_projection_supplies_success_creative_not_finance_receipt(self):
+  self.active_ad(AMOUNT);self.active_ad(SUCCESS);self.verify_payment()
+  before=self.o.total_changes;x=self.view()
+  self.assertEqual(x['ads'][SUCCESS]['id'],'adSuccess');self.assertEqual(x['ads'][AMOUNT]['id'],'adAmount')
+  self.assertTrue(x['success_receipt_ad_allowed']);self.assertTrue(x['payment_success_verified'])
+  self.assertFalse(x['simulation_only']);self.assertFalse(x['order']['provider_settlement_verified']);self.assertEqual(self.o.total_changes,before)
+ def test_signed_payment_with_unavailable_ad_store_keeps_original_amount_and_state(self):
+  self.verify_payment();self.a.close();before=self.o.total_changes;x=self.view()
+  self.assertTrue(x['payment_success_verified']);self.assertIsNone(x['ads'][SUCCESS])
+  self.assertEqual(x['order']['amount_minor'],120);self.assertEqual(x['order']['state'],'SUCCESS');self.assertEqual(self.o.total_changes,before)
+ def test_same_reference_other_merchant_proof_cannot_unlock_target_success_ad(self):
+  self.active_ad(SUCCESS);self.verify_payment(OTHER);x=self.view()
+  self.assertFalse(x['payment_success_verified']);self.assertIsNone(x['ads'][SUCCESS]);self.assertEqual(x['order']['state'],'PENDING')
+  other=self.view(OTHER);self.assertTrue(other['payment_success_verified']);self.assertIsNone(other['ads'][SUCCESS])
+ def test_verified_full_refund_does_not_consume_payment_success_placement(self):
+  self.active_ad(SUCCESS);self.verify_payment()
+  with self.o:self.o.execute("UPDATE orders SET state='REFUNDED' WHERE tenant_id='t1' AND merchant_id='m1' AND store_id='s1' AND reference='ref1'")
+  x=self.view();self.assertEqual(x['order']['state'],'REFUNDED');self.assertFalse(x['payment_success_verified']);self.assertIsNone(x['ads'][SUCCESS])
 if __name__=="__main__":unittest.main()
