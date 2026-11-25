@@ -756,6 +756,7 @@ Page({
     row.photo_state=uploadConfirmed?'SAVED':savePreparationFailed?'FAILED':'NOT_CONFIRMED';
     row.ocr_state=this.directOcrHints[ocrKind]?.active()?'SUGGESTION_VISIBLE':'NO_CURRENT_SUGGESTION';
     if(typeof previous.request_id_present==='boolean')row.request_id_present=previous.request_id_present;
+    if(typeof previous.request_id_sha256==='string'&&/^[a-f0-9]{64}$/.test(previous.request_id_sha256))row.request_id_sha256=previous.request_id_sha256;
     this.directOcrTimings[ocrKind]=row;
     let preview=false;
     try{const info=wx.getAccountInfoSync();preview=!!info&&!!info.miniProgram&&['develop','trial'].includes(info.miniProgram.envVersion);}catch(_){}
@@ -840,7 +841,7 @@ Page({
       }));
       resolve(active()&&visible);
      }));
-    },timing:{pickedAt:directPickedAt,now:clientOcrClock,record:row=>{if(active())this.directOcrTimings[ocrKind]=row;}}
+    },timing:{pickedAt:directPickedAt,now:clientOcrClock,hashRequestId:id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(id)?proof.sha256(Uint8Array.from(Array.from(id,ch=>ch.charCodeAt(0))).buffer):null,record:row=>{if(active())this.directOcrTimings[ocrKind]=row;}}
    });
    await Promise.all([attempt.storage,attempt.ocr]);
    }finally{finishBankFeedback();reportTiming();if(this.directSelectionAttempt===selectionAttempt)this.directSelectionAttempt=null;}
@@ -1337,7 +1338,7 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
       }));
       resolve(active()&&visible);
      }));
-    },timing:{pickedAt,now:clientOcrClock,record:r=>{if(active())this.directOcrTimings[kind]=r;}}
+    },timing:{pickedAt,now:clientOcrClock,hashRequestId:id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(id)?proof.sha256(Uint8Array.from(Array.from(id,ch=>ch.charCodeAt(0))).buffer):null,record:r=>{if(active())this.directOcrTimings[kind]=r;}}
    });
    return await attempt.ocr;
   }finally{finishBankFeedback();if(this.directOcrRetry===record)this.directOcrRetry=null;}

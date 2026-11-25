@@ -78,9 +78,13 @@ function startDirectOcr({kind,original,sha256,signDigest,savePrivate,request,isC
   const packet=await new Promise((resolve,reject)=>request({url:URL,method:'POST',data:bytes,header:{...header},dataType:'json',
    success:r=>{received=timestamp();resolve(r);},fail:()=>reject(Error('DIRECT_OCR_REQUEST_FAILED'))}));
   if(!isCurrent())return false;
+  const id=packet?.data?.RequestId,requestMeta={request_id_present:typeof id==='string'&&!!id};
+  if(requestMeta.request_id_present&&timing&&typeof timing.hashRequestId==='function'){
+   try{const hash=timing.hashRequestId(id);if(typeof hash==='string'&&/^[a-f0-9]{64}$/.test(hash))requestMeta.request_id_sha256=hash;}catch{}
+  }
   if(!packet||packet.statusCode!==200){
    if(timing&&typeof timing.record==='function'&&Number.isFinite(sent)&&Number.isFinite(received)&&received>=sent){
-    try{timing.record({ocr_round_trip_ms:Math.round(received-sent),ocr_http_status:Number.isInteger(packet?.statusCode)?packet.statusCode:0,request_id_present:typeof packet?.data?.RequestId==='string'&&!!packet.data.RequestId});}catch{}
+    try{timing.record({ocr_round_trip_ms:Math.round(received-sent),ocr_http_status:Number.isInteger(packet?.statusCode)?packet.statusCode:0,...requestMeta});}catch{}
    }
    throw Error('DIRECT_OCR_REQUEST_FAILED');
   }
@@ -92,7 +96,7 @@ function startDirectOcr({kind,original,sha256,signDigest,savePrivate,request,isC
    const filled=timestamp(),picked=timing.pickedAt;
    if([picked,sent,received,filled].every(Number.isFinite)&&picked<=sent&&sent<=received&&received<=filled){
     try{timing.record({kind,ocr_round_trip_ms:Math.round(received-sent),
-      pick_to_front_filled_ms:Math.round(filled-picked),request_id_present:typeof packet.data?.RequestId==='string'&&!!packet.data.RequestId});}catch{/* metrics cannot fail OCR */}
+      pick_to_front_filled_ms:Math.round(filled-picked),...requestMeta});}catch{/* metrics cannot fail OCR */}
    }
   }
   return isCurrent();
