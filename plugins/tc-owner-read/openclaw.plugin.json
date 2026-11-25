@@ -1,0 +1,66 @@
+{
+  "id": "tc-owner-read",
+  "name": "TC owner-admitted receipt read",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": false
+      },
+      "python": {
+        "type": "string"
+      },
+      "database": {
+        "type": "string"
+      },
+      "runtimeConfig": {
+        "type": "string"
+      },
+      "dispatchConfig": {
+        "type": "string"
+      },
+      "bindings": {
+        "type": "array",
+        "maxItems": 128,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gateway_profile_id",
+            "tenant_id",
+            "principal_id",
+            "session_hash",
+            "task_id",
+            "attempt_id",
+            "expires_at"
+          ],
+          "properties": {
+            "gateway_profile_id": {
+              "type": "string"
+            },
+            "tenant_id": {
+              "type": "string"
+            },
+            "principal_id": {
+              "type": "string"
+            },
+            "session_hash": {
+              "type": "string"
+            },
+            "task_id": {
+              "type": "string"
+            },
+            "attempt_id": {
+              "type": "string"
+            },
+            "expires_at": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  }
+}
