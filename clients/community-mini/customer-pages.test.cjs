@@ -18,6 +18,8 @@ function environment(baseUrl='https://fixture.invalid'){
       const op=o.data&&o.data.operation;
       if(op==='customer.contexts')return o.success({statusCode:200,data:{payment_enabled:false,result:{contexts:[],has_more:false,next_cursor:null,scope:'CURRENT_CUSTOMER_AUTHORIZED_CONTEXTS',payment_enabled:false}}});
       if(op==='customer.directory')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],categories:[],has_more:false,next_cursor:null,visibility:'CURRENT_AUTHORIZED_PROJECT_TENANT',storefront_photo_supported:false}}});
+      if(o.url.endsWith('/mini/merchant')&&op==='onboarding'&&o.data.params.operation==='mine')return o.success({statusCode:200,data:{payment_enabled:false,result:{applications:[]}}});
+      if(o.url.endsWith('/mini/merchant')&&op==='workspaces')return o.success({statusCode:200,data:{payment_enabled:false,result:{workspaces:[]}}});
       if(op==='commerce.profile_read')return o.success({statusCode:200,data:{payment_enabled:false,result:{
         user_id:'user1',project_customer_id:'customer1',nickname:'',contact:'',version:0}}});
       if(op==='commerce.notices')return o.success({statusCode:200,data:{payment_enabled:false,result:{records:[],has_more:false,next_cursor:null}}});
@@ -43,11 +45,25 @@ function loadPage(path,{baseUrl='https://fixture.invalid',env=null}={}){
   return {page,calls:env.calls,nav:env.nav,config:env.config,wx:env.wx,env};
 }
 
+// Positive private-profile fixtures explicitly simulate published docs and the
+// real user agreement action. Product policy remains disabled/unchanged.
+async function consentProfilePhone(h){
+ h.config.profilePhonePolicy={...require('./pages/user-agreement/content').policy(),privacyContractPublished:true};
+ h.wx.openPrivacyContract=()=>{};h.page.showProfile();
+ assert.equal(h.page.data.loaded,false);await h.page.agreeProfilePhone();
+ assert.equal(h.page.data.phoneConsent,true);
+}
+
 test('native bottom navigation is fixed, safe-area aware, and reserves content space',()=>{
  for(const page of ['home','checkout','profile','merchant','merchant-join']){
   const wxml=fs.readFileSync(__dirname+'/pages/'+page+'/index.wxml','utf8');
   const css=fs.readFileSync(__dirname+'/app.wxss','utf8');assert.match(wxml,/class="xj-nav"/);assert.match(css,/position:fixed/);assert.match(css,/safe-area-inset-bottom/);
-  assert.match(wxml,/padding-bottom:180rpx/);
+  if(page==='merchant'){
+   const merchantCss=fs.readFileSync(__dirname+'/pages/merchant/index.wxss','utf8');
+   assert.ok(wxml.includes(`wx:if="{{!workspace||view!=='home'}}"`));
+   assert.ok(merchantCss.includes('.consumer-page:not(.wa-frame){padding-bottom:180rpx}'));
+   assert.ok(merchantCss.includes('.wa-frame{padding-bottom:34rpx;padding-bottom:calc(34rpx + env(safe-area-inset-bottom))}'));
+  }else assert.match(wxml,/padding-bottom:180rpx/);
  }
  const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
  assert.match(checkout,/disabled="{{pending\|\|!sessionReady}}"/);
@@ -56,16 +72,19 @@ test('native bottom navigation is fixed, safe-area aware, and reserves content s
 });
 test('app routes customer home/profile while preserving checkout route and checkout links home',()=>{
   const app=JSON.parse(fs.readFileSync(__dirname+'/app.json','utf8'));
-  assert.deepEqual(app.pages,['pages/home/index','pages/profile/index','pages/checkout/index','pages/merchant/index','pages/merchant-join/index','pages/h5-confirm/index']);
+  assert.deepEqual(app.pages,['pages/home/index','pages/profile/index','pages/checkout/index','pages/merchant/index','pages/merchant-join/index','pages/h5-confirm/index','pages/user-agreement/index']);
   const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
   const script=fs.readFileSync(__dirname+'/pages/checkout/index.js','utf8');
   assert.match(checkout,/bindtap="openCustomerHome"/);
   assert.match(script,/auth.navigate\(this,e.currentTarget.dataset.section/);
   assert.match(fs.readFileSync(__dirname+'/customer-auth.js','utf8'),/home:'\/pages\/home\/index'/);
-  assert.match(fs.readFileSync(__dirname+'/app.js','utf8'),/baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false/);
+  let application;vm.runInNewContext(fs.readFileSync(__dirname+'/app.js','utf8'),{App:value=>application=value,require});
+  assert.equal(application.globalData.token,'');assert.equal(application.globalData.mode,'WECHAT_LOGIN');assert.equal(application.globalData.payments,false);
+  assert.equal(new URL(application.globalData.baseUrl).protocol,'https:');
+  assert.deepEqual(JSON.parse(JSON.stringify(application.globalData.profilePhonePolicy)),require('./pages/user-agreement/content').policy());
 });
 
-test('owner customer-facing contract removes technical copy and keeps real onboarding route',()=>{
+test('owner customer-facing contract removes technical copy and keeps real onboarding route',async()=>{
   const home=fs.readFileSync(__dirname+'/pages/home/index.wxml','utf8');
   const checkout=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8');
   const profile=fs.readFileSync(__dirname+'/pages/profile/index.wxml','utf8');
@@ -73,10 +92,10 @@ test('owner customer-facing contract removes technical copy and keeps real onboa
   for(const forbidden of ['扫一下','附近商家目录尚未接通','微信身份已验证','展示当前范围内已审核','筛选仅作用当前已读','未知状态保留','登录与账户状态','客服：当前项目'])assert.doesNotMatch(customerFacing,new RegExp(forbidden));
   for(const required of ['搜一搜','餐饮','副食','待付款','待发货','已发货','个人资料','我的服务'])assert.match(customerFacing,new RegExp(required));
   assert.match(fs.readFileSync(__dirname+'/pages/profile/index.js','utf8'),/申请入驻/);
-  const h=loadPage('pages/profile/index.js');h.page.openMerchantEntry();
+  const h=loadPage('pages/profile/index.js');await h.page.loginAndLoad();await new Promise(r=>setImmediate(r));h.page.openMerchantEntry();
   assert.deepEqual(h.nav,['/pages/merchant-join/index']);
   const join=fs.readFileSync(__dirname+'/pages/merchant-join/index.wxml','utf8'),joinScript=fs.readFileSync(__dirname+'/pages/merchant-join/index.js','utf8');
-  assert.match(join,/\{\{steps\[step\]\}\}/);assert.match(joinScript,/主体与法人资料/);assert.match(join,/bindtap="connectApplicant"/);
+  assert.match(join,/:steps\[step\]\}\}/);assert.ok(join.includes("?'申请进度':steps[step]"));assert.match(joinScript,/主体与法人资料/);assert.match(join,/bindtap="connectApplicant"/);
 });
 
 test('missing backend is explicit and retry login uses existing session boundary',async()=>{
@@ -95,11 +114,12 @@ test('missing backend is explicit and retry login uses existing session boundary
 
 test('profile read and update reuse commerce profile APIs without fabricated fields',async()=>{
   const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
-  await h.page.loginAndLoad();
+  await h.page.loginAndLoad();await consentProfilePhone(h);
   assert.equal(h.page.data.loaded,true);
   assert.equal(h.page.data.nickname,'');
   assert.equal(h.page.data.contact,'');
   assert.equal(h.page.data.customerId,'customer1');
+  h.page.showNotices();await new Promise(r=>setImmediate(r));
   h.page.input({currentTarget:{dataset:{field:'nickname'}},detail:{value:'Alice'}});
   h.page.input({currentTarget:{dataset:{field:'contact'}},detail:{value:'alice@example.org'}});
   await h.page.save();
@@ -113,7 +133,7 @@ test('profile read and update reuse commerce profile APIs without fabricated fie
 
 test('logout clears private profile state and prevents further profile writes',async()=>{
   const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
-  await h.page.loginAndLoad();
+  await h.page.loginAndLoad();await consentProfilePhone(h);
   await h.page.logout();
   assert.equal(h.page.data.authenticated,false);
   assert.equal(h.page.data.loaded,false);
@@ -126,7 +146,7 @@ test('logout clears private profile state and prevents further profile writes',a
 
 test('access denial during update clears private state and requires explicit relogin',async()=>{
   const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
-  await h.page.loginAndLoad();
+  await h.page.loginAndLoad();await consentProfilePhone(h);
   h.page.setData({nickname:'Alice'});
   h.wx.request=o=>{
     h.calls.push(o);
@@ -174,6 +194,7 @@ test('logout from profile revokes retained home and checkout page sessions and p
   const profile=loadPage('pages/profile/index.js',{env}).page;
   profile.onLoad({scene:'shop1'});
   await new Promise(resolve=>setImmediate(resolve));
+  await consentProfilePhone({page:profile,config:env.config,wx:env.wx});
   assert.equal(profile.data.loaded,true);
 
   await profile.logout();
@@ -213,10 +234,10 @@ test('stack revocation makes a late login callback unable to restore authenticat
 
 test('profile logout releases pending so explicit relogin is not blocked',async()=>{
   const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
-  await h.page.loginAndLoad();
+  await h.page.loginAndLoad();await consentProfilePhone(h);
   await h.page.logout();
   assert.equal(h.page.data.pending,false);
-  await h.page.retryLogin();
+  await h.page.retryLogin();await consentProfilePhone(h);
   assert.equal(h.page.data.authenticated,true);
   assert.equal(h.page.data.loaded,true);
 });
@@ -267,7 +288,7 @@ test('old login finally cannot unlock a replacement login',async()=>{
 
 test('late rejected profile save cannot revoke a newer successful login',async()=>{
   const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
-  await h.page.loginAndLoad();
+  await h.page.loginAndLoad();await consentProfilePhone(h);
   let oldSave;
   h.wx.request=o=>{
     h.calls.push(o);
@@ -283,7 +304,7 @@ test('late rejected profile save cannot revoke a newer successful login',async()
   h.page.setData({nickname:'Old'});
   const stale=h.page.save();await Promise.resolve();assert.ok(oldSave);
   authModule.revokePages(h.env.pages,'登录已退出，请重新登录');
-  await h.page.retryLogin();
+  await h.page.retryLogin();await consentProfilePhone(h);
   assert.equal(h.page.data.authenticated,true);assert.equal(h.page.data.loaded,true);assert.equal(h.page.data.nickname,'Fresh');
   oldSave.success({statusCode:403,data:{error:'old denied'}});await stale;
   assert.equal(h.page.data.authenticated,true);
@@ -295,7 +316,7 @@ test('late rejected profile save cannot revoke a newer successful login',async()
 
 test('late profile save finally cannot release a newer save request lock',async()=>{
   const h=loadPage('pages/profile/index.js');h.page.scene='shop1';
-  await h.page.loginAndLoad();
+  await h.page.loginAndLoad();await consentProfilePhone(h);
   const updates=[];let freshVersion=1;
   h.wx.request=o=>{
     h.calls.push(o);
@@ -311,7 +332,7 @@ test('late profile save finally cannot release a newer save request lock',async(
   h.page.setData({nickname:'Old'});
   const stale=h.page.save();await Promise.resolve();assert.equal(updates.length,1);
   authModule.revokePages(h.env.pages,'登录已退出，请重新登录');
-  await h.page.retryLogin();
+  await h.page.retryLogin();await consentProfilePhone(h);
   h.page.setData({nickname:'Newest'});
   const fresh=h.page.save();await Promise.resolve();assert.equal(updates.length,2);assert.equal(h.page.data.pending,true);
   updates[0].success({statusCode:500,data:{error:'old failure'}});await stale;
@@ -398,3 +419,5 @@ test('more services home omits owner-rejected store shortcuts and raw request er
 test('visible order list preserves original next-page action rather than stranding it in more services',()=>{const text=fs.readFileSync(__dirname+'/pages/checkout/index.wxml','utf8').split("viewMode==='orders'")[1].split("viewMode==='services'")[0];assert.match(text,/wx:if="{{ordersMore}}" bindtap="loadOrders" data-more="true"/);});
 
 test('stale current home safely re-enters the new scene instead of same-route short circuit',()=>{const nav=[],page={route:'pages/home/index',scene:'old',_sceneStale:true,data:{activeSection:'home'},setData(p){Object.assign(this.data,p);}};authModule.navigate(page,'home',{redirectTo:o=>nav.push(o.url)},{globalData:{scene:'new'}});assert.deepEqual(nav,['/pages/home/index?scene=new']);assert.equal(page.scene,'old');});
+
+test('default unpublished profile policy never reads private fields before explicit valid consent',async()=>{const h=loadPage('pages/profile/index.js');h.page.scene='shop1';await h.page.loginAndLoad();assert.equal(h.page.data.loaded,false);assert.equal(h.calls.some(c=>c.data?.operation==='commerce.profile_read'),false);h.page.showProfile();await h.page.agreeProfilePhone();assert.equal(h.page.data.loaded,false);assert.equal(h.calls.some(c=>c.data?.operation==='commerce.profile_read'),false);});

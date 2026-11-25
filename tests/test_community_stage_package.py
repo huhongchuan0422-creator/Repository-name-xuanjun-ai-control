@@ -132,7 +132,13 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(photo_target.read_bytes(),archive.read(photo))
                 self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
                 self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
-                self.assertEqual(len(receipt['prepared_files']),49)
+                prefix='clients/community-mini/'
+                expected={name[len(prefix):] for name in manifest['files']
+                          if name.startswith(prefix) and not name.endswith('.test.cjs')}
+                self.assertEqual(set(receipt['prepared_files']),expected)
+                for name in expected-{'app.js'}:
+                    self.assertEqual((output/name).read_bytes(),archive.read(prefix+name))
+                    self.assertEqual(receipt['prepared_files'][name],manifest['files'][prefix+name])
                 driver='draft-test-driver.js'
                 self.assertEqual((output/driver).read_bytes(),archive.read('clients/community-mini/'+driver))
                 self.assertEqual(receipt['prepared_files'][driver],manifest['files']['clients/community-mini/'+driver])
