@@ -36,15 +36,26 @@ function makeClient(transport) {
       const version = generation;
       const result = await call('community.receipt', {reference});
       if (version !== generation) throw Error('STALE_RECEIPT');
-      if (result.simulation_only !== true || result.provider_settlement_verified !== false ||
+      if (result.provider_settlement_verified !== false ||
           result.financial_receipt_issued !== false || result.finance_effect !== 'NONE' ||
           !result.order || result.order.reference !== reference || result.order.provider_settlement_verified !== false ||
           !Number.isSafeInteger(result.order.amount_minor) || result.order.amount_minor < 1 ||
           result.order.amount_minor > 100000000 || result.order.currency !== 'CNY' ||
           (snapshotAmount !== null && result.order.amount_minor !== snapshotAmount))
         throw Error('UNTRUSTED_RECEIPT');
-      if (result.ads.AD_SLOT_PAYMENT_SUCCESS !== null &&
-          (result.payment_state !== 'MOCK_PAID_SIMULATED' || result.order.state !== 'SUCCESS'))
+      const orderState=result.order.state;
+      const simulated=result.simulation_only===true&&result.provider_order_verified!==true&&result.provider_payment_verified!==true;
+      const verified=result.simulation_only===false&&result.provider_order_verified===true&&
+        result.payment_state==='PROVIDER_'+orderState&&
+        result.provider_payment_verified===['SUCCESS','REFUNDED'].includes(orderState);
+      const localCancelled=result.simulation_only===false&&result.provider_order_verified===false&&
+        result.provider_payment_verified===false&&orderState==='CANCELLED'&&result.payment_state==='CANCELLED_BEFORE_PROVIDER';
+      if(!['PENDING','SUCCESS','FAILED','CANCELLED','REFUNDED'].includes(orderState)||
+         !(simulated||verified||localCancelled)||!result.ads||typeof result.ads!=='object'||Array.isArray(result.ads))
+        throw Error('UNTRUSTED_RECEIPT');
+      const ad=result.ads.AD_SLOT_PAYMENT_SUCCESS;
+      if (ad !== null && (!verified||orderState!=='SUCCESS'||!ad||
+          ad.slot!=='AD_SLOT_PAYMENT_SUCCESS'||typeof ad.title!=='string'))
         throw Error('UNTRUSTED_SUCCESS_AD');
       return result;
     }

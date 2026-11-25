@@ -6,5 +6,5 @@
   "frontend_manifest_sha256": "f8a554c458662a9a5181ee1cbdecc4e2d3a00809aedc86e4d478446eaa9795b5",
   "frontend_archive_sha256": "16f4448df51b7b27e7bd9797a641f6ef437da43625f3172c589e57fbeed009f5",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
-  "evidence": "Assembly trio rebound to c741-reviewed 57-file snapshot; live backend baseline 17ecb128 unchanged; startup manifest 91306bd0 derived from pinned 35c1b71e set plus single-file host delta 952b->4baf byte-verified on host (one-line 3578 onboarding reader activation); 208 other pins identical; payments untouched. Independent review of host delta pending at carrier staging."
+  "evidence": "Assembly trio rebound to c741-reviewed 57-file snapshot (manifest f8a554c4/archive 16f4448d); backend pair bound to independent-review receipt live-host-reader-line-20261125 (host 952b->4baf single-line, fail-closed, zero bank-region overlap); startup manifest 91306bd0 closure derived from pinned 35c1b71e set plus byte-verified host file; runtime baseline 17ecb128 unchanged; payments untouched."
 }

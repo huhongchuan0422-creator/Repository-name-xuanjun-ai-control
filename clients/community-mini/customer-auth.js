@@ -17,6 +17,7 @@ function navigate(page,section,wx,app,pages=[]){
   if(section==='back')return back(page,wx,app,pages);
   let url=routes[section];if(!url)return;
   const scene=page.sceneInvalid?'':stale?app.globalData.scene||'':page.scene||app.globalData.scene||'';
+  if(section==='store-detail'&&!scene)url=routes.recommendations;
   if(scene){try{require('./session').parseScene({scene});}catch(_){page.setData({status:'门店入口无效，请重新扫码'});return;}url+=(url.includes('?')?'&':'?')+'scene='+encodeURIComponent(scene);}
   const tab=['home','recommendations','orders','profile'].includes(section);
   if(!stale&&!page._refreshNavigation&&page.route===url.split('?')[0].slice(1)&&page.data.activeSection===section)return;
