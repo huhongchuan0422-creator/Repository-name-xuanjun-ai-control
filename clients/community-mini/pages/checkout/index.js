@@ -57,7 +57,15 @@ Page({
       this.setData({sceneStorefront:{name:merchant.name,description:merchant.description},merchant:merchant.name,detailState:'READY'});
     }catch(error){if(this.customerReadDenied(request,error))return;if(current())this.setData({sceneStorefront:null,detailState:'FAILED',detailError:error.storefrontCode==='STOREFRONT_UNAVAILABLE'?customerError(error):'',directoryError:error.message});}
   },
-  backRecommendations(){this._detailRequest=null;this.setData({viewMode:'recommendations',activeSection:'recommendations',selectedRecommendation:null,sceneStorefront:null,detailState:'NOT_QUERIED',detailError:''});if(this.data.directoryState==='NOT_QUERIED')return this.loadDirectory();},
+  backRecommendations(){this._detailRequest=null;this.setData({viewMode:'recommendations',activeSection:'recommendations',selectedRecommendation:null,sceneStorefront:null,detailState:'NOT_QUERIED',detailError:''});if(['NOT_QUERIED','FAILED'].includes(this.data.directoryState))return this.loadDirectory();},
+  async retryStoreDetail(){
+    if(this.data.detailState==='LOADING'||this._pageUnloaded||this._sceneStale)return;
+    const id=this._detailRequest&&this._detailRequest.id;
+    if(!this.data.sessionReady)return this.onLoad({scene:this.scene,view:id||!this.scene?'recommendations':'store-detail'});
+    if(id)return this.openRecommendation({currentTarget:{dataset:{id}}});
+    if(this.scene)return this.loadSceneStorefront();
+    return this.backRecommendations();
+  },
   openOrders(){this.setData({viewMode:'orders',activeSection:'orders',selectedRecommendation:null});return this.loadOrders();},
   openService(e){
     if(this._pageUnloaded||this.data.pending||this.data.productsPending||this.data.refundRecoveryPending)return;
@@ -183,7 +191,9 @@ Page({
       const config = getApp().globalData;
       if (config.mode !== 'OFFLINE') {
         if(!(options&&options.scene)&&!config.scene){
-          this.scene='';this.setData({needsScene:true,sessionReady:false,status:'正在恢复登录信息'});
+          this.scene='';
+          // No scene means no current storefront. Show the real directory, never an unbound detail.
+          this.setData({needsScene:true,sessionReady:false,status:'正在恢复登录信息',...(this.data.viewMode==='store-detail'?{viewMode:'recommendations',activeSection:'recommendations'}:{})});
           this.session=getSharedSession(wx,config,undefined,this);
           this._authEpoch=auth.current();lifecycle=this._pageGeneration=(this._pageGeneration||0)+1;
           await this.session.ensureLogin({automatic:true,prepared:true});if(!current())return;
