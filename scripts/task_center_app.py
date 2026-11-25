@@ -446,7 +446,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                   session_store=None, outbound_enabled=False,
                   provider_connection_test_enabled=False,
                   external_origin=None, base_path='/',mcp_auth_store=None,
-                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None):
+                  mcp_model_worker_enabled=False,mcp_dispatch_config=None,mcp_development_host=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None,handoff_binding_projection_enabled=False):
     from task_delivery_observer import MetadataReader
     if handoff_host is not None:
         from task_center_handoff_host import HandoffHost
@@ -867,6 +867,37 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                     self._send(200,_json_bytes(result),'application/json; charset=utf-8',headers)
                 except Exception:
                     self._send(503,_json_bytes({'state':'UNAVAILABLE','writer_verification':'UNKNOWN'}),'application/json; charset=utf-8')
+                return
+            if path == '/api/admin/handoff-binding-status':
+                if handoff_binding_projection_enabled is not True:
+                    self._send(404,_json_bytes({'error':'NOT_FOUND'}),'application/json; charset=utf-8');return
+                def formal_admin():
+                    from task_center_handoff_host import FormalHandoffIdentityProvider
+                    try:
+                        session=self._session()
+                        return (session_store is not None and session_store.tenant_id==tenant_id
+                            and session is not None and session.get('tenant_id')==tenant_id
+                            and 'TASK_CENTER_ADMIN' in session.get('roles',[])
+                            and isinstance(identity_provider,FormalHandoffIdentityProvider)
+                            and identity_provider.is_formal_session(session) is True)
+                    except Exception:return False
+                if not formal_admin():
+                    self._send(403,_json_bytes({'error':'FORMAL_ADMIN_REQUIRED'}),'application/json; charset=utf-8');return
+                try:
+                    query=__import__('urllib.parse').parse.parse_qs(urlsplit(self.path).query,keep_blank_values=True)
+                    if set(query)!={'task_id','attempt_id','principal_id'} or any(len(v)!=1 for v in query.values()):
+                        raise ValueError('EXACT_BINDING_QUERY_REQUIRED')
+                    from task_center_binding_projection import read_binding_status
+                    result=read_binding_status(db_path,tenant_id,**{k:v[0] for k,v in query.items()})
+                    if not formal_admin():
+                        self._send(403,_json_bytes({'error':'FORMAL_ADMIN_REQUIRED'}),'application/json; charset=utf-8');return
+                    self._send(200,_json_bytes(result),'application/json; charset=utf-8')
+                except LookupError:
+                    self._send(404,_json_bytes({'error':'BINDING_TARGET_UNAVAILABLE'}),'application/json; charset=utf-8')
+                except ValueError:
+                    self._send(400,_json_bytes({'error':'EXACT_BINDING_QUERY_REQUIRED'}),'application/json; charset=utf-8')
+                except Exception:
+                    self._send(503,_json_bytes({'error':'BINDING_STATUS_UNAVAILABLE'}),'application/json; charset=utf-8')
                 return
             if path == '/api/admin/model-control':
                 if not self._admin_allowed():
@@ -1659,7 +1690,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None):
+                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None,handoff_binding_projection_enabled=False):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if mcp_claim_host is not None:
@@ -1726,7 +1757,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                                 identity_provider,session_store,outbound_enabled,
                                 provider_connection_test_enabled,
                                 external_origin,base_path,mcp_auth_store,
-                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader,handoff_host,ledger_bridge,mcp_claim_host,gateway_runtime)
+                                mcp_model_worker_enabled,mcp_dispatch_config,mcp_development_host,delivery_ledger_reader,handoff_host,ledger_bridge,mcp_claim_host,gateway_runtime,handoff_binding_projection_enabled)
         server=TaskCenterHTTPServer((host, port), handler)
         server.mcp_service_lease=mcp_service_lease;mcp_service_lease=None
         server.correction_observer=None
@@ -1756,7 +1787,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
 
 
 def main(argv=None, gateway_runtime=None, *, mcp_claim_host=None, mcp_development_host=None, execution_provider=None, delivery_ledger_reader=None,
-         identity_provider=None, session_store=None, handoff_host=None, ledger_bridge=None):
+         identity_provider=None, session_store=None, handoff_host=None, ledger_bridge=None, handoff_binding_projection_enabled=False):
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
     authority = parser.add_mutually_exclusive_group(required=True)
@@ -1913,7 +1944,7 @@ def main(argv=None, gateway_runtime=None, *, mcp_claim_host=None, mcp_developmen
                          mcp_claim_host=mcp_claim_host,
                          correction_observer_interval=args.correction_observer_interval,
                          delivery_ledger_reader=delivery_ledger_reader,
-                         handoff_host=handoff_host,ledger_bridge=ledger_bridge,gateway_runtime=gateway_runtime)
+                         handoff_host=handoff_host,ledger_bridge=ledger_bridge,gateway_runtime=gateway_runtime,handoff_binding_projection_enabled=handoff_binding_projection_enabled)
     advertised_origin=(args.external_origin or
                        'http://%s:%d'%server.server_address)
     advertised_base=_normalize_base_path(args.base_path)
