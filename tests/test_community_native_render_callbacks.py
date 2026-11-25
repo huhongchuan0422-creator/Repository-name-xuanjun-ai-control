@@ -22,3 +22,27 @@ async function evaluate(body){return vm.runInNewContext(setup+`async function te
   result=subprocess.run(['node','-e',script],cwd=ROOT,text=True,capture_output=True,timeout=15)
   self.assertEqual(result.returncode,0,result.stdout+result.stderr)
   self.assertIn('PASS_RENDER_CALLBACK_ORDER_RAPID_INPUT_AND_BOUNDED_FAILURE',result.stdout)
+
+ def test_sceneless_profile_fixture_reaches_visible_save_and_original_draft_handlers(self):
+  script=r'''
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const source=fs.readFileSync('tests/community_mini_native_render.cjs','utf8');
+const start=source.indexOf('const adapter=')+14,end=source.indexOf(';\nconst script=',start);let adapter=JSON.parse(source.slice(start,end));
+const root='clients/community-mini',path=require('path'),files={};
+function collect(dir){for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())collect(file);else if(/\.(js|json|wxml|wxss)$/.test(entry.name)&&!entry.name.includes('.test.'))files[path.relative(root,file).split(path.sep).join('/')]=fs.readFileSync(file,'utf8');}}
+collect(root);
+const a=adapter.indexOf('async function draw(){'),b=adapter.indexOf('async function load(',a);
+adapter=adapter.slice(0,a)+"async function draw(){for(let pass=0;pass<20;pass++){renderDirty=false;const done=renderCallbacks.splice(0);window.__nativeEvidence={state:structuredClone(active.data),calls:structuredClone(calls)};for(const callback of done)callback();if(!renderDirty)return;}throw Error('CALLBACK_UNSETTLED');}\n"+adapter.slice(b);
+const window={},context={window,document:{body:{}},structuredClone,URLSearchParams,setTimeout:()=>1,clearTimeout(){},btoa:s=>Buffer.from(s).toString('base64')};
+vm.runInNewContext('const files='+JSON.stringify(files)+';'+require('./tests/community_mini_native_render.cjs').splitChoiceSnapshot.toString()+';'+require('./tests/community_mini_native_render.cjs').splitChoiceDraft.toString()+';'+adapter,context);
+(async()=>{for(let i=0;i<20&&!window.__nativeEvidence;i++)await new Promise(r=>setImmediate(r));
+for(const [handler,dataset] of [['navigateSection',{section:'profile'}],['openMerchantEntry',{}]])await window.nativeEvent({handler,dataset});
+assert.equal(window.__nativeEvidence.state.ready,true);assert.equal(window.__nativeEvidence.state.pending,false);
+assert.ok(files['pages/merchant-join/index.wxml'].includes('bindtap="save"'));
+await window.nativeEvent({handler:'save',dataset:{}});assert.ok(window.__nativeEvidence.state.application);assert.equal(window.__nativeEvidence.state.ready,true);
+const ops=window.__nativeEvidence.calls.map(c=>c.suboperation);for(const op of ['save','wechat_save','read','wechat_read'])assert.ok(ops.includes(op),op);
+console.log('PASS_ORIGINAL_VISIBLE_SAVE_AND_DRAFT_CHAIN');})().catch(e=>{console.error(e);process.exitCode=1;});
+'''
+  result=subprocess.run(['node','-e',script],cwd=ROOT,text=True,capture_output=True,timeout=15)
+  self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+  self.assertIn('PASS_ORIGINAL_VISIBLE_SAVE_AND_DRAFT_CHAIN',result.stdout)

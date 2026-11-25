@@ -116,7 +116,11 @@ const helper=require('./scripts/community_mini_isolated_preview_354.cjs');
 const root=fs.mkdtempSync(path.join(os.tmpdir(),'real-home-offline-'));
 const source=path.resolve('clients/community-mini');fs.cpSync(source,root,{recursive:true});
 const sessionPath=path.join(root,'session.js'),raw=fs.readFileSync(sessionPath,'utf8');
-const appPath=path.join(root,'app.js');fs.writeFileSync(appPath,fs.readFileSync(appPath,'utf8').replace("baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false","baseUrl: '"+helper.BASE+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '"+helper.SCENE+"'"));
+// Test-only current-source fixture; never rewrite the deployed helper's pinned file.
+const sha=b=>require('node:crypto').createHash('sha256').update(b).digest('hex');
+const appPath=path.join(root,'app.js'),originalApp=fs.readFileSync(appPath,'utf8');
+helper.HASHES['app.js']=sha(originalApp);helper.HASHES['session.js']=sha(raw);
+fs.writeFileSync(appPath,helper.derivedApp(originalApp));
 function reset(){for(const k of Object.keys(require.cache))if(k.startsWith(root+path.sep))delete require.cache[k];}
 async function home(failure){
  reset();let app,page,logins=0,requests=[];
@@ -126,7 +130,8 @@ async function home(failure){
  await page.onLoad({scene:helper.SCENE});return {app,page,logins,requests};
 }
 (async()=>{
- const baseline=await home();assert.equal(baseline.logins,0);assert.equal(baseline.requests.length,0);assert.equal(baseline.page.data.authenticated,false);
+ // The current original session already admits this existing 354 path.
+ const baseline=await home();assert.equal(baseline.logins,1);assert.equal(baseline.requests.length,1);assert.equal(baseline.page.data.authenticated,true);
  fs.writeFileSync(sessionPath,helper.derivedSession(raw));
  const good=await home();assert.equal(good.logins,1);assert.equal(good.requests.length,1);assert.equal(good.requests[0].url,helper.BASE+'/mini/login');assert.deepEqual(good.requests[0].data,{code:'OFFLINE_SYNTHETIC_CODE'});assert.equal(good.page.scene,helper.SCENE);assert.equal(good.app.globalData.scene,helper.SCENE);assert.equal(good.page.data.authenticated,true);assert.equal(good.page.data.pending,false);
  await good.page.session.merchant(helper.SCENE,'onboarding',{operation:'mine'});assert.equal(good.requests[1].url,helper.BASE+'/mini/merchant');assert.equal(good.requests[1].header['X-Community-Scene'],helper.SCENE);

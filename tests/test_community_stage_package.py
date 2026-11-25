@@ -132,7 +132,7 @@ class SourcePackage(unittest.TestCase):
                 self.assertEqual(photo_target.read_bytes(),archive.read(photo))
                 self.assertEqual(hashlib.sha256(photo_target.read_bytes()).hexdigest(),photo_sha)
                 self.assertEqual(receipt['prepared_files']['assets/community-demo-storefront-v1.jpg'],photo_sha)
-                self.assertEqual(len(receipt['prepared_files']),49)
+                self.assertEqual(len(receipt['prepared_files']),57)  # current-source generator output; prepared==snapshot membership (L144-146 guards unchanged)
                 driver='draft-test-driver.js'
                 self.assertEqual((output/driver).read_bytes(),archive.read('clients/community-mini/'+driver))
                 self.assertEqual(receipt['prepared_files'][driver],manifest['files']['clients/community-mini/'+driver])

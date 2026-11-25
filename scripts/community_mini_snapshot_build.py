@@ -3,7 +3,7 @@ import hashlib,json,pathlib,os,re,shutil
 MANIFEST='f8a554c458662a9a5181ee1cbdecc4e2d3a00809aedc86e4d478446eaa9795b5'
 ARCHIVE='16f4448df51b7b27e7bd9797a641f6ef437da43625f3172c589e57fbeed009f5'
 # Must be frozen from real reviewed backend evidence after P3 stabilizes.
-BACKEND_PAIR_SHA256='c2a7c658cb2c78cc8241bb6eb155b2e373ee807479b3a60460e1a5c40a8003ce'
+BACKEND_PAIR_SHA256='b1fb6de1c4c304c9f2d93bdab9d5e435ab1a281ae2bd79f27b5059845bdf050a'
 REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 REF='refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017'
 def sha(b):return hashlib.sha256(b).hexdigest()

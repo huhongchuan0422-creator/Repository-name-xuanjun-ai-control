@@ -1,6 +1,5 @@
 """Actual browser navigation of isolated original-field projections, no business IO."""
 import functools,json,os,threading,unittest
-from playwright.sync_api import expect
 from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
 from pathlib import Path
 from scripts.community_ui_preview_build import build,main,BASE,ROOT
@@ -25,7 +24,21 @@ class SourceBoundary(unittest.TestCase):
         self.assertTrue(next(m for m in historical_photo['materials'] if m['id']=='cashier_photo')['uploaded'])
         self.assertIn('已有历史材料保留',historical_photo['note'])
         self.assertIn('场景照片不做OCR',historical_photo['note'])
-        self.assertIn('wx:if="{{group.ocrKind&&application}}"',native)
+        self.assertIn("wx:if=\"{{(group.ocrKind||group.id==='bank')&&application}}\"",native)
+        # Evaluate the real guard, not an obsolete exact guard that excludes bank review.
+        script=r"""
+const fs=require('fs'),assert=require('assert/strict'),form=require('./clients/community-mini/merchant-form');
+const wxml=fs.readFileSync('clients/community-mini/pages/merchant-join/index.wxml','utf8');
+const guard=wxml.match(/wx:if="{{([^}]+)}}" class="group-recognition"/)[1];
+const visible=(group,application)=>!!Function('group','application','return ('+guard+')')(group,application);
+for(const scene of ['store','both']){
+ const groups=form.materialGroups({}, {entity:'ENTERPRISE',contact:'LEGAL',doc:form.docs[0],scene,ubos:'unknown'},[],1);
+ const photo=groups.find(g=>g.id==='store');assert.equal(visible(photo,{}),false);
+}
+assert.equal(visible({id:'bank'},{}),true);assert.equal(visible({id:'bank'},null),false);
+assert.equal(visible({id:'license',ocrKind:'business_license'},{}),true);
+"""
+        subprocess.run(['node','-e',script],cwd=ROOT,check=True,capture_output=True,text=True)
         self.assertIn('识别营业执照',native)
         self.assertIn('识别身份证人像面',native)
         self.assertIn('识别身份证国徽面',native)
@@ -60,7 +73,8 @@ class SourceBoundary(unittest.TestCase):
 class ClickThrough(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from playwright.sync_api import sync_playwright
+        global expect
+        from playwright.sync_api import sync_playwright,expect
         class Handler(SimpleHTTPRequestHandler):
             def log_message(self,*args):pass
         cls.server=ThreadingHTTPServer(('127.0.0.1',0),functools.partial(Handler,directory=str(ROOT)))

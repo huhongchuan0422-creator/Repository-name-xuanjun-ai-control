@@ -19,16 +19,29 @@ function context(env){
  requireTrue(typeof msg==='string'&&msg.includes(MARKER)&&!msg.includes('[mini-upload]')&&!msg.includes('[mini-preview]')&&event.after===env.GITHUB_SHA,'EXACT_TEST_PREVIEW_PUSH_REQUIRED');
  return env.GITHUB_SHA;
 }
+const APP_ORIGINAL="baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false";
+const APP_CURRENT="baseUrl: 'https://uk.wenwenwenyiyiyi.work/community-preview', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: ''";
+const APP_TEST="baseUrl: '"+BASE+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '"+SCENE+"'";
 const SESSION_ORIGINAL_TRUST="baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-preview'";
+const SESSION_CURRENT_TRUST=SESSION_ORIGINAL_TRUST+" && baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-test-354d1fac' && baseUrl!=='https://uk.wenwenwenyiyiyi.work/community-h5-test'";
 const SESSION_TEST_TRUST="baseUrl!=='"+BASE+"'";
-function derivedSession(original){
- requireTrue(sha(original)===HASHES['session.js']&&original.split(SESSION_ORIGINAL_TRUST).length===2,'EXACT_SESSION_SOURCE_REQUIRED');
- return original.replace(SESSION_ORIGINAL_TRUST,SESSION_TEST_TRUST);
+function deriveExact(original,hash,needles,replacement,reason){
+ requireTrue(sha(original)===hash,reason);
+ const matches=needles.filter(needle=>original.split(needle).length===2);
+ // The current trust chain contains the legacy needle; use its complete exact form.
+ const needle=matches.sort((a,b)=>b.length-a.length)[0];requireTrue(needle,reason);
+ return original.replace(needle,replacement);
 }
+function restoreExact(derived,hash,needles,replacement,reason){
+ requireTrue(derived.split(replacement).length===2,reason);
+ const candidates=needles.map(needle=>derived.replace(replacement,needle)).filter(original=>sha(original)===hash);
+ requireTrue(candidates.length===1,reason);return candidates[0];
+}
+function derivedApp(original){return deriveExact(original,HASHES['app.js'],[APP_ORIGINAL,APP_CURRENT],APP_TEST,'EXACT_APP_SOURCE_REQUIRED');}
+function derivedSession(original){return deriveExact(original,HASHES['session.js'],[SESSION_ORIGINAL_TRUST,SESSION_CURRENT_TRUST],SESSION_TEST_TRUST,'EXACT_SESSION_SOURCE_REQUIRED');}
 function sessionBinding(root){
  const derived=fs.readFileSync(path.join(root,'session.js'),'utf8');
- requireTrue(derived.split(SESSION_TEST_TRUST).length===2,'EXACT_TEST_SESSION_TRUST_REQUIRED');
- const original=derived.replace(SESSION_TEST_TRUST,SESSION_ORIGINAL_TRUST);
+ const original=restoreExact(derived,HASHES['session.js'],[SESSION_ORIGINAL_TRUST,SESSION_CURRENT_TRUST],SESSION_TEST_TRUST,'EXACT_TEST_SESSION_TRUST_REQUIRED');
  requireTrue(derivedSession(original)===derived,'TEST_SESSION_SOURCE_MISMATCH');
  return {source_sha256:HASHES['session.js'],derived_sha256:sha(derived),trusted_path:BASE,transformation:'EXACT_EXISTING_PATH_REBIND_ONLY'};
 }
@@ -37,7 +50,7 @@ function preparedSource(root){
  const actual=sourceManifest(root),expected=expectedPrepared();
  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
  requireTrue(app.includes("baseUrl: '"+BASE+"'")&&app.includes("scene: '"+SCENE+"'")&&app.includes('payments: false, commerce: true'),'TEST_PREVIEW_APP_REQUIRED');
- const original=app.replace("baseUrl: '"+BASE+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '"+SCENE+"'","baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false");
+ const original=restoreExact(app,HASHES['app.js'],[APP_ORIGINAL,APP_CURRENT],APP_TEST,'TEST_PREVIEW_APP_SOURCE_MISMATCH');
  requireTrue(sha(original)===HASHES['app.js'],'TEST_PREVIEW_APP_SOURCE_MISMATCH');expected['app.js']=sha(app);
  expected['session.js']=sessionBinding(root).derived_sha256;verifySource(root,expected);return actual;
 }
@@ -57,9 +70,7 @@ async function prepare(env){
  requireTrue(config.appid===APPID&&config.compileType==='miniprogram'&&config.miniprogramRoot==='./','EXACT_APPID_REQUIRED');
  const out=env.COMMUNITY_MINI_PROJECT_PATH;requireTrue(out&&!fs.existsSync(out),'NEW_TEST_PROJECT_DIRECTORY_REQUIRED');
  const original=fs.readFileSync(path.join(source,'app.js'),'utf8');
- const needle="baseUrl: '', token: '', mode: 'WECHAT_LOGIN', payments: false";
- requireTrue(original.split(needle).length===2,'EXACT_APP_SOURCE_REQUIRED');
- const updated=original.replace(needle,"baseUrl: '"+BASE+"', token: '', mode: 'WECHAT_LOGIN', payments: false, commerce: true, scene: '"+SCENE+"'");
+ const updated=derivedApp(original);
  // Health is checked before publishing prepared project and before credential loading.
  const ready=await health();const temp=fs.mkdtempSync(path.join(path.dirname(path.resolve(out)),'.isolated-mini-'));
  try{for(const name of fs.readdirSync(source))fs.cpSync(path.join(source,name),path.join(temp,name),{recursive:true,errorOnExist:true,force:false,filter:p=>!p.endsWith('.test.cjs')});fs.writeFileSync(path.join(temp,'app.js'),updated);fs.writeFileSync(path.join(temp,'session.js'),derivedSession(fs.readFileSync(path.join(source,'session.js'),'utf8')));preparedSource(temp);fs.renameSync(temp,out);}finally{fs.rmSync(temp,{recursive:true,force:true});}
@@ -92,4 +103,4 @@ async function preview(env){
  finally{[console.log,console.error,console.warn,process.stdout.write,process.stderr.write]=old;key=null;delete env.WECHAT_MINIPROGRAM_PRIVATE_KEY;save();}
 }
 if(require.main===module){const op=process.argv[2];(op==='prepare'?prepare(process.env):op==='preview'?preview(process.env):Promise.reject(Error('PREPARE_OR_PREVIEW_REQUIRED'))).catch(e=>{console.error('ISOLATED_TEST_PREVIEW_STATUS='+(/^[A-Z0-9_]+$/.test(e.message)?e.message:'LOCAL_SETUP_FAILED'));process.exitCode=2;});}
-module.exports={SOURCE,BASE,SCENE,APPID,HASHES,context,preparedSource,verifyHealth,prepare,preview,derivedSession,sessionBinding};
+module.exports={SOURCE,BASE,SCENE,APPID,HASHES,context,preparedSource,verifyHealth,prepare,preview,derivedApp,derivedSession,sessionBinding};
