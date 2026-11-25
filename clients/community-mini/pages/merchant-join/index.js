@@ -1185,9 +1185,11 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
    this.updateOcrView({...this.restoreOcrLocal(local),ocrKind:capture.document_type,ocrJob:capture.job_id,ocrConfirmed:false,ocrProgressState:'querying',ocrStatus:'正在查询原保存回执；不会重复确认或重新上传。'});
    return this.readOcr();
   }
-  const capture={...previous,...(previous.document_type==='bank_card'?{bound_provider_version:this.version}:{}),original_locator:previous.original_locator||(previous.job_id?{job_id:previous.job_id}:{original_key:previous.idempotency_key}),recovery_key:'mini-recovery-'+Date.now()+'-'+Math.random().toString(36).slice(2),recovery:true,recovery_confirmation:null,pending_confirmation:false,revision:a.revision,generation:this.ocrGeneration,request_generation:(this.ocrRequestGeneration||0)+1};
+  const capture={...previous,...(previous.document_type==='bank_card'?{bound_provider_version:this.version,recovery_binding:null,recovery_confirmation_revision:undefined,recovery_writeback_key:undefined,recovery_apply_pending:false,auto_save_fields:null,pending_confirmation_fields:undefined}:{}),original_locator:previous.original_locator||(previous.job_id?{job_id:previous.job_id}:{original_key:previous.idempotency_key}),recovery_key:'mini-recovery-'+Date.now()+'-'+Math.random().toString(36).slice(2),recovery:true,recovery_confirmation:null,pending_confirmation:false,revision:a.revision,generation:this.ocrGeneration,request_generation:(this.ocrRequestGeneration||0)+1};
   this.ocrCapture=capture;this.ocrRequestGeneration=capture.request_generation;
-  const restored=this.restoreOcrLocal(local);this.updateOcrView({...restored,ocrKind:capture.document_type,ocrJob:capture.job_id,ocrConfirmed:false,ocrProgressState:'reading',ocrStatus:'正在读取原识别结果，不会重新识别或上传。'});
+  // A new bank recovery key is a fresh view, not a replay of the old receipt or its human authority.
+  if(capture.document_type==='bank_card')for(const cache of [this.ocrHeldCaptures,this.ocrDisplayCaptures])if(cache)delete cache.bank_card;
+  const restored=this.restoreOcrLocal(capture.document_type==='bank_card'?{}:local);this.updateOcrView({...restored,ocrKind:capture.document_type,ocrJob:capture.job_id,ocrConfirmed:false,ocrProgressState:'reading',ocrStatus:'正在读取原识别结果，不会重新识别或上传。'});
   return this.readOcr();
  },
  bankRecoveryBindingMatches(capture,binding){
