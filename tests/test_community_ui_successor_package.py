@@ -46,6 +46,7 @@ RUNTIME_CHANGED = {
     'scripts/community_ad_store.py',
     'scripts/community_commerce.py',
     'scripts/community_merchant_store.py',
+    'scripts/community_mini_direct_ocr.py',
     'scripts/community_workbench.py',
     'scripts/community_stage_migration.py',
 }

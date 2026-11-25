@@ -242,7 +242,7 @@ class PlatformHost:
             owner.close()
             raise
 
-    def configure_ocr(self, scene, api, store, *, applicant_mode=False):
+    def configure_ocr(self, scene, api, store, *, applicant_mode=False, bank_card_infer=None):
         """Explicit protected Python opt-in; plan/env/HTTP cannot enable OCR.
 
         Uses existing Center and admitted encrypted store; no key generation,
@@ -250,6 +250,8 @@ class PlatformHost:
         """
         if self.application is None or self.application.server is not None or self.ocr is not None:
             raise PermissionError('OCR_HOST_CONFIGURATION_DENIED')
+        if bank_card_infer is not None and not callable(bank_card_infer):
+            raise ValueError('BANK_CARD_INFERENCE_CALLABLE_REQUIRED')
         from scripts.community_mini_merchant import MiniMerchant
         from scripts.community_ocr_host import HostOcr
         app=self.application
@@ -267,7 +269,7 @@ class PlatformHost:
                for info in (_file(path) for path in original)):
             raise PermissionError('OCR_SEPARATE_STORE_REQUIRED')
         merchant=MiniMerchant(app.identity,app.onboarding,app.operations)
-        self.ocr=HostOcr(merchant,scene,api,store,applicant_mode=applicant_mode)
+        self.ocr=HostOcr(merchant,scene,api,store,applicant_mode=applicant_mode,bank_card_infer=bank_card_infer)
         app.gateway.ocr=self.ocr
         return self.ocr
 
@@ -298,7 +300,7 @@ class PlatformHost:
             raise PermissionError('OCR_ONBOARDING_REQUIRED')
         self.application.center.db.execute('SELECT 1')
 
-    def configure_applicant_ocr(self,key_reference,store_reference):
+    def configure_applicant_ocr(self,key_reference,store_reference, *, bank_card_infer=None):
         """Explicit original-install opt-in using pre-existing protected inputs.
 
         Does not create keys/files, initialize a missing DB, infer secret paths,
@@ -306,6 +308,8 @@ class PlatformHost:
         """
         if self.application is None or self.application.server is not None or self.ocr is not None:
             raise PermissionError('OCR_HOST_CONFIGURATION_DENIED')
+        if bank_card_infer is not None and not callable(bank_card_infer):
+            raise ValueError('BANK_CARD_INFERENCE_CALLABLE_REQUIRED')
         self.preflight_applicant_ocr()  # Must precede key/model/store handling.
         _require_nonroot()
         key_path=Path(key_reference);db_path=Path(store_reference)
@@ -344,11 +348,22 @@ class PlatformHost:
             store=api.SecureSQLiteJobStore(str(db_path),material['ocr_encryption_key'].encode('ascii'))
             # Exclusive store lifecycle lock is held; no OCR worker exists yet.
             store.recover_interrupted()
-            result=self.configure_ocr('',api,store,applicant_mode=True)
+            result=self.configure_ocr('',api,store,applicant_mode=True,bank_card_infer=bank_card_infer)
             self.ocr_lock=lock
             return result
         except BaseException:
             os.close(lock);raise
+
+    def configure_applicant_direct_ocr_signer(self, signer):
+        """Original trusted Python startup only; no env/HTTP credential injection."""
+        if (self.application is None or self.application.server is not None
+                or self.application.onboarding is None):
+            raise PermissionError('DIRECT_OCR_HOST_CONFIGURATION_DENIED')
+        _require_nonroot()
+        if not callable(signer) or getattr(self.application.onboarding, 'direct_ocr_signer', None) is not None:
+            raise ValueError('ORIGINAL_DIRECT_OCR_SIGNER_REQUIRED')
+        self.application.onboarding.direct_ocr_signer = signer
+        return 'APPLICANT_DIRECT_OCR_SIGNER_CONFIGURED'
 
     def configure_applicant_image_scanner(self):
         """Opt in to the bundled image-only decode/sanitize/scan boundary."""
@@ -414,7 +429,7 @@ class PlatformHost:
         self.close()
 
 
-def main(argv=None):
+def main(argv=None, *, bank_card_infer=None, direct_ocr_signer=None):
     parser = argparse.ArgumentParser(description='Admitted original community platform host')
     parser.add_argument('--plan',required=True)
     parser.add_argument('--center-keys',required=True)
@@ -426,6 +441,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if bool(args.applicant_ocr_key_reference)!=bool(args.applicant_ocr_store_reference):
         parser.error('Both existing applicant OCR references are required')
+    if bank_card_infer is not None:
+        if not callable(bank_card_infer):
+            parser.error('BANK_CARD_INFERENCE_CALLABLE_REQUIRED')
+        if not args.applicant_ocr_key_reference:
+            parser.error('EXISTING_APPLICANT_OCR_REFERENCES_REQUIRED')
+    if direct_ocr_signer is not None and not callable(direct_ocr_signer):
+        parser.error('ORIGINAL_DIRECT_OCR_SIGNER_REQUIRED')
     def stop(signum,frame):
         raise KeyboardInterrupt()
     previous = signal.signal(signal.SIGTERM,stop)
@@ -436,10 +458,12 @@ def main(argv=None):
                 print(result, flush=True)
                 return 0
         with PlatformHost.open(args.plan,args.center_keys,args.wechat_secret) as host:
+            if direct_ocr_signer is not None:
+                host.configure_applicant_direct_ocr_signer(direct_ocr_signer)
             if args.applicant_image_scanner:
                 host.configure_applicant_image_scanner()
             if args.applicant_ocr_key_reference:
-                host.configure_applicant_ocr(args.applicant_ocr_key_reference,args.applicant_ocr_store_reference)
+                host.configure_applicant_ocr(args.applicant_ocr_key_reference,args.applicant_ocr_store_reference,bank_card_infer=bank_card_infer)
             host.serve()
     except KeyboardInterrupt:
         return 0

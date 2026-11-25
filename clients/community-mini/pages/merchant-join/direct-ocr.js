@@ -1,5 +1,5 @@
 'use strict';
-// Inactive integration block. No signing implementation or active routes.
+// Phone-only inference; the protected backend supplies one body-bound short-lived proof.
 const URL='https://ocr-api.cn-hangzhou.aliyuncs.com/';
 const ACTION=Object.freeze({business_license:'RecognizeBusinessLicense',id_front:'RecognizeIdcard',id_back:'RecognizeIdcard',bank_card:'RecognizeBankCard'});
 const MAP={
@@ -17,7 +17,7 @@ function validHeaders(h,kind,digest){
  const auth=/^ACS3-HMAC-SHA256 Credential=[A-Za-z0-9_-]{1,128},SignedHeaders=([a-z0-9;-]+),Signature=[a-f0-9]{64}$/.exec(h.authorization);
  return !!auth&&auth[1]===SIGNED&&h['content-type']==='application/octet-stream'&&h['x-acs-action']===ACTION[kind]&&
  h['x-acs-version']==='2021-07-07'&&h['x-acs-content-sha256']===digest&&
- /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(h['x-acs-date'])&&/^[A-Za-z0-9_-]{16,128}$/.test(h['x-acs-signature-nonce']);
+ /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(h['x-acs-date'])&&Number.isFinite(Date.parse(h['x-acs-date']))&&Date.now()-Date.parse(h['x-acs-date'])<=90000&&Date.parse(h['x-acs-date'])-Date.now()<=30000&&/^[A-Za-z0-9_-]{16,128}$/.test(h['x-acs-signature-nonce']);
 }
 function dateValue(y,m,d){
  const v=new Date(Date.UTC(+y,+m-1,+d));
@@ -57,15 +57,15 @@ function startDirectOcr({kind,original,sha256,signDigest,savePrivate,request,isC
  if(!has(ACTION,kind)||!(original instanceof ArrayBuffer)||!original.byteLength||original.byteLength>10_000_000)
   throw Error('DIRECT_OCR_INPUT_INVALID');
  const bytes=original.slice(0);
- // Hold the original revision until the narrow proof is minted. With
- // proof ready, the two image transfers proceed independently in parallel.
+ // A proof request and private image storage are independent. A failed or
+ // slow proof must never gate storage; a failed/slow save never gates OCR.
  const authorization=Promise.resolve().then(()=>sha256(bytes.slice(0))).then(async digest=>{
   if(!isCurrent())return null;
   if(typeof digest!=='string'||!HEX.test(digest))return null;
   const header=await signDigest({kind,digest,size:bytes.byteLength});
   return isCurrent()&&validHeaders(header,kind,digest)?header:null;
  }).catch(()=>null);
- const storage=authorization.then(()=>isCurrent()?savePrivate(bytes.slice(0)):null).then(ack=>{
+ const storage=Promise.resolve().then(()=>isCurrent()?savePrivate(bytes.slice(0)):null).then(ack=>{
   if(ack!==null&&isCurrent())onSave(ack);return ack!==null;
  },()=>{if(isCurrent())onSave(null);return false;});
  const ocr=authorization.then(async header=>{
@@ -78,7 +78,16 @@ function startDirectOcr({kind,original,sha256,signDigest,savePrivate,request,isC
   const packet=await new Promise((resolve,reject)=>request({url:URL,method:'POST',data:bytes,header:{...header},dataType:'json',
    success:r=>{received=timestamp();resolve(r);},fail:()=>reject(Error('DIRECT_OCR_REQUEST_FAILED'))}));
   if(!isCurrent())return false;
-  if(!packet||packet.statusCode!==200)throw Error('DIRECT_OCR_REQUEST_FAILED');
+  const id=packet?.data?.RequestId,requestMeta={request_id_present:typeof id==='string'&&!!id};
+  if(requestMeta.request_id_present&&timing&&typeof timing.hashRequestId==='function'){
+   try{const hash=timing.hashRequestId(id);if(typeof hash==='string'&&/^[a-f0-9]{64}$/.test(hash))requestMeta.request_id_sha256=hash;}catch{}
+  }
+  if(!packet||packet.statusCode!==200){
+   if(timing&&typeof timing.record==='function'&&Number.isFinite(sent)&&Number.isFinite(received)&&received>=sent){
+    try{timing.record({ocr_round_trip_ms:Math.round(received-sent),ocr_http_status:Number.isInteger(packet?.statusCode)?packet.statusCode:0,...requestMeta});}catch{}
+   }
+   throw Error('DIRECT_OCR_REQUEST_FAILED');
+  }
   const result=suggestions(kind,packet.data);
   // The consumer returns true only once setData's callback confirms the
   // current suggestion has been rendered. Never infer that from receipt.
@@ -87,7 +96,7 @@ function startDirectOcr({kind,original,sha256,signDigest,savePrivate,request,isC
    const filled=timestamp(),picked=timing.pickedAt;
    if([picked,sent,received,filled].every(Number.isFinite)&&picked<=sent&&sent<=received&&received<=filled){
     try{timing.record({kind,ocr_round_trip_ms:Math.round(received-sent),
-      pick_to_front_filled_ms:Math.round(filled-picked)});}catch{/* metrics cannot fail OCR */}
+      pick_to_front_filled_ms:Math.round(filled-picked),...requestMeta});}catch{/* metrics cannot fail OCR */}
    }
   }
   return isCurrent();

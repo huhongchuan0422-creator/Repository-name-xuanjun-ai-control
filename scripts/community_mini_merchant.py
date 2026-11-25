@@ -7,7 +7,7 @@ import re
 from scripts.community_mini_center_identity import CenterIdentity
 from scripts.community_merchant_onboarding import MerchantOnboarding,validate_mini_license_region
 
-APPLICANT={'material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history',
+APPLICANT={'direct_ocr_sign','material_preview','catalog','mine','read','save','upload','remove_material','submit','withdraw','history',
            'notices','notice_read','wechat_read','wechat_save','wechat_submit_review','wechat_apply','wechat_status','wechat_media','wechat_cashier_link','wechat_qualifications_select'}
 WRITES={'community.profile','community.item'}
 READS={'community.orders','community.summary','community.orders_page',
@@ -23,6 +23,15 @@ class MiniMerchant:
         self.identity,self.onboarding,self.operations=identity,onboarding,operations
         self.collection_codes=collection_codes
         self.ocr=ocr
+    def _direct_selection(self,token,csrf,p,scene):
+        from scripts.community_mini_direct_ocr import DirectOcrSelection
+        authorize=lambda:self.identity.applicant_context(token) if scene=='' else self.context(token,scene)
+        if p['operation']=='direct_ocr_sign':
+            return DirectOcrSelection(self.onboarding,authorize).sign(token,csrf,p['params'])
+        if p['operation']=='upload' and 'direct_ocr_binding' in p['params']:
+            return DirectOcrSelection(self.onboarding,authorize).upload(token,csrf,p['params'],
+                lambda params:self.onboarding.dispatch(token,csrf,{'operation':'upload','params':params},_mini_submission=True))
+        return None
     def context(self,token,scene):
         return self.identity.merchant_context(token,scene)
     def _grant(self,token,scene,workspace):
@@ -49,6 +58,8 @@ class MiniMerchant:
             if (op!='onboarding' or set(p)!={'operation','params'}
                     or type(p['operation']) is not str or p['operation'] not in APPLICANT):
                 raise PermissionError('APPLICANT_OPERATION_REQUIRED')
+            direct=self._direct_selection(token,csrf,p,scene)
+            if direct is not None:return direct
             self._validate_contact_for_submit(uid,p)
             return self.onboarding.dispatch(token,csrf,p,source_origin=None,_mini_submission=True)
         uid,pid,csrf,principal=self.context(token,scene)
@@ -75,6 +86,8 @@ class MiniMerchant:
         if op=='onboarding':
             if set(p)!={'operation','params'} or type(p['operation']) is not str or p['operation'] not in APPLICANT:
                 raise PermissionError('APPLICANT_OPERATION_REQUIRED')
+            direct=self._direct_selection(token,csrf,p,scene)
+            if direct is not None:return direct
             self._validate_contact_for_submit(uid,p)
             return self.onboarding.dispatch(token,csrf,p,source_origin=self._ocr_origin(scene,pid,principal),_mini_submission=True)
         if op in ('read','write'):

@@ -31,7 +31,7 @@ class PomeloSnapshot(unittest.TestCase):
         untouched = {k: v for k, v in files.items() if k not in changed}
         # d344-lineage 57-file snapshot bound to c741 trio; 54 non-checkout entries unchanged vs their pins.
         digest = hashlib.sha256(json.dumps(untouched, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        self.assertEqual(digest, 'd20c1e3432128f3d54c02620f87c28662ed1f51164639f6792a2a34b66d9a08b')
+        self.assertEqual(digest, '712c034d9db3aba167ef1eac53d76bb11ca44291a5e21ad626657c52a3c02f37')
         self.assertEqual(len(files), 57)
 
 if __name__ == '__main__':

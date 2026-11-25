@@ -231,6 +231,7 @@ function directOcrHint(page,kind,key,hasStored,row,field,savedRow,freshRow,activ
  const has=(object,key)=>object!=null&&Object.prototype.hasOwnProperty.call(object,key);
  const touched=has(page.ocrExplicitEmptyFields,field.path)||(active&&has(page.ocrSuggestionEdits,key))||(held&&held.local_state&&has(held.local_state.edits,key));
  const blankLegacy=row&&!savedRow&&!freshRow&&row.value==='';
+ if(kind==='bank_card'&&hasStored&&typeof value==='string'&&value&&value!==form.get(page.profile,field.path))return {ocrDirect:'',ocrDirectCompare:kind,ocrHint:'识别建议：'+value+'；已填写内容保留，请人工核对。'};
  if(hasStored||touched||(row&&!blankLegacy)||typeof value!=='string'||!value)return {ocrDirect:''};
  const display={value,ocrDirect:kind,ocrHint:'识别建议，请人工核对',ocrKey:'',ocrRetained:false,ocrPrivateDraft:false,ocrSuggestion:false,ocrConflict:false,ocrInReview:false,ocrResultPresent:kind!=='bank_card'};
  if(kind==='bank_card'&&key==='account_bank'&&Array.isArray(field.choices)){
@@ -704,7 +705,7 @@ Page({
   const pickerTerminal=status=>{if(this.current()&&this.uploadViewToken===viewToken)this.setData({uploadFeedback:null,status});}; const abandonBeforeUpload=()=>{pickerTerminal('当前选图等待已结束或申请状态已变化，照片未上传；请核对原申请。');if(!uploadIdentity())return;if(this.showApplicantSessionRecovery())return;this.setData({status:'当前申请状态已变化，照片未上传；请核对后重新选择。'});};
   let boundApplicationId=uploadApplication?uploadApplication.application:null;
   const binding={current:()=>uploadAuthorized()&&(this.data.application?this.data.application.application:null)===boundApplicationId,accept:(saved,old)=>{if(!binding.current()||!saved||typeof saved.application!=='string'||!saved.application)return false;if(boundApplicationId!==null&&saved.application!==boundApplicationId)return false;if(boundApplicationId===null&&old!==null&&old!==undefined)return false;boundApplicationId=saved.application;return true;}};
-  const ocrKind=kind==='business_license'?'business_license':kind==='identity_front'?'id_front':kind==='identity_back'?'id_back':'';
+  const ocrKind=kind==='business_license'?'business_license':kind==='identity_front'?'id_front':kind==='identity_back'?'id_back':kind==='bank_card'?'bank_card':'';
   const waitsForForeground=['business_license','identity_front','identity_back','bank_card'].includes(kind); const bankOcrKind=kind==='bank_card'?'bank_card':''; const viewToken={};this.uploadViewToken=viewToken;
   let uploadSent=false,uploadConfirmed=false;
   const feedback=(phase,label)=>{if(binding.current()&&this.uploadViewToken===viewToken)this.setData({uploadFeedback:{kind,phase,label}});};
@@ -728,7 +729,8 @@ Page({
   if(!binding.current())return;if(!this.data.application||(kind==='cashier_photo'||ocrKind||bankOcrKind||form.industryMaterialKind(kind))&&this.data.dirty){const saved=await this.saveDraft(binding);if(!saved||saved.application!==boundApplicationId)return;}if(!binding.current()||!this.data.application)return;const app=this.data.application,postedRevision=app.revision,postedProviderVersion=this.version;
   // One original selection, one scoped proof, two independent image transfers.
   if(ocrKind){
-   let acceptedRevision=null,originalDigest='';
+   let acceptedRevision=null,originalDigest='',directBinding=null;
+   const selectionAttempt={token:viewToken,kind:ocrKind,photo_confirmed:false};
    const active=()=>{
     const view=this.data.application;
     // wx.setData may clone the application object; compare bound identity
@@ -739,7 +741,7 @@ Page({
    let savePreparationFailed=false,photoRecognizing=false,photoSaving=false;
    const clock=()=>clientOcrClock()??Date.now();
    const spans={};
-   const timed=async(key,fn)=>{const start=clock();try{return await fn();}finally{spans[key]=Math.max(0,Math.round(clock()-start));}};
+   const timed=async(key,fn)=>{const start=clock();spans[key+'_started_ms']=Math.max(0,Math.round(start-directPickedAt));try{return await fn();}finally{const end=clock();spans[key]=Math.max(0,Math.round(end-start));spans[key+'_received_ms']=Math.max(0,Math.round(end-directPickedAt));}};
    const privateSave=fn=>timed('private_save_ms',fn);
    const directSend=arg=>{
     const start=clock(), mark=()=>{spans.aliyun_round_trip_ms=Math.max(0,Math.round(clock()-start));};
@@ -748,10 +750,14 @@ Page({
    const reportTiming=()=>{
     if(!active())return;
     const previous=this.directOcrTimings[ocrKind]||{}, row={};
-    for(const key of ['sign_wait_ms','aliyun_round_trip_ms','private_save_ms','ocr_round_trip_ms','pick_to_front_filled_ms']){
+    for(const key of ['sign_wait_ms','sign_wait_ms_started_ms','sign_wait_ms_received_ms','aliyun_round_trip_ms','private_save_ms','private_save_ms_started_ms','private_save_ms_received_ms','ocr_round_trip_ms','pick_to_front_filled_ms','ocr_http_status']){
      const n=Object.prototype.hasOwnProperty.call(spans,key)?spans[key]:previous[key];
      if(Number.isFinite(n)&&n>=0)row[key]=Math.round(n);
     }
+    row.photo_state=uploadConfirmed?'SAVED':savePreparationFailed?'FAILED':'NOT_CONFIRMED';
+    row.ocr_state=Number.isFinite(previous.pick_to_front_filled_ms)?'SUGGESTION_VISIBLE':this.directOcrHints[ocrKind]?.active()?'RECEIVED_NOT_RENDER_CONFIRMED':'NO_CURRENT_SUGGESTION';
+    if(typeof previous.request_id_present==='boolean')row.request_id_present=previous.request_id_present;
+    if(typeof previous.request_id_sha256==='string'&&/^[a-f0-9]{64}$/.test(previous.request_id_sha256))row.request_id_sha256=previous.request_id_sha256;
     this.directOcrTimings[ocrKind]=row;
     let preview=false;
     try{const info=wx.getAccountInfoSync();preview=!!info&&!!info.miniProgram&&['develop','trial'].includes(info.miniProgram.envVersion);}catch(_){}
@@ -770,7 +776,7 @@ Page({
    this.directOcrHints=this.directOcrHints||{};this.directOcrTimings=this.directOcrTimings||{};
    delete this.directOcrHints[ocrKind];delete this.directOcrTimings[ocrKind];
    if(this.ocrCapture&&this.ocrCapture.document_type===ocrKind)this.invalidateOcr('当前证照已更换');
-   this.updateOcrView();
+   this.updateOcrView({ocrKind,ocrJob:'',ocrRows:[],ocrConfirmed:false,ocrProgressState:'',ocrStatus:'正在识别原图；照片保存独立进行'});
    for(const cache of [this.ocrHeldCaptures,this.ocrDisplayCaptures])if(cache)delete cache[ocrKind];
    feedback('preparing','正在核对识别授权');
    const prepareSaveCopy=async()=>{
@@ -789,15 +795,16 @@ Page({
     photoSaving=true;
     if(photoRecognizing)updatePhotoOverlay();else feedback('uploading','正在上传');
     this.setData({status:'正在上传照片'});uploadSent=true;
-    return privateSave(()=>this.request('upload',{application:app.application,revision:postedRevision,kind,content_base64:copy.content,expires_at:null}));
+    return privateSave(()=>this.request('upload',{application:app.application,revision:postedRevision,kind,content_base64:copy.content,expires_at:null,...(directBinding?{direct_ocr_binding:directBinding}:{})}));
    };
    const ack=result=>{
     photoSaving=false;
     if(!active()||savePreparationFailed)return;
-    if(!result||result.application!==app.application||result.revision!==postedRevision+1||!result.materials||!result.materials[kind]){
-     feedback('unknown','上传结果待核实，请先重新读取原申请；不会自动重传');return;
+    const receipt=result&&result.direct_ocr_receipt;
+    if(!result||result.application!==app.application||result.revision!==postedRevision+1||!result.materials||!result.materials[kind]||directBinding&&(!receipt||receipt.intent_key!==directBinding.intent_key||receipt.digest!==directBinding.digest||receipt.kind!==ocrKind||receipt.original_revision!==postedRevision||receipt.saved_revision!==result.revision||receipt.provider_version!==postedProviderVersion)){
+     const status='上传结果待核实，请先重新读取原申请；不会自动重传';feedback('unknown',status);this.setData({status});return;
     }
-    uploadConfirmed=true;acceptedRevision=result.revision;
+    uploadConfirmed=true;selectionAttempt.photo_confirmed=true;acceptedRevision=result.revision;
     if(this.ocrDrafts)delete this.ocrDrafts[ocrKind];
     if(this.ocrFreshReview)delete this.ocrFreshReview[ocrKind];
     this.advanceDirectOcrHints(ocrKind,app,result,active);
@@ -812,7 +819,9 @@ Page({
    }
    const original=wx.base64ToArrayBuffer(content);
    if(!(original instanceof ArrayBuffer)||original.byteLength!==prepared.size)throw merchantImageError('IMAGE_FILE_CHANGED');
-   const proof=directProof((operation,params)=>uploadSession.merchant(uploadScene||'','onboarding',{operation,params}),app.application,postedRevision);
+   const proof=directProof((operation,params)=>uploadSession.merchant(uploadScene||'','onboarding',{operation,params}),app.application,postedRevision,postedProviderVersion);
+   originalDigest=proof.sha256(original);directBinding=proof.binding(ocrKind,originalDigest,original.byteLength);
+   this.directSelectionAttempt=selectionAttempt;
    const clearBankFeedback=this.beginBankOcrFeedback(ocrKind,active);
    photoRecognizing=true;updatePhotoOverlay();
    const finishBankFeedback=(refresh=true)=>{
@@ -820,7 +829,7 @@ Page({
     clearBankFeedback(refresh);
    };
    try{
-   const attempt=startDirectOcr({kind:ocrKind,original,sha256:bytes=>(originalDigest=proof.sha256(bytes)),signDigest:(...args)=>timed('sign_wait_ms',()=>proof.signDigest(...args)),
+   const attempt=startDirectOcr({kind:ocrKind,original,sha256:()=>originalDigest,signDigest:(...args)=>timed('sign_wait_ms',()=>proof.signDigest(...args)),
     savePrivate:save,request:directSend,isCurrent:active,onSave:ack,
     onSuggestion:result=>{
      if(!active()){finishBankFeedback();return false;}
@@ -829,15 +838,15 @@ Page({
      this.setDirectOcrHint(ocrKind,result.fields,active,uploadConfirmed);
      return new Promise(resolve=>this.updateOcrView({ocrStatus:'识别建议，请人工核对'},()=>{
       const visible=(this.data.materialGroups||[]).some(g=>(g.fields||[]).some(field=>{
-       const k=field.ocrDirect===ocrKind&&this.ocrPathKey(field.path,ocrKind);
-       return !!k&&typeof result.fields[k]==='string'&&!!result.fields[k]&&!!field.value;
+       const k=(field.ocrDirect===ocrKind||field.ocrDirectCompare===ocrKind)&&this.ocrPathKey(field.path,ocrKind);
+       return !!k&&typeof result.fields[k]==='string'&&!!result.fields[k]&&(field.ocrDirectCompare===ocrKind?typeof field.ocrHint==='string'&&field.ocrHint.includes(result.fields[k]):!!field.value);
       }));
       resolve(active()&&visible);
      }));
-    },timing:{pickedAt:directPickedAt,now:clientOcrClock,record:row=>{if(active())this.directOcrTimings[ocrKind]=row;}}
+    },timing:{pickedAt:directPickedAt,now:clientOcrClock,hashRequestId:id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(id)?proof.sha256(Uint8Array.from(Array.from(id,ch=>ch.charCodeAt(0))).buffer):null,record:row=>{if(active())this.directOcrTimings[ocrKind]=row;}}
    });
    await Promise.all([attempt.storage,attempt.ocr]);
-   }finally{finishBankFeedback();reportTiming();}
+   }finally{finishBankFeedback();reportTiming();if(this.directSelectionAttempt===selectionAttempt)this.directSelectionAttempt=null;}
    return;
   }
  feedback('uploading','正在上传');this.setData({status:'正在上传照片'});uploadSent=true;const result=await this.request('upload',{application:app.application,revision:app.revision,kind,content_base64:content,expires_at:null,
@@ -961,7 +970,7 @@ Page({
   let filled=0;
   for(const field of flatten(this.projectOcrGroups(this.data.materialGroups||[]).map(group=>group.fields||[]))){
    const hint=this.directOcrHints&&this.directOcrHints[field.ocrDirect];
-   if(!hint||!hint.bound||!hint.active()||field.ocrManualBank||typeof field.value!=='string'||!field.value.trim()||
+   if(!hint||(!hint.bound&&!(field.ocrDirect==='bank_card'&&hint.currentAttempt()))||!hint.active()||field.ocrManualBank||typeof field.value!=='string'||!field.value.trim()||
       ocrHasValue(form.get(this.profile,field.path)))continue;
    form.put(this.profile,field.path,field.value);filled++;
   }
@@ -1067,7 +1076,7 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
  waitForOcr(error){const d=error&&error.ocrDiagnostic;this.chainRecord('ocr','OCR_03',d||(error&&error.ocrCode==='OCR_EMPTY_RESPONSE'?{reason:'PROVIDER_EMPTY_RESPONSE'}:null));if(d&&d.retryable===false){this.stopOcrPoll();if(this.ocrCapture&&this.ocrCapture.original_locator&&this.ocrCapture.original_locator.current_material===true&&['JOB_NOT_FOUND','MATERIAL_JOB_NOT_FOUND','IDEMPOTENCY_CONFLICT'].includes(d.reason)){this.updateOcrView({ocrDiagnostic:d,ocrStatus:['JOB_NOT_FOUND','MATERIAL_JOB_NOT_FOUND'].includes(d.reason)?'没有找到这份照片的原识别结果，照片仍已保留；未重新识别或上传。':'这份照片有多份识别记录，暂时无法确定应恢复哪一份；未选择任何结果，也未重新识别。'});return;}const status=d.reason==='IDEMPOTENCY_CONFLICT'||['APPLICATION_REVISION_CHANGED','PROVIDER_VERSION_CHANGED','SOURCE_BINDING_CHANGED','ATTACHMENT_CHANGED','SOURCE_EXPIRED'].includes(d.reason)?'申请资料已更新，原识别结果需要重新核对。已暂停自动查询，原资料保留，请勿重复上传。':d.reason==='RATE_LIMITED'?'识别请求较多，已暂停自动查询。原资料保留，请稍后查看结果，勿重复上传。':d.reason==='AUTHENTICATION_FAILED'?'暂时无法核实识别结果的访问权限，已暂停自动查询。原资料保留，请先核对登录状态。':d.reason==='APPLICATION_ACCESS_DENIED'?(this.data.application&&this.data.application.status==='SUBMITTED'?'当前申请已提交，识别结果读取被拒绝，已暂停自动查询。原申请与材料保留，请勿重复上传或提交。':'当前申请的识别结果读取被拒绝，可能与申请状态或访问权限有关，已暂停自动查询。原申请与材料保留，请勿重复上传或提交。'):'暂时无法读取识别结果，已暂停自动查询。原资料保留，请联系管理员核对，勿重复上传。';this.updateOcrView({ocrDiagnostic:d,ocrStatus:status});return;}this.ocrPolling=true;const status=error&&error.networkKind?'网络连接暂时不稳定，正在继续查询识别结果，无需重新上传。':d&&d.request_retained===false?'识别结果还没返回，正在自动查询，请勿重复上传。':error&&error.ocrCode==='OCR_EMPTY_RESPONSE'?'识别服务本次返回空结果，原识别任务已保留，正在继续自动查询，无需重新上传。':error&&error.ocrCode==='OCR_UNAVAILABLE'?'识别服务暂时无法响应，正在继续查询，原材料无需重新上传。':d&&d.stage==='QUEUE'?'正在等待识别，请稍候，无需重新上传。':d&&d.stage==='EXECUTION'&&d.request_retained===true?'原识别任务仍在处理中，尚未取得可核对结果；耗时未确认，请勿重复上传。':'正在查询识别结果，请稍候，无需重新上传。';this.updateOcrView({ocrDiagnostic:d||null,ocrProgressState:'querying',ocrStatus:status});},
  pauseInvalidOcr(capture){if(this.ocrHidden||!this.current()||capture&&capture!==this.ocrCapture)return;this.stopOcrPoll();const a=this.data.application;const onlyDirty=this.data.dirty&&capture&&capture.session===this.session&&capture.scene===this.scene&&a&&capture.application===a.application&&capture.revision===a.revision&&capture.source===this.ocrSource(capture.document_type)&&(capture.session_generation===undefined||capture.session_generation===this.session.getGeneration())&&(!this.session.isAuthenticated||this.session.isAuthenticated());const sessionLost=this.session&&typeof this.session.isAuthenticated==='function'&&!this.session.isAuthenticated();this.updateOcrView({ocrConfirmed:false,...(onlyDirty?{}:{ocrRows:[]}),ocrStatus:onlyDirty?'当前资料有未保存修改，原识别查询已暂停；原任务标识已保留':!capture?'原识别请求标识不可用，无法查询原结果；请联系管理员核对原任务，勿重复上传':sessionLost?'原识别请求的登录状态已失效，已停止查询；原任务结果待核对，勿重复上传':'原识别请求与当前申请、材料或会话不一致，已停止查询；未创建新任务，请核对原任务'});},
  scheduleOcrPoll(){this.clearOcrTimer();const capture=this.ocrCapture;if(!this.ocrPolling||this.ocrHidden||this.ocrFlight)return;if(!this.ocrCurrent(capture)){this.pauseInvalidOcr(capture);return;}if(typeof setTimeout!=='function')return;const delay=[1000,2000,4000,8000][Math.min(this.ocrPollAttempt||0,3)];this.ocrPollAttempt=(this.ocrPollAttempt||0)+1;this.chainRecord('ocr','OCR_03',null);this.ocrTimer=setTimeout(async()=>{this.ocrTimer=undefined;if(!this.ocrPolling||this.ocrHidden)return;if(!this.ocrCurrent(capture)){this.pauseInvalidOcr(capture);return;}if(capture.job_id||capture.recovery){const missing=await this.readOcr();if(missing&&missing.explicit_first_key&&this.ocrCurrent(missing)&&missing.source!=='null'){const next={...missing,idempotency_key:missing.explicit_first_key,recovery:false};delete next.explicit_first_key;delete next.original_locator;this.ocrCapture=next;this.chainRecord('ocr','OCR_01',null);this.updateOcrView({ocrProgressState:'requesting',ocrStatus:'正在请求证照识别；结果仍需人工核对'});await this.resumeOcrSubmit(next);}}else if(capture.idempotency_key)await this.resumeOcrSubmit(capture);},delay);},
- onHide(){this.invalidateSigningQrForHide();this.cancelStepOcrReview();this.clearProviderPoll();this.privatePreviewCleanup();this.ocrHidden=true;this.clearUploadedOcrRestoreTimer();this.beginStepScroll();this.clearOcrTimer();if(this.ocrCapture)this.ocrRequest(this.ocrCapture);},
+ onHide(){if(this.directSelectionAttempt&&this.directSelectionAttempt.token===this.uploadViewToken){const attempt=this.directSelectionAttempt;this.uploadViewToken=null;this.directSelectionAttempt=null;this.ocrHidden=true;if(this.directOcrHints)delete this.directOcrHints[attempt.kind];const status=attempt.photo_confirmed?'本次识别回填已停止，照片已私密保存。':'本次识别回填已停止；照片保存结果请刷新原申请核对，不会自动重传。';this.updateOcrView({uploadFeedback:null,ocrProgressState:'',ocrStatus:status,status});}this.invalidateSigningQrForHide();this.cancelStepOcrReview();this.clearProviderPoll();this.privatePreviewCleanup();this.ocrHidden=true;this.clearUploadedOcrRestoreTimer();this.beginStepScroll();this.clearOcrTimer();if(this.ocrCapture)this.ocrRequest(this.ocrCapture);},
  ocrFeedback(error){const code=String(error&&error.ocrCode||error&&error.message||'');if(/REVOKED|CHANGED|EXPIRED|REVISION|BINDING/.test(code))return '暂时无法读取识别结果：资料或登录状态已变化，请先重新读取原申请；无需重新上传材料。';if(code==='OCR_UNAVAILABLE')return '暂时无法读取识别结果，原材料无需重新上传，请稍后查询原任务。';if(error&&error.code==='ACCESS_DENIED'||/AUTH|SESSION|PERMISSION|LOGIN/.test(code))return '识别结果的认证或权限验证未通过，请重新登录后读取原申请；无需重新上传材料。';return '暂时无法读取识别结果，请稍后查询原任务；原材料无需重新上传。';},
  async ocrCall(action,extra){this.clearUploadedOcrRestoreTimer();const app=this.data.application;if(!app)throw new Error('APPLICATION_REQUIRED');const request=this.session.merchant(this.scene,'ocr',{action,application:app.application,...extra});this.ocrTransport=request;return request;},
  holdOcrLocal(capture){return {...capture,local_state:{edits:{...(this.ocrSuggestionEdits||{})},rows:(this.data.ocrRows||[]).map(row=>({...row})),edit_version:this.ocrSuggestionEditVersion||0,confirmation_revision:this.ocrConfirmationRevision||0,edit_group:this.data.editMaterialGroup||''}};},
@@ -1247,14 +1256,14 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
  directHintBinding(kind,application){
   const session=this.session,source=this.ocrSource(kind,{application});
   if(!session||!application||!source||source==='null')return null;
-  return {application:application.application,revision:application.revision,source,session,scene:this.scene,epoch:this.epoch,
+  return {application:application.application,revision:application.revision,provider_version:this.version,source,session,scene:this.scene,epoch:this.epoch,
    generation:typeof session.getGeneration==='function'?session.getGeneration():undefined};
  },
  directHintBindingMatches(kind,bound,application=this.data.application){
   const current=this.directHintBinding(kind,application);
   return !!current&&!!bound&&this.current()&&!this.ocrHidden&&
    (!current.session.isAuthenticated||current.session.isAuthenticated())&&
-   current.application===bound.application&&current.revision===bound.revision&&current.source===bound.source&&
+   current.application===bound.application&&current.revision===bound.revision&&current.provider_version===bound.provider_version&&current.source===bound.source&&
    current.session===bound.session&&current.scene===bound.scene&&current.epoch===bound.epoch&&current.generation===bound.generation;
  },
  setDirectOcrHint(kind,fields,currentAttempt,committed){
@@ -1307,7 +1316,7 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
     if(!active())return;if(prepared.ocrTooLarge){choose();return;}
     original=wx.base64ToArrayBuffer(prepared.content);
     proof=directProof((operation,params)=>session.merchant(record.scene||'','onboarding',{operation,params}),
-     record.application,record.revision);
+     record.application,record.revision,record.version);
     digest=proof.sha256(original);
    }catch(_){if(active())choose();return;}
    if(!active())return;
@@ -1331,7 +1340,7 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
       }));
       resolve(active()&&visible);
      }));
-    },timing:{pickedAt,now:clientOcrClock,record:r=>{if(active())this.directOcrTimings[kind]=r;}}
+    },timing:{pickedAt,now:clientOcrClock,hashRequestId:id=>typeof id==='string'&&/^[A-Za-z0-9_-]{1,128}$/.test(id)?proof.sha256(Uint8Array.from(Array.from(id,ch=>ch.charCodeAt(0))).buffer):null,record:r=>{if(active())this.directOcrTimings[kind]=r;}}
    });
    return await attempt.ocr;
   }finally{finishBankFeedback();if(this.directOcrRetry===record)this.directOcrRetry=null;}
