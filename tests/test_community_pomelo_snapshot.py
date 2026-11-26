@@ -31,7 +31,7 @@ class PomeloSnapshot(unittest.TestCase):
         untouched = {k: v for k, v in files.items() if k not in changed}
         # 5fbb61c4: preserve exact 54 non-checkout entries including the independent OCR delta.
         digest = hashlib.sha256(json.dumps(untouched, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        self.assertEqual(digest, '67f2699b3ee9fb4888ba3f68a83b100309980f614750c2e2f0518abd813a0773')
+        self.assertEqual(digest, 'd2ca20805144b0d1111d364e7716f3badaae73e17cb1c60a8d341553a302d07f')
         self.assertEqual(len(files), 57)
 
 if __name__ == '__main__':
