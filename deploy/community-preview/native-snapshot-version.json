@@ -2,9 +2,9 @@
   "runtime_source_sha": "17ecb128e8e0407e0a99259959babd0fbeea6085",
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
-  "startup_source_manifest_sha256": "b0bf3fb9341543fb1952f532c043b5019ea25603460581b9f3ef88bacece98a2",
-  "frontend_manifest_sha256": "161eefba2fee4a948cc67c78ea61d0e7bb2f5d8d990fac9964cf047d711e8c43",
-  "frontend_archive_sha256": "5bc5334e28c50b11a09795bcb563c7894b85f9b6fe44b037534a17178f2effce",
+  "startup_source_manifest_sha256": "96d4d75cc1ab8e179a12da500c9ff0186462822d59965e5db82f7d0e44cdf8eb",
+  "frontend_manifest_sha256": "562f5637274599abbbc4d4f10772a8be5cee873a8b08d8fad2232cb6c8575ece",
+  "frontend_archive_sha256": "e3039ad912b1890bc820edd7a30367b3e36c779c0dfd81dd3060fb740234e050",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
-  "evidence": "a63e9afc checkout wait removal; 56 other files unchanged incl OCR/home; signer2a56db38/startup b0bf3fb9 HTTPS rechecked. Material timeout unresolved; no device speed acceptance."
+  "evidence": "3b83d890 media async consumption; a63e checkout retained; installed applymentbe9219c4/host30ebfb52 and signer2a56 checked over HTTPS. Real material recovery not accepted."
 }
