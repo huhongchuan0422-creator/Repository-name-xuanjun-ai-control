@@ -2,9 +2,9 @@
   "runtime_source_sha": "17ecb128e8e0407e0a99259959babd0fbeea6085",
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
-  "startup_source_manifest_sha256": "96d4d75cc1ab8e179a12da500c9ff0186462822d59965e5db82f7d0e44cdf8eb",
+  "startup_source_manifest_sha256": "20f5879b9f28ef0e425ff39be8be15640464e12eff5e5a202ed91248bc231471",
   "frontend_manifest_sha256": "61b3bc1090215b2b5806ddf50d60c6f471b585bf87a12ea291092a54218926c0",
   "frontend_archive_sha256": "1180ff1aa623c163febffa916fa393046eb35a7bfe9315069a7e8607ec29f907",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
-  "evidence": "f54c2c50 media async + original foreground epoch; a63e checkout retained; installed applymentbe9219c4/host30ebfb52 and signer2a56 checked over HTTPS. Real material recovery not accepted."
+  "evidence": "f54c frontend bytes unchanged; live phase3eef and reviewed e918 integration22ec/projectionc749 installed21:08; Commerce df7c preserved; genuine media/final submit still unverified."
 }
