@@ -649,8 +649,8 @@ Page({
   issued.add(kind);
   // Original writer uses the saved, authorized source, owns the single-write fence,
   // and returns the provider media_id. No status pre-read or automatic fallback.
-  const material=stored[kind],source=material.sha256;
-  const materialCurrent=()=>currentAuthorization()&&!this.ocrHidden&&this.data.application.materials&&this.data.application.materials[kind]===material&&material.sha256===source;
+  const material=stored[kind],source=material.sha256,foreground=this.providerForeground;
+  const materialCurrent=()=>currentAuthorization()&&!this.ocrHidden&&this.providerForeground===foreground&&this.data.application.materials&&this.data.application.materials[kind]===material&&material.sha256===source;
   let result=await this.request('wechat_media',{application,kind,application_revision:revision,owner_confirmed_material_send:true,async_media:true},true);
   if(result&&result.state==='UPLOADING'){
    const expectedSource=result.source_sha256;
