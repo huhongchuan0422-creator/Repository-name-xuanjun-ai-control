@@ -3,8 +3,8 @@
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
   "startup_source_manifest_sha256": "91306bd09f8966eedda79d1823feaff320b48e988e6ff950c8db31805850641d",
-  "frontend_manifest_sha256": "dcaf6184314e96df4bb808399a9be0eea989249fd01419e993d9997b0f5534fb",
-  "frontend_archive_sha256": "78855ebf9130121a9c9cca3643c909409a27a557f4aa2da845bde5da97182f54",
+  "frontend_manifest_sha256": "c977e315f5be4090cdcaf1940def0254de2f9beffc31004a10c20bf510588960",
+  "frontend_archive_sha256": "aab85bad3ecc54411d05456e6767e15e7bfdb04282d703ae6d589fea576f2a7e",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
-  "evidence": "73d3c3f4 OCR upload-verify fix bound: trio dcaf6184/78855ebf byte-verified from 73d3 tree; only pages/merchant-join/index.js changed vs v9 trio (receipt verified only when backend echoes one; live 17ecb128 never returns it). Backend closure unchanged (91306bd0; 208 pins; runtime 17ecb128). Bank passthrough on live: NOT_LOADED/UNKNOWN. Payments/production untouched."
+  "evidence": "ebccfd09 independent professional OCR delta; backend unchanged; actual request status and live signer revision race not accepted."
 }
