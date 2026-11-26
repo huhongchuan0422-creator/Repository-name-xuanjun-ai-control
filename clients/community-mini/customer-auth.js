@@ -15,9 +15,10 @@ function navigate(page,section,wx,app,pages=[]){
   const stale=page._sceneStale||page.sceneStale;if(stale){if(!['home','back'].includes(section)){page.setData({status:'授权场景已切换，请重新进入对应门店'});return;}section='home';}
   if(page.data.pending||page._navigationPending)return;
   if(section==='back')return back(page,wx,app,pages);
+  // Owner 2026-11-26: home recent-browsing joins the working recommendations entry (same page/link/chain); the scene-authorized store-detail chain stays reachable only from inside checkout.
+  if(section==='store-detail')section='recommendations';
   let url=routes[section];if(!url)return;
   const scene=page.sceneInvalid?'':stale?app.globalData.scene||'':page.scene||app.globalData.scene||'';
-  if(section==='store-detail'&&!scene)url=routes.recommendations;
   if(scene){try{require('./session').parseScene({scene});}catch(_){page.setData({status:'门店入口无效，请重新扫码'});return;}url+=(url.includes('?')?'&':'?')+'scene='+encodeURIComponent(scene);}
   const tab=['home','recommendations','orders','profile'].includes(section);
   if(!stale&&!page._refreshNavigation&&page.route===url.split('?')[0].slice(1)&&page.data.activeSection===section)return;

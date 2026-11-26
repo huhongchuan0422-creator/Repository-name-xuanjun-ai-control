@@ -29,9 +29,9 @@ class PomeloSnapshot(unittest.TestCase):
         files = json.loads((p / 'manifest.json').read_bytes())['files']
         changed = ['pages/checkout/index.js', 'pages/checkout/index.wxml', 'pages/checkout/index.wxss']
         untouched = {k: v for k, v in files.items() if k not in changed}
-        # d344-lineage 57-file snapshot bound to c741 trio; 54 non-checkout entries unchanged vs their pins.
+        # 8e4f home-entry-fix trio; 54 non-checkout entries (only customer-auth.js moved vs f473 pins).
         digest = hashlib.sha256(json.dumps(untouched, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        self.assertEqual(digest, '712c034d9db3aba167ef1eac53d76bb11ca44291a5e21ad626657c52a3c02f37')
+        self.assertEqual(digest, '57c4d7fecac06e6d28083c0f9b697091c7b98b79fcb6a3b41e4df7a908cd26d6')
         self.assertEqual(len(files), 57)
 
 if __name__ == '__main__':

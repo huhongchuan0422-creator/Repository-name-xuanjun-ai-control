@@ -31,8 +31,8 @@ function fixture({scene='shop1',store=originalStore,hold=false,holdPublic=false,
   return {app,calls,held,heldPublic,page,get navigation(){return navigation;},deny(){denied=true;},setUnavailable(value){unavailable=value;},setPublicNetwork(value){publicNetwork=value;},setPublicDenied(value){publicDenied=value;},setDirectoryNetwork(value){directoryNetwork=value;},setLoginDenied(value){loginDenied=value;},releasePublic(){for(const o of heldPublic.splice(0))reply(o,publicStore);},release(){const waiting=held.splice(0);for(const o of waiting)storefront(o);},async waitHeld(){for(let n=0;n<30&&!held.length;n++)await tick();assert.ok(held.length,'original storefront request was issued');}};
 }
 const event=dataset=>({currentTarget:{dataset}});
-test('home current-store route reads original scene storefront with one identity and no invented directory id',async()=>{
-  const f=fixture(),home=f.page('home');await home.onLoad({scene:'shop1'});home.openStorefront();assert.equal(f.navigation,'/pages/checkout/index?view=store-detail&scene=shop1');home.onUnload();
+test('home recent-browsing joins the recommendations chain while direct detail load still reads original scene storefront',async()=>{
+  const f=fixture(),home=f.page('home');await home.onLoad({scene:'shop1'});home.openStorefront();assert.equal(f.navigation,'/pages/checkout/index?view=recommendations&scene=shop1');home.onUnload();
   const p=f.page();await p.onLoad({scene:'shop1',view:'store-detail'});
   assert.equal(p.data.detailState,'READY');assert.equal(p.data.sceneStorefront.name,originalStore.name);assert.equal(p.data.sceneStorefront.description,originalStore.description);
   assert.deepEqual(Object.keys(p.data.sceneStorefront).sort(),['description','name']);assert.equal(p.data.selectedRecommendation,null);assert.equal(p.data.paymentsEnabled,false);
@@ -139,6 +139,10 @@ test('detail template renders only fixed safe feedback with the existing generic
 test('scene-less home storefront entry opens real recommendations rather than an unbound detail error',async()=>{
   const f=fixture({scene:''}),home=f.page('home');await home.onLoad({});home.openStorefront();
   assert.equal(f.navigation,'/pages/checkout/index?view=recommendations');home.onUnload();
+});
+test('home recent-browsing opens the exact same entry link as the recommendations tab',async()=>{
+  const f=fixture(),home=f.page('home');await home.onLoad({scene:'shop1'});home.openRecommendations();const rec=f.navigation;
+  home.openStorefront();assert.equal(f.navigation,rec);assert.ok(!f.navigation.includes('view=store-detail'));home.onUnload();
 });
 test('scene-less direct detail cold entry settles in actual directory',async()=>{
   const f=fixture({scene:''}),p=f.page();await p.onLoad({view:'store-detail'});
