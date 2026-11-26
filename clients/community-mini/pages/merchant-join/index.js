@@ -729,7 +729,7 @@ Page({
   if(!binding.current())return;if(!this.data.application||(kind==='cashier_photo'||form.industryMaterialKind(kind))&&this.data.dirty){const saved=await this.saveDraft(binding);if(!saved||saved.application!==boundApplicationId)return;}if(!binding.current()||!this.data.application)return;const app=this.data.application,postedRevision=app.revision,postedProviderVersion=this.version;
   // One original selection, one scoped proof, two independent image transfers.
   if(ocrKind){
-   let originalDigest='',directBinding=null;
+   let originalDigest='';
    const selectionAttempt={token:viewToken,kind:ocrKind,photo_confirmed:false};
    const active=()=>{
     const view=this.data.application;
@@ -794,7 +794,7 @@ Page({
     photoSaving=true;
     if(photoRecognizing)updatePhotoOverlay();else feedback('uploading','正在上传');
     this.setData({status:'正在上传照片'});uploadSent=true;
-    return privateSave(()=>this.request('upload',{application:app.application,revision:postedRevision,kind,content_base64:copy.content,expires_at:null,...(directBinding?{direct_ocr_binding:directBinding}:{})}));
+    return privateSave(()=>this.request('upload',{application:app.application,revision:postedRevision,kind,content_base64:copy.content,expires_at:null}));
    };
    const ack=result=>{
     photoSaving=false;
@@ -819,7 +819,7 @@ Page({
    const original=wx.base64ToArrayBuffer(content);
    if(!(original instanceof ArrayBuffer)||original.byteLength!==prepared.size)throw merchantImageError('IMAGE_FILE_CHANGED');
    const proof=directProof((operation,params)=>uploadSession.merchant(uploadScene||'','onboarding',{operation,params}),app.application,postedRevision,postedProviderVersion);
-   originalDigest=proof.sha256(original);directBinding=proof.binding(ocrKind,originalDigest,original.byteLength);
+   originalDigest=proof.sha256(original);
    this.directSelectionAttempt=selectionAttempt;
    const clearBankFeedback=this.beginBankOcrFeedback(ocrKind,active);
    photoRecognizing=true;updatePhotoOverlay();
