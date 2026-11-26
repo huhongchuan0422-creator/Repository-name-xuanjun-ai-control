@@ -726,17 +726,16 @@ Page({
   const path=prepared.path,content=prepared.content;
   feedback('preparing','正在准备上传');
   this.setData({materialPreviews:{...this.data.materialPreviews,[kind]:path},status:prepared.compressed?'照片已自动压缩，正在准备上传；请核对证照小字，大小不代表识别成功':'照片可保存，正在准备上传'});
-  if(!binding.current())return;if(!this.data.application||(kind==='cashier_photo'||ocrKind||bankOcrKind||form.industryMaterialKind(kind))&&this.data.dirty){const saved=await this.saveDraft(binding);if(!saved||saved.application!==boundApplicationId)return;}if(!binding.current()||!this.data.application)return;const app=this.data.application,postedRevision=app.revision,postedProviderVersion=this.version;
+  if(!binding.current())return;if(!this.data.application||(kind==='cashier_photo'||form.industryMaterialKind(kind))&&this.data.dirty){const saved=await this.saveDraft(binding);if(!saved||saved.application!==boundApplicationId)return;}if(!binding.current()||!this.data.application)return;const app=this.data.application,postedRevision=app.revision,postedProviderVersion=this.version;
   // One original selection, one scoped proof, two independent image transfers.
   if(ocrKind){
-   let acceptedRevision=null,originalDigest='',directBinding=null;
+   let originalDigest='',directBinding=null;
    const selectionAttempt={token:viewToken,kind:ocrKind,photo_confirmed:false};
    const active=()=>{
     const view=this.data.application;
     // wx.setData may clone the application object; compare bound identity
-    // and revisions, not JS references. The original upload token still owns it.
-    return binding.current()&&uploadIdentity()&&this.version===postedProviderVersion&&view&&view.application===app.application&&
-     (view.revision===postedRevision||acceptedRevision!==null&&view.revision===acceptedRevision);
+    // not material-save revisions. The original upload token still owns it.
+    return binding.current()&&uploadIdentity()&&view&&view.application===app.application&&view.status==='DRAFT';
    };
    let savePreparationFailed=false,photoRecognizing=false,photoSaving=false;
    const clock=()=>clientOcrClock()??Date.now();
@@ -800,12 +799,11 @@ Page({
    const ack=result=>{
     photoSaving=false;
     if(!active()||savePreparationFailed)return;
-    const receipt=result&&result.direct_ocr_receipt;
-    // Owner 2026-11-26: the reviewed live backend (17ecb128) never echoes direct_ocr_receipt; requiring it made every successful upload "unknown" and blocked the OCR chain (regression vs 765). Verify the receipt only when the backend actually returns one; an absent receipt falls back to the 765 application/revision/materials contract.
-    if(!result||result.application!==app.application||result.revision!==postedRevision+1||!result.materials||!result.materials[kind]||directBinding&&receipt&&(receipt.intent_key!==directBinding.intent_key||receipt.digest!==directBinding.digest||receipt.kind!==ocrKind||receipt.original_revision!==postedRevision||receipt.saved_revision!==result.revision||receipt.provider_version!==postedProviderVersion)){
+    // Material-save verification only; OCR does not consume this receipt.
+    if(!result||result.application!==app.application||result.revision!==postedRevision+1||!result.materials||!result.materials[kind]){
      const status='上传结果待核实，请先重新读取原申请；不会自动重传';feedback('unknown',status);this.setData({status});return;
     }
-    uploadConfirmed=true;selectionAttempt.photo_confirmed=true;acceptedRevision=result.revision;
+    uploadConfirmed=true;selectionAttempt.photo_confirmed=true;
     if(this.ocrDrafts)delete this.ocrDrafts[ocrKind];
     if(this.ocrFreshReview)delete this.ocrFreshReview[ocrKind];
     this.advanceDirectOcrHints(ocrKind,app,result,active);
@@ -835,7 +833,7 @@ Page({
     onSuggestion:result=>{
      if(!active()){finishBankFeedback();return false;}
      finishBankFeedback(false);
-     if(!result||!Object.keys(result.fields).length){this.updateOcrView({ocrStatus:'未取得识别建议，可手动填写'});return false;}
+     if(!result||!result.fields||!Object.keys(result.fields).length){this.updateOcrView({ocrStatus:'未取得识别建议，可手动填写'});return false;}
      this.setDirectOcrHint(ocrKind,result.fields,active,uploadConfirmed);
      return new Promise(resolve=>this.updateOcrView({ocrStatus:'识别建议，请人工核对'},()=>{
       const visible=(this.data.materialGroups||[]).some(g=>(g.fields||[]).some(field=>{
@@ -971,7 +969,7 @@ Page({
   let filled=0;
   for(const field of flatten(this.projectOcrGroups(this.data.materialGroups||[]).map(group=>group.fields||[]))){
    const hint=this.directOcrHints&&this.directOcrHints[field.ocrDirect];
-   if(!hint||(!hint.bound&&!(field.ocrDirect==='bank_card'&&hint.currentAttempt()))||!hint.active()||field.ocrManualBank||typeof field.value!=='string'||!field.value.trim()||
+   if(!hint||!hint.active()||field.ocrManualBank||typeof field.value!=='string'||!field.value.trim()||
       ocrHasValue(form.get(this.profile,field.path)))continue;
    form.put(this.profile,field.path,field.value);filled++;
   }
@@ -1268,9 +1266,14 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
    current.session===bound.session&&current.scene===bound.scene&&current.epoch===bound.epoch&&current.generation===bound.generation;
  },
  setDirectOcrHint(kind,fields,currentAttempt,committed){
-  const hint={fields,bound:committed?this.directHintBinding(kind,this.data.application):null,currentAttempt};
-  hint.active=()=>this.directOcrHints&&this.directOcrHints[kind]===hint&&
-   (hint.bound?this.directHintBindingMatches(kind,hint.bound):currentAttempt());
+  // Valid OCR fields belong to the authenticated application, not a saved material/revision.
+  const session=this.session,application=this.data.application&&this.data.application.application,
+   scene=this.scene,epoch=this.epoch,generation=freshGeneration(session);
+  const hint={fields,bound:null,currentAttempt};
+  hint.active=()=>this.directOcrHints&&this.directOcrHints[kind]===hint&&this.current()&&!this.ocrHidden&&
+   this.session===session&&this.scene===scene&&this.epoch===epoch&&freshGeneration(session)===generation&&
+   (!session.isAuthenticated||session.isAuthenticated())&&this.data.application&&
+   this.data.application.application===application&&this.data.application.status==='DRAFT';
   this.directOcrHints[kind]=hint;
  },
  advanceDirectOcrHints(uploadedKind,before,after,currentAttempt){
@@ -1330,7 +1333,7 @@ fresh.source===this.ocrSource(kind)&&typeof fresh.fields[key]==='string'?{key,va
     onSuggestion:result=>{
      if(!active()){finishBankFeedback();return false;}
      finishBankFeedback(false);
-     if(!result||!Object.keys(result.fields).length){
+     if(!result||!result.fields||!Object.keys(result.fields).length){
       this.updateOcrView({ocrStatus:'未取得识别建议，可手动填写'});return false;
      }
      this.setDirectOcrHint(kind,result.fields,active,true);

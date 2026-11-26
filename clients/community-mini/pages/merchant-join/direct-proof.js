@@ -37,7 +37,9 @@ function directProof(request,application,revision,provider_version=0){
      typeof digest!=='string'||!/^[0-9a-f]{64}$/.test(digest)||!Number.isSafeInteger(size)||size<1||size>10_000_000)
    throw Error('DIRECT_OCR_BINDING_INVALID');
   taken=true;
-  const result=await request('direct_ocr_sign',binding(kind,digest,size));
+  // Pinned live signer accepts six fields; private-save version is not an OCR prerequisite.
+  const {provider_version: _privateVersion,...params}=binding(kind,digest,size);
+  const result=await request('direct_ocr_sign',params);
   if(!result||Object.keys(result).join(',')!=='headers'||!result.headers||typeof result.headers!=='object'||Array.isArray(result.headers))
    throw Error('DIRECT_OCR_PROOF_UNAVAILABLE');
   return result.headers;
