@@ -801,7 +801,8 @@ Page({
     photoSaving=false;
     if(!active()||savePreparationFailed)return;
     const receipt=result&&result.direct_ocr_receipt;
-    if(!result||result.application!==app.application||result.revision!==postedRevision+1||!result.materials||!result.materials[kind]||directBinding&&(!receipt||receipt.intent_key!==directBinding.intent_key||receipt.digest!==directBinding.digest||receipt.kind!==ocrKind||receipt.original_revision!==postedRevision||receipt.saved_revision!==result.revision||receipt.provider_version!==postedProviderVersion)){
+    // Owner 2026-11-26: the reviewed live backend (17ecb128) never echoes direct_ocr_receipt; requiring it made every successful upload "unknown" and blocked the OCR chain (regression vs 765). Verify the receipt only when the backend actually returns one; an absent receipt falls back to the 765 application/revision/materials contract.
+    if(!result||result.application!==app.application||result.revision!==postedRevision+1||!result.materials||!result.materials[kind]||directBinding&&receipt&&(receipt.intent_key!==directBinding.intent_key||receipt.digest!==directBinding.digest||receipt.kind!==ocrKind||receipt.original_revision!==postedRevision||receipt.saved_revision!==result.revision||receipt.provider_version!==postedProviderVersion)){
      const status='上传结果待核实，请先重新读取原申请；不会自动重传';feedback('unknown',status);this.setData({status});return;
     }
     uploadConfirmed=true;selectionAttempt.photo_confirmed=true;acceptedRevision=result.revision;
