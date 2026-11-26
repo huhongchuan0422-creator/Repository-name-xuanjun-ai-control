@@ -3,8 +3,8 @@
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
   "startup_source_manifest_sha256": "91306bd09f8966eedda79d1823feaff320b48e988e6ff950c8db31805850641d",
-  "frontend_manifest_sha256": "c977e315f5be4090cdcaf1940def0254de2f9beffc31004a10c20bf510588960",
-  "frontend_archive_sha256": "aab85bad3ecc54411d05456e6767e15e7bfdb04282d703ae6d589fea576f2a7e",
+  "frontend_manifest_sha256": "78471cf2426603c955d9cf868677c2b35ab0ffdbdcc21eca6e75ade2a391a2a5",
+  "frontend_archive_sha256": "184752a156afecb96bf76d806500c40d4cab4984568f1a7629c22c7a2829ca75",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
-  "evidence": "ebccfd09 independent professional OCR delta; backend unchanged; actual request status and live signer revision race not accepted."
+  "evidence": "5fbb61c4: independent professional OCR fill; pinned six-field sign and five-field private upload APIs restored. Material save does not gate or clear valid OCR. Actual request classification and protected live signer revision race remain unverified; not customer acceptance."
 }
