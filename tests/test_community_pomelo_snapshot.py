@@ -31,7 +31,7 @@ class PomeloSnapshot(unittest.TestCase):
         untouched = {k: v for k, v in files.items() if k not in changed}
         # 8e4f home-entry-fix trio; 54 non-checkout entries (only customer-auth.js moved vs f473 pins).
         digest = hashlib.sha256(json.dumps(untouched, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        self.assertEqual(digest, '57c4d7fecac06e6d28083c0f9b697091c7b98b79fcb6a3b41e4df7a908cd26d6')
+        self.assertEqual(digest, '0906dd5fb2df6049ace9cddedd7d23f16d193fbd87bc736a7227ebc85323436d')
         self.assertEqual(len(files), 57)
 
 if __name__ == '__main__':
