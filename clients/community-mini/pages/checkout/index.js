@@ -121,8 +121,10 @@ Page({
   async loadDirectory(e){
     if(!this.session||!this.data.sessionReady)return;
     const more=e?.currentTarget?.dataset?.more==='true';if(more&&!this.data.directoryMore)return;
+    const active=this._directoryRequest,category=this.data.categoryId,cursor=more?this.data.directoryCursor:null;
+    if(active&&active.pending&&active.category===category&&active.more===more&&active.cursor===cursor&&this.customerReadCurrent(active))return;
     this.clearDemoProjection('正在重新核对展示商家状态');
-    const request={...this.customerReadToken(),category:this.data.categoryId};this._directoryRequest=request;
+    const request={...this.customerReadToken(),category,more,cursor,pending:true};this._directoryRequest=request;
     const params={};if(request.category&&!request.category.startsWith('local:'))params.category_id=request.category;if(more)params.after_id=this.data.directoryCursor;
     if(!more)this.clearShowcaseCovers();
     this.setData({demoStore:null,demoState:'UNKNOWN',directoryState:'LOADING',directoryError:'',...(!more?{directory:[],directoryCursor:null,directoryMore:false,demoStore:null,demoState:'UNKNOWN',demoPhotoFailed:false}:{})});
@@ -131,10 +133,20 @@ Page({
       if(!r||!Array.isArray(r.records)||r.records.some(v=>!this.validPublicStore(v))||!Array.isArray(r.categories)||r.categories.some(v=>!v||typeof v.id!=='string'||typeof v.name!=='string')||typeof r.has_more!=='boolean'||(r.has_more?typeof r.next_cursor!=='string'||!r.next_cursor||r.next_cursor===params.after_id:r.next_cursor!==null))throw Error('推荐列表返回未确认');
       const demo=r.demo;
       if(demo&&(!['VISIBLE','HIDDEN_REAL_APPROVAL_OBSERVED','UNKNOWN','NOT_CURRENT_PROJECT'].includes(demo.state)||(demo.state==='VISIBLE'?!this.validDemoStore(demo.record):demo.record!==null)))throw Error('展示商家状态未确认');
-      const records=more?this.data.directory.slice():[];for(const v of r.records)if(!records.some(x=>x.id===v.id))records.push(await this.cacheShowcaseCover(v,current));if(!current())return;
+      const records=more?this.data.directory.slice():[];for(const v of r.records)if(!records.some(x=>x.id===v.id))records.push(v);if(!current())return;
       const categories=[...LOCAL_CATEGORIES,...r.categories.filter(category=>!LOCAL_CATEGORIES.some(local=>local.name===category.name))],visibleRecords=records.map(v=>({...v,visible:this.directoryVisible(v,request.category)}));
       this.setData({demoStore:demo&&demo.state==='VISIBLE'?demo.record:null,demoState:demo?demo.state:'UNKNOWN',directory:visibleRecords,categories,directoryState:'READY',visibleDirectoryCount:visibleRecords.filter(v=>v.visible).length,directoryMore:r.has_more,directoryCursor:r.next_cursor});
+      this.hydrateDirectoryCovers(records,current);
     }catch(e){if(this.customerReadDenied(request,e))return;if(current())this.setData({directoryState:'FAILED',directoryError:e.message});}
+    finally{request.pending=false;}
+  },
+  async hydrateDirectoryCovers(records,current){
+    for(const record of records){
+      if(!current())return;
+      if(!record.platform_showcase||!record.showcase_cover||record.coverPath||record.coverFailed)continue;
+      const cover=await this.cacheShowcaseCover(record,current);if(!current())return;
+      this.setData({directory:this.data.directory.map(row=>row.id===record.id?{...row,coverPath:cover.coverPath,coverFailed:cover.coverFailed,coverLoaded:cover.coverLoaded}:row)});
+    }
   },
   chooseCategory(e){const id=e.currentTarget.dataset.id;if(id!==''&&!this.data.categories.some(c=>c.id===id))return;const directory=this.data.directory.map(v=>({...v,visible:this.directoryVisible(v,id)}));this.setData({categoryId:id,directory,visibleDirectoryCount:directory.filter(v=>v.visible).length});return this.loadDirectory();},
   async loadContexts(){
@@ -213,7 +225,7 @@ Page({
         this._authEpoch=auth.current();lifecycle=this._pageGeneration=(this._pageGeneration||0)+1;
         await this.session.ensureLogin({automatic:true,prepared:true});
         if(!current())return;
-        if(config.commerce===true&&!nativeEntry){this.setData({commerceEnabled:true,status:'支付尚未开放，可浏览商品和查询订单'});await this.reloadProducts();if(!current())return;}
+        if(config.commerce===true&&!nativeEntry){this.setData({commerceEnabled:true,status:'支付尚未开放，可浏览商品和查询订单'});if(!['recommendations','orders'].includes(this.data.viewMode)){await this.reloadProducts();if(!current())return;}}
         this.client = makeClient(body => this.session.transport(scene,body));
         this.setData({sessionReady:!!this.session&&auth.active(this._authEpoch)});if(this.data.viewMode==='recommendations'&&typeof this.session.customer==='function')await this.loadDirectory();else if(this.data.viewMode==='orders')await this.loadOrders();if(!current())return;
         if(config.payments===true&&!nativeEntry){this.paymentFlow=createPaymentFlow(wx,(op,reference)=>this.session.payment(scene,op,reference));this.setData({paymentsEnabled:true,status:'请创建订单，或输入原订单号查询微信结果'});}

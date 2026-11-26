@@ -3,8 +3,8 @@
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
   "startup_source_manifest_sha256": "b0bf3fb9341543fb1952f532c043b5019ea25603460581b9f3ef88bacece98a2",
-  "frontend_manifest_sha256": "78471cf2426603c955d9cf868677c2b35ab0ffdbdcc21eca6e75ade2a391a2a5",
-  "frontend_archive_sha256": "184752a156afecb96bf76d806500c40d4cab4984568f1a7629c22c7a2829ca75",
+  "frontend_manifest_sha256": "161eefba2fee4a948cc67c78ea61d0e7bb2f5d8d990fac9964cf047d711e8c43",
+  "frontend_archive_sha256": "5bc5334e28c50b11a09795bcb563c7894b85f9b6fe44b037534a17178f2effce",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
-  "evidence": "5fbb61c4 frontend bytes unchanged; original installer loaded independently reviewed signer delta 2a56db38; actual HTTPS pin verified. Real authorized OCR/provider/refill not accepted."
+  "evidence": "a63e9afc checkout wait removal; 56 other files unchanged incl OCR/home; signer2a56db38/startup b0bf3fb9 HTTPS rechecked. Material timeout unresolved; no device speed acceptance."
 }
