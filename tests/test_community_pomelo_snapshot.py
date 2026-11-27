@@ -29,9 +29,9 @@ class PomeloSnapshot(unittest.TestCase):
         files = json.loads((p / 'manifest.json').read_bytes())['files']
         changed = ['pages/checkout/index.js', 'pages/checkout/index.wxml', 'pages/checkout/index.wxss']
         untouched = {k: v for k, v in files.items() if k not in changed}
-        # f0cafa5 rebind: exact 54 non-checkout entries including owner-direct submit contract bytes.
+        # c46b605 rebind: exact 54 non-checkout entries; submit wire op = installed wechat_submit_review contract.
         digest = hashlib.sha256(json.dumps(untouched, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        self.assertEqual(digest, 'da790b6bdceb89e280c3bbe7149bc45d95df424efe66083ee65a29799c4d2964')
+        self.assertEqual(digest, '6da949534cd18c9c62648207a3dc194bf74505b3e6d92a01b1334f6af8c1f065')
         self.assertEqual(len(files), 57)
 
 if __name__ == '__main__':
