@@ -1732,7 +1732,6 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         raise ValueError('LOOPBACK_HOST_REQUIRED')
     if not os.path.isfile(db_path):
         raise ValueError('CANONICAL_SQLITE_REQUIRED')
-    check_existing_bindings(db_path,mcp_dispatch_config)
     if mcp_model_worker_enabled and not mcp_enabled:
         raise ValueError('MCP_WORKER_REQUIRES_MCP')
     # Schema initialization is an explicit startup phase.  GET handlers remain
@@ -1765,6 +1764,17 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         mcp_db=mcp_connect()
         try:ensure_mcp_task_schema(mcp_db)
         finally:mcp_db.close()
+        # Existing-binding validation opens the ledger read-only, so it runs
+        # only after the explicit schema-initialization phases above have
+        # created every registry table the service itself owns
+        # (model_catalog, role_templates, service_connections,
+        # mcp_task_bindings).  A legitimately constructed FORMAL target starts
+        # without those tables; checking first made the tables-missing branch
+        # fire on every fresh --db switch before the service could initialize
+        # them.  Enabled dispatch already requires mcp_enabled above, and a
+        # disabled config returns immediately, so this placement preserves
+        # every prior gate.
+        check_existing_bindings(db_path,mcp_dispatch_config)
         # The lease is held across listener bind, recovery and the full service
         # lifetime.  It protects the ledger even on a different TCP port.
         mcp_service_lease=MCPServiceLease(os.path.realpath(db_path)+

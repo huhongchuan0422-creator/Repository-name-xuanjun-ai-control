@@ -213,4 +213,108 @@ class HostHTTPTests(unittest.TestCase):
         self.assertEqual(caught.exception.code,400)
         self.assertEqual(self.control.db.execute('SELECT count(*) FROM model_requests').fetchone()[0],0)
 
+
+class FirstBootSchemaOrderTests(unittest.TestCase):
+    """The FORMAL first boot creates registry schema before the read-only
+    existing-binding check; the row-existence gate itself stays enforced.
+    Same startup order as the live --db switch; synthetic keys only."""
+    def setUp(self):
+        from cryptography.fernet import Fernet
+        from task_center_session_auth import (FileTestIdentityProvider,
+            SessionStore,password_hash)
+        self.root=tempfile.mkdtemp()
+        self.db=os.path.join(self.root,'formal-boot.sqlite3')
+        Supervisor(self.db).close()  # legitimate target construction, task schema only
+        self.master=Fernet.generate_key()
+        identity_path=os.path.join(self.root,'identities.json')
+        with open(identity_path,'w') as stream:json.dump({'users':{'owner':{
+            'enabled':True,'password_hash':password_hash('test-password-12'),
+            'tenant_id':'tenant-mcp','principal_id':'owner-1',
+            'roles':['TASK_CENTER_ADMIN']}}},stream)
+        os.chmod(identity_path,0o600)
+        self.identity=FileTestIdentityProvider(identity_path)
+        db=self.db
+        def connect():
+            import sqlite3
+            handle=sqlite3.connect(db);handle.row_factory=sqlite3.Row;return handle
+        self.sessions=SessionStore(connect,'tenant-mcp')
+        self.config=validate_config(config())
+        self.server=None
+    def tearDown(self):
+        if self.server is not None:self.server.server_close()
+        import shutil;shutil.rmtree(self.root,ignore_errors=True)
+    def boot(self):
+        return make_server(self.db,fixture.KEY,'tenant-mcp','owner',port=0,
+            model_master_key=self.master,identity_provider=self.identity,
+            session_store=self.sessions,outbound_enabled=False,
+            external_origin='https://'+fixture.HOST,
+            base_path='/task-center-test/',mcp_enabled=True,
+            mcp_dispatch_config=self.config)
+    def names(self):
+        import sqlite3
+        db=sqlite3.connect(self.db)
+        try:return {row[0] for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        finally:db.close()
+    def register_bindings_through_original_entries(self):
+        # Same call shapes as provider_onboarding.save / the MCP fixture; no
+        # raw INSERT of forged connections and no copied live ciphertext.
+        from connection_management import ConnectionManager
+        from provider_onboarding import ensure_schema as ensure_onboarding_schema
+        supervisor=Supervisor(self.db)
+        authority=TestTenantAuthority(fixture.KEY)
+        gateway=GatewayKernel(supervisor,authority)
+        context=authority.issue('tenant-mcp','admin:fixture')
+        control=ModelControl(gateway,context,self.master)
+        ensure_onboarding_schema(supervisor.db)
+        control.upsert_provider({'provider_id':'fixture','display_name':'Fixture',
+            'adapter_type':'openai-compatible','base_url':'https://fixture.invalid',
+            'enabled':True,'price_state':'UNKNOWN','rate_limit_per_min':10,
+            'concurrency_limit':1,'timeout_seconds':1,'retry_limit':0},
+            'fixture-secret')
+        control.upsert_model({'provider_id':'fixture','model_id':'fixture-chat',
+            'capabilities':['general'],'enabled':True,'price_state':'UNKNOWN',
+            'input_unit_cost':None,'output_unit_cost':None})
+        ConnectionManager(gateway,context,self.master).upsert(
+            {'connection_id':'fixture-connection','provider_id':'fixture',
+            'purpose':'MODEL_INFERENCE','auth_type':'API_KEY',
+            'destination_origin':'https://fixture.invalid','issuer':None,
+            'authorization_endpoint':None,'token_endpoint':None,
+            'revocation_endpoint':None,'redirect_uri':None,'client_id':None,
+            'scopes':[],'supports_refresh':False},'fixture-secret')
+        control.create_role({'role_id':'developer','version':'v1',
+            'phase':'EXECUTOR','capabilities':['general'],'writer_allowed':True,
+            'enabled':True,'review_kind':None})
+        supervisor.db.commit();supervisor.close()
+    def test_fresh_target_bootstraps_schema_before_existing_binding_check(self):
+        self.assertNotIn('service_connections',self.names())
+        with self.assertRaisesRegex(ValueError,
+                'MCP_EXISTING_ROLE_MODEL_CONNECTION_REQUIRED'):self.boot()
+        present=self.names()
+        for table in ('service_connections','role_templates','model_catalog',
+                      'mcp_task_bindings'):
+            self.assertIn(table,present)
+        # The bootstrap phase creates schema only; it never seeds bindings.
+        import sqlite3
+        db=sqlite3.connect(self.db)
+        try:
+            self.assertEqual(db.execute('SELECT count(*) FROM '
+                'service_connections').fetchone()[0],0)
+            self.assertEqual(db.execute('SELECT count(*) FROM '
+                'role_templates').fetchone()[0],0)
+        finally:db.close()
+    def test_registered_bindings_start_and_missing_rows_still_block(self):
+        self.register_bindings_through_original_entries()
+        self.server=self.boot()
+        self.assertTrue(self.server.server_port)
+        # Revoke the connection again: the same entry must refuse to start,
+        # proving the ordering fix did not weaken the existing-registry gate.
+        self.server.server_close();self.server=None
+        import sqlite3
+        db=sqlite3.connect(self.db)
+        db.execute("UPDATE service_connections SET status='REVOKED'")
+        db.commit();db.close()
+        with self.assertRaisesRegex(ValueError,
+                'MCP_EXISTING_ROLE_MODEL_CONNECTION_REQUIRED'):self.boot()
+
 if __name__=='__main__':unittest.main()
