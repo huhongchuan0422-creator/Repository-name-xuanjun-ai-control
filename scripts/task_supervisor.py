@@ -592,7 +592,7 @@ class Supervisor(object):
             raise ValueError('EXACT_DEVELOPMENT_CONTRACT_REQUIRED')
         return contract
 
-    def register_development_contract(self, task_id, contract):
+    def register_development_contract(self, task_id, contract, admission_check=None):
         contract = self._development_contract_shape(contract)
         now = self.clock()
         if not finite(now):
@@ -609,6 +609,8 @@ class Supervisor(object):
                        != task['checkpoint_sha256']
                     or contract['entry'] != task['entry']):
                 raise ValueError('CANONICAL_DEVELOPMENT_CONTRACT_MISMATCH')
+            if admission_check is not None:
+                admission_check()
             prior = self.db.execute('''SELECT * FROM events
               WHERE task_id=? AND attempt_id=? AND event_id=?''',
               (task_id, UNKNOWN, 'development-contract-v1')).fetchone()

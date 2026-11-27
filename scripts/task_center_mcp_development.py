@@ -78,14 +78,22 @@ class DevelopmentHost:
         if self.contract_provider is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
         control._admin()
         control.gateway.assert_task_context(control.context,task_id)
+        contract=self.pinned_contract(task_id,control.tenant_id,
+            lambda project:control._assert_expected_project(task_id,project))
+        return control.gateway.supervisor.register_development_contract(task_id,contract)
+
+    def pinned_contract(self,task_id,tenant_id,assert_project):
+        """Shared content validation, not authentication or registration."""
+        if self.contract_provider is None:raise ValueError('HOLD_TRUSTED_DEVELOPMENT_CONTRACT_UNAVAILABLE')
         contract=self.contract_provider(task_id)
-        control.gateway.supervisor._development_contract_shape(contract)
-        rows=[b for b in self.bindings if b['tenant_id']==control.tenant_id and b['task_id']==task_id]
+        from task_supervisor import Supervisor
+        Supervisor._development_contract_shape(contract)
+        rows=[b for b in self.bindings if b['tenant_id']==tenant_id and b['task_id']==task_id]
         if not rows:raise ValueError('DEVELOPMENT_HOST_ACTION_REQUIRED')
         sha=hashlib.sha256(canonical(contract).encode()).hexdigest()
         if any(b['contract_sha256']!=sha or b['spec_sha256']!=contract['spec_sha256'] or b['checkpoint_sha256']!=contract['checkpoint_sha256'] for b in rows):
             raise ValueError('CURRENT_PINNED_DEVELOPMENT_SCOPE_REQUIRED')
-        for b in rows:control._assert_expected_project(task_id,b['project_id'])
+        for b in rows:assert_project(b['project_id'])
         executors=[b for b in rows if b['phase']=='EXECUTOR']
         reviewers=[b for b in rows if b['phase']=='REVIEWER']
         from entry_review_gate import identity
@@ -106,7 +114,7 @@ class DevelopmentHost:
                 raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
         elif profile['repository']!=contract['target_repository'] or contract['allowed_files']!=[profile['allowed_file']]:
             raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
-        return control.gateway.supervisor.register_development_contract(task_id,contract)
+        return contract
 
     def visible(self,identity):
         allowed=set()
