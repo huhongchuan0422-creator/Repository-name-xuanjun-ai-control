@@ -127,6 +127,61 @@ def main(argv=None, *, identity_backend=None,evidence=None,gateway_runtime=None,
     finally:db.close()
 
 
+def development_main(argv=None, *, issuer,provenance_source,principal_mapper,
+                     native_runner=None,native_test_plan_sha256=None,
+                     gateway_runtime=None,execution_provider=None):
+    """MCP development bootstrap, independent of HandoffHost evidence assembly.
+
+    In-process injection only; same real source/mapper and canonical sessions.
+    No issuer, SSO, cross-runtime bridge or CLI source loader is created here.
+    """
+    from task_center_provenance_consumer import GuardedProvenanceConsumer
+    GuardedProvenanceConsumer.validate_source(provenance_source,principal_mapper)
+    selectors=argparse.ArgumentParser(add_help=False)
+    selectors.add_argument('--db',required=True)
+    selectors.add_argument('--tenant',required=True)
+    selectors.add_argument('--enable-mcp',action='store_true')
+    selectors.add_argument('--mcp-development-config-file',required=True)
+    selectors.add_argument('--session-ttl-seconds',type=int,default=1800)
+    selectors.add_argument('--test-identity-file')
+    selectors.add_argument('--admin-token-file')
+    selectors.add_argument('--actor-token-file')
+    app_argv=list(sys.argv[1:] if argv is None else argv)
+    args,_=selectors.parse_known_args(app_argv)
+    if not args.enable_mcp:
+        raise ValueError('DEVELOPMENT_ENTRY_REQUIRES_MCP')
+    if args.test_identity_file or args.admin_token_file or args.actor_token_file:
+        raise ValueError('SINGLE_AUTH_MODE_REQUIRED')
+    executor=None
+    if native_runner is not None or native_test_plan_sha256 is not None:
+        from native_development_executor import NativeDevelopmentExecutor
+        executor=NativeDevelopmentExecutor(native_runner,native_test_plan_sha256)
+    from task_center_mcp_development import load_host
+    development=load_host(args.mcp_development_config_file,
+        execution_provider=execution_provider,native_executor=executor)
+    if development is None:
+        raise ValueError('EXISTING_MCP_DEVELOPMENT_HOST_REQUIRED')
+    def connect():
+        db=sqlite3.connect('file:%s?mode=rw'%quote(os.path.realpath(args.db),safe='/'),uri=True,timeout=5)
+        db.row_factory=sqlite3.Row
+        return db
+    db=connect()
+    try:
+        from task_center_handoff_backend import CanonicalHandoffBackend
+        sessions=runtime.FormalSessionStore(connect,args.tenant,args.session_ttl_seconds)
+        consumer=GuardedProvenanceConsumer(sessions,provenance_source,principal_mapper)
+        backend=CanonicalHandoffBackend(sessions,consumer,issuer,db)
+        identity=runtime.HostIdentityProvider(args.tenant,backend)
+        sessions.bind_identity(identity)
+        from task_center_app import main as app_main
+        return app_main(app_argv,gateway_runtime,identity_provider=identity,
+            session_store=sessions,mcp_development_host=development,
+            mcp_claim_host=getattr(development,'claim_host',None),
+            execution_provider=execution_provider)
+    finally:
+        db.close()
+
+
 if __name__=='__main__':
     try:raise SystemExit(main())
     except ValueError as exc:
