@@ -45,7 +45,7 @@ def sha(path):
 
 
 class HandoffFixture(unittest.TestCase):
-    def build_source(self, grant_history=False):
+    def build_source(self, grant_history=False, resources=None):
         self.source = str(self.root / 'source.sqlite')
         s = Supervisor(self.source)  # no verifier -> TEST_ONLY, like the real ledger
         g = GatewayKernel(s, TestTenantAuthority(KEY))
@@ -57,7 +57,7 @@ class HandoffFixture(unittest.TestCase):
         task.update(task_id=TASK, node_id='node-tc', stage='DEVELOPMENT',
                     owner='developer', entry='CHATGPT', checkpoint_sha256=CHECKPOINT,
                     spec_sha256=SPEC, board_id='acceptance-delivery',
-                    resources=['fake:tc-1', 'fake:tc-2'], dependencies=[],
+                    resources=list(resources or ['fake:tc-1', 'fake:tc-2']), dependencies=[],
                     completion_evidence=[{'evidence_ref': 'evid-tc'}])
         graph['tasks'] = [task]
         g.register_graph(ctx, graph)
@@ -86,6 +86,22 @@ class HandoffFixture(unittest.TestCase):
             "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
         s.close()
         self.source_tables = sorted(tables - handoff.DISALLOWED_CARRY)
+
+    def add_task_rows(self, rows):
+        """Append unrelated-task rows to the isolated synthetic source, shaped
+        from the real ledger's residual grant rows (full history columns)."""
+        db = sqlite3.connect(self.source)
+        cols = [r[1] for r in db.execute('PRAGMA table_info(tasks)')]
+        base = dict(zip(cols, db.execute('SELECT * FROM tasks').fetchone()))
+        for task_id, patch in rows:
+            row = dict(base, task_id=task_id, writer_scope='ws-' + task_id,
+                       spec_sha256='d' * 64, checkpoint_sha256='c' * 64)
+            row.update(patch)
+            db.execute('INSERT INTO tasks (%s) VALUES(%s)' % (
+                ','.join('"%s"' % c for c in cols),
+                ','.join('?' * len(cols))), tuple(row[c] for c in cols))
+        db.commit()
+        db.close()
 
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
@@ -186,10 +202,11 @@ class HandoffFixture(unittest.TestCase):
             caller_file=self.write_json('c-%s.json' % operation, caller or self.caller()),
             target=str(self.root / target), operation_id=operation)
 
-    def run_handoff(self, target='formal.sqlite', **kwargs):
+    def run_handoff(self, target='formal.sqlite', extra_rows=None, **kwargs):
+        if extra_rows:
+            self.add_task_rows(extra_rows)
         self.make_freeze()
         return self.do_handoff(target=target, **kwargs)
-
 
 class HandoffTests(HandoffFixture):
     def test_freeze_pins_consistent_snapshot_and_before_manifest(self):
@@ -390,6 +407,66 @@ class HandoffTests(HandoffFixture):
         with self.assertRaises(ValueError) as caught:
             self.run_handoff(target='neg-grant-history.sqlite')
         self.assertEqual(str(caught.exception), 'SOURCE_TASK_GRANT_HISTORY_RECONCILIATION_REQUIRED')
+
+    # Real-window residuals, un-neutralized shapes from the live ledger.
+    UNRELATED_ROWS = (
+        ('mcp-5801d831db422d9ecc3ec6da', dict(stage='DEVELOPMENT',
+            state='RUNNING', owner='developer', entry='MCP',
+            authority_state='VALID', lease_id='lease-mcp-attempt-1',
+            attempt_id='attempt-mcp-1', started_at=1793105160.57)),
+        ('tc-r5-20261123-1600', dict(stage='DEVELOPMENT', state='HOLD',
+            owner='developer', entry='MCP',
+            authority_state='REVOKED', lease_id='lease-r5-attempt-2',
+            attempt_id='attempt-r5-2', started_at=1795420564.35)))
+
+    def test_unrelated_live_or_unresolved_grant_still_blocks_carry(self):
+        # BUG-3147C scope decision: the same-task invariant is pinned to the
+        # target row plus zero promoted live grants. An unrelated task whose
+        # grant is still VALID/REVOKING/UNKNOWN must be closed through the
+        # original supervisor/fence revocation channel before the window;
+        # neutralizing or deleting its row is not a legitimate pass.
+        self.add_task_rows(self.UNRELATED_ROWS)
+        for live_state in ('VALID', 'REVOKING', 'UNKNOWN'):
+            db = sqlite3.connect(self.source)
+            db.execute('UPDATE tasks SET authority_state=? WHERE task_id=?',
+                       (live_state, 'mcp-5801d831db422d9ecc3ec6da'))
+            db.commit()
+            db.close()
+            with self.assertRaises(ValueError) as caught:
+                self.run_handoff(target='neg-live-%s.sqlite' % live_state)
+            self.assertEqual(str(caught.exception),
+                             'SOURCE_TASK_GRANT_HISTORY_RECONCILIATION_REQUIRED')
+
+    def test_unrelated_terminal_grant_history_carries_verbatim(self):
+        # Both real residual rows after the live one was legitimately closed:
+        # full grant history (lease/attempt/started) preserved byte-identical
+        # in the live carry AND in authority_handoff_provenance; the pinned
+        # task stays grant-free; no VALID grant is promoted.
+        self.add_task_rows(self.UNRELATED_ROWS)
+        db = sqlite3.connect(self.source)
+        db.execute("UPDATE tasks SET authority_state='REVOKED' WHERE task_id=?",
+                   ('mcp-5801d831db422d9ecc3ec6da',))
+        db.commit()
+        db.close()
+        receipt = self.run_handoff(target='terminal-carry.sqlite')
+        self.assertEqual(receipt['state'], 'COMMITTED')
+        target = str(self.root / 'terminal-carry.sqlite')
+        db = sqlite3.connect('file:%s?mode=ro' % target, uri=True)
+        self.assertEqual(db.execute(
+            'SELECT authority_state,lease_id,attempt_id,started_at FROM tasks '
+            'WHERE task_id=?', ('mcp-5801d831db422d9ecc3ec6da',)).fetchone(),
+            ('REVOKED', 'lease-mcp-attempt-1', 'attempt-mcp-1', 1793105160.57))
+        self.assertEqual(db.execute(
+            'SELECT authority_state,lease_id,attempt_id,started_at FROM tasks '
+            'WHERE task_id=?', ('tc-r5-20261123-1600',)).fetchone(),
+            ('REVOKED', 'lease-r5-attempt-2', 'attempt-r5-2', 1795420564.35))
+        self.assertEqual(db.execute(
+            "SELECT count(*) FROM tasks WHERE authority_state='VALID'"
+        ).fetchone()[0], 0)
+        self.assertEqual(db.execute(
+            'SELECT authority_state,lease_id,started_at FROM tasks '
+            'WHERE task_id=?', (TASK,)).fetchone(), ('NONE', 'UNKNOWN', None))
+        db.close()
 
     def test_failpoint_rollback_leaves_no_partial_authority(self):
         self.make_freeze()
@@ -613,6 +690,43 @@ class F4FormalClaimOnTargetTests(HandoffFixture):
                                native_source_provider=lambda *a: None)
         host.claim_host = claim_host
         return FirstClaimAssembly(host)
+
+    def test_repo_form_resource_registers_and_claims_RECEIVED_on_formal_target(self):
+        # BUG-3147B end-to-end regression with the real canonical form: the
+        # gateway metadata resource is the repo:<org>/<repo>:<name> reference
+        # accepted by admission; register once + same-params claim once must
+        # reach RECEIVED with the exact reference bound, no stand-in key.
+        repo_ref = ('repo:huhongchuan0422-creator/'
+                    'Repository-name-xuanjun-ai-control:development-entry')
+        for suffix in ('', '-wal', '-shm'):
+            path = self.source + suffix
+            if os.path.lexists(path):
+                os.unlink(path)
+        self.build_source(resources=[repo_ref])
+        source_sha = sha(self.source)
+        target = str(self.root / 'formal-repo.sqlite')
+        receipt = self.run_handoff(target='formal-repo.sqlite')
+        assembly = self.assembly()
+        registered = assembly.run(target, KEY, TASK, 'register')
+        self.assertFalse(registered['duplicate'])
+        self.assertFalse(registered['authority_created'])
+        claimed = assembly.run(target, KEY, TASK, 'claim')
+        self.assertEqual(claimed['state'], 'RECEIVED')
+        self.assertFalse(claimed['execution_started'])
+        db = sqlite3.connect('file:%s?mode=ro' % target, uri=True)
+        self.assertEqual(
+            [r[0] for r in db.execute(
+                'SELECT DISTINCT resource_key FROM resource_claims')],
+            [repo_ref])
+        self.assertEqual(json.loads(db.execute(
+            'SELECT resources_json FROM gateway_task_metadata WHERE task_id=?',
+            (TASK,)).fetchone()[0]), [repo_ref])
+        db.close()
+        self.assertEqual(receipt['promoted_authority'], 'NONE')
+        # same-params re-claim must not double-claim (concurrency intact)
+        with self.assertRaises(ValueError):
+            assembly.run(target, KEY, TASK, 'claim')
+        self.assertEqual(sha(self.source), source_sha)
 
     def test_same_task_registers_and_claims_RECEIVED_on_formal_target(self):
         source_sha = sha(self.source)

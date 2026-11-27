@@ -510,10 +510,28 @@ def handoff(db_path, backup, freeze_path, manifest_path, trust_key_file,
             for row in ordered_rows(snapshot, name, columns):
                 if name == 'tasks':
                     grant = dict(zip(columns, row))
-                    if (grant.get('authority_state') not in (None, 'NONE')
-                            or grant.get('lease_id') not in (None, 'UNKNOWN')
-                            or grant.get('started_at') is not None):
-                        raise ValueError('SOURCE_TASK_GRANT_HISTORY_RECONCILIATION_REQUIRED')
+                    if grant.get('task_id') == pins['task_id']:
+                        # Same-task invariant, unchanged: the pinned task being
+                        # handed over must arrive grant-free.
+                        if (grant.get('authority_state') not in (None, 'NONE')
+                                or grant.get('lease_id') not in (None, 'UNKNOWN')
+                                or grant.get('started_at') is not None):
+                            raise ValueError(
+                                'SOURCE_TASK_GRANT_HISTORY_RECONCILIATION_REQUIRED')
+                    elif grant.get('authority_state') not in (None, 'NONE',
+                                                              'REVOKED'):
+                        # BUG-3147C same-task carry scope: an unrelated task's
+                        # terminal REVOKED row is preserved history and carries
+                        # verbatim (all history stays intact here and byte-
+                        # identical in authority_handoff_provenance). A live,
+                        # in-flight or unknown grant (VALID/REVOKING/UNKNOWN or
+                        # anything outside the reconciled set) is never
+                        # promoted into the project-isolated FORMAL ledger; the
+                        # real window must first close it through the original
+                        # supervisor/fence revocation channel. No row is
+                        # deleted or rewritten to fake a pass.
+                        raise ValueError(
+                            'SOURCE_TASK_GRANT_HISTORY_RECONCILIATION_REQUIRED')
                 db.execute('INSERT INTO "%s" (%s) VALUES(%s)' % (
                     name.replace('"', '""'),
                     ','.join('"%s"' % c.replace('"', '""') for c in columns),

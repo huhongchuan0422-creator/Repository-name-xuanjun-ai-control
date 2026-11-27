@@ -168,6 +168,62 @@ class WriterFenceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 adapter.normalize(bad)
 
+    REPO_REF = ('repo:huhongchuan0422-creator/'
+                'Repository-name-xuanjun-ai-control:development-entry')
+
+    def test_repo_canonical_form_passes_identity_preserving(self):
+        # BUG-3147B: the canonical gateway reference must survive the fence
+        # unchanged (same bytes in, same bytes out; no alias stand-in).
+        adapter = SourceResourceAdapter()
+        self.assertEqual(adapter.normalize(self.REPO_REF), self.REPO_REF)
+        self.assertEqual(adapter.normalize_many([self.REPO_REF]),
+                         [self.REPO_REF])
+        self.claim(resources=[self.REPO_REF])
+        task = self.s._task('t1')
+        self.assertEqual(json.loads(task['resource_scope_json']),
+                         [self.REPO_REF])
+        self.assertIsNotNone(self.s.db.execute(
+            "SELECT 1 FROM resource_claims WHERE resource_key=?",
+            (self.REPO_REF,)).fetchone())
+
+    def test_repo_form_segment_injection_and_alias_collision_rejected(self):
+        adapter = SourceResourceAdapter()
+        for bad in (
+                'repo:huhongchuan0422-creator/Repository-name-xuanjun-ai-control',
+                'repo:org/repo:',
+                'repo:org/repo:entry:extra',
+                'repo:org/../repo:entry',
+                'repo:./repo:entry',
+                'repo:org/repo/other:entry',
+                'repo:/repo:entry',
+                'repo:org/:entry',
+                'repo:repo:entry',
+                'repo:org/repo:entry name',
+                'repo:org/repo:\x00entry',
+                'repo:org/repo:entry\n'):
+            with self.assertRaises(ValueError) as caught:
+                adapter.normalize(bad)
+            self.assertEqual(str(caught.exception),
+                             'CANONICAL_RESOURCE_KEY_REQUIRED')
+        with self.assertRaises(ValueError) as caught:
+            adapter.normalize_many([self.REPO_REF, self.REPO_REF])
+        self.assertEqual(str(caught.exception), 'RESOURCE_ALIAS_COLLISION')
+
+    def test_repo_form_recovery_inventory_binds_exact_reference(self):
+        self.claim(resources=[self.REPO_REF])
+        self.s.db.execute("DELETE FROM resource_claims WHERE task_id='t1'")
+        self.s.db.execute("""UPDATE tasks SET authority_state=?,state='HOLD',
+          resource_scope_json='[]',resource_scope_digest=? WHERE task_id='t1'""",
+          (UNKNOWN, UNKNOWN))
+        self.s.db.commit()
+        recovered = self.fence.recover_unknown(
+            't1',
+            {'role': 'SOURCE_INVENTORY_CONTROLLER', 'caller_id': 'inventory'},
+            [self.REPO_REF], 'inventory-repo-1')
+        self.assertEqual(recovered['state'], 'REVOKING')
+        self.assertEqual(json.loads(self.s._task('t1')['resource_scope_json']),
+                         [self.REPO_REF])
+
     def test_commit_api_has_no_per_call_lock_root_or_time_override(self):
         params = inspect.signature(self.fence.commit_lease).parameters
         self.assertNotIn('lock_root', params)

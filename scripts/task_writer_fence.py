@@ -62,8 +62,20 @@ class SourceResourceAdapter(object):
         if not isinstance(value, str) or ':' not in value:
             raise ValueError('CANONICAL_RESOURCE_KEY_REQUIRED')
         kind, raw = value.split(':', 1)
-        if kind not in ('fake', 'git') or not raw:
+        if kind not in ('fake', 'git', 'repo') or not raw:
             raise ValueError('CANONICAL_RESOURCE_KEY_REQUIRED')
+        if kind == 'repo':
+            # BUG-3147B: the canonical DB and gateway admission both treat
+            # repo:<org>/<repo>:<name> as the task's authoritative resource
+            # reference. Accept that exact form identity-preservingly: no
+            # alias substitution into another kind, no ledger rewrite.
+            if raw.count(':') != 1:
+                raise ValueError('CANONICAL_RESOURCE_KEY_REQUIRED')
+            path, name = raw.split(':', 1)
+            if (not _safe_segmented(path, exact_parts=2)
+                    or not _safe_atom(name)):
+                raise ValueError('CANONICAL_RESOURCE_KEY_REQUIRED')
+            return 'repo:' + path + ':' + name
         parts = raw.split('/')
         if (any(not _safe_atom(part) for part in parts)
                 or any(part in ('.', '..') for part in parts)):
