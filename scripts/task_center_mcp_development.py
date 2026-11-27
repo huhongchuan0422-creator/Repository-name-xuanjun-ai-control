@@ -229,7 +229,7 @@ def _read_host_json(path,code):
     except (OSError,ValueError,TypeError):raise ValueError(code+'_UNAVAILABLE_OR_INVALID') from None
 
 
-def load_host(path, *, execution_provider=None,native_executor=None):
+def load_host(path, *, execution_provider=None,native_executor=None,db_path=None):
     """Read-only original-host custody references; never generates/saves keys.
 
     Files are owned0600 regular single-link and bounded by secure_file_input.
@@ -239,7 +239,7 @@ def load_host(path, *, execution_provider=None,native_executor=None):
     """
     cfg=_read_host_json(path,'DEVELOPMENT_HOST_CONFIG')
     required={'schema_version','enabled','bindings','review_keyring_file','writer_context_file'}
-    if (not isinstance(cfg,dict) or not required.issubset(cfg) or set(cfg)-required-{'native_source_file','claim_registration','contract_file'}
+    if (not isinstance(cfg,dict) or not required.issubset(cfg) or set(cfg)-required-{'native_source_file','claim_registration','contract_file','native_sandbox'}
             or type(cfg['schema_version']) is not int or cfg['schema_version']!=1 or type(cfg['enabled']) is not bool):
         raise ValueError('EXACT_DEVELOPMENT_HOST_CONFIG_REQUIRED')
     for k in ('review_keyring_file','writer_context_file','native_source_file','contract_file'):
@@ -250,10 +250,23 @@ def load_host(path, *, execution_provider=None,native_executor=None):
         if (not isinstance(registration,dict) or set(registration)!={'owner_public_key_file','custody_file'}
                 or any(not isinstance(v,str) or not v.startswith('/') for v in registration.values())):
             raise ValueError('EXISTING_CLAIM_REGISTRATION_REFERENCES_REQUIRED')
+    sandbox=cfg.get('native_sandbox')
+    if sandbox is not None:
+        if (not isinstance(sandbox,dict) or set(sandbox)!={'repository_root','base_commit','test_plan_sha256'}
+                or not isinstance(sandbox['repository_root'],str) or not sandbox['repository_root'].startswith('/')
+                or not isinstance(sandbox['base_commit'],str) or re.fullmatch('[0-9a-f]{40}',sandbox['base_commit']) is None
+                or not isinstance(sandbox['test_plan_sha256'],str) or re.fullmatch('[0-9a-f]{64}',sandbox['test_plan_sha256']) is None):
+            raise ValueError('FIXED_NATIVE_SANDBOX_REFERENCES_REQUIRED')
     if not cfg['enabled']:
-        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('native_source_file') is not None or cfg.get('contract_file') is not None or registration is not None:
+        if cfg['bindings'] or cfg['review_keyring_file'] is not None or cfg['writer_context_file'] is not None or cfg.get('native_source_file') is not None or cfg.get('contract_file') is not None or registration is not None or sandbox is not None:
             raise ValueError('DISABLED_DEVELOPMENT_CONFIG_MUST_BE_EMPTY')
         return None
+    if sandbox is not None:
+        if native_executor is not None:raise ValueError('ONE_TRUSTED_NATIVE_EXECUTOR_REQUIRED')
+        from native_sandbox_runner import BubblewrapNativeRunner
+        from native_development_executor import NativeDevelopmentExecutor
+        runner=BubblewrapNativeRunner(db_path,sandbox['repository_root'],sandbox['base_commit'],sandbox['test_plan_sha256'])
+        native_executor=NativeDevelopmentExecutor(runner,runner.plan)
     def keys(task,ids):
         raw=_read_host_json(cfg['review_keyring_file'],'TRUSTED_REVIEW_KEYRING')
         if not isinstance(raw,dict) or any(k not in raw or not isinstance(raw[k],str) or not re.fullmatch('[0-9a-f]{64,256}',raw[k]) or len(raw[k])%2 for k in ids):

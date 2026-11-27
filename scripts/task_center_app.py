@@ -1957,7 +1957,7 @@ def main(argv=None, gateway_runtime=None, *, mcp_claim_host=None, mcp_developmen
         handoff_host=configured_host
     from task_center_mcp_development import load_host as load_development_host
     if mcp_development_host is None and args.mcp_development_config_file:
-        mcp_development_host=load_development_host(args.mcp_development_config_file,execution_provider=execution_provider)
+        mcp_development_host=load_development_host(args.mcp_development_config_file,execution_provider=execution_provider,db_path=args.db)
     if mcp_claim_host is None and mcp_development_host is not None:
         mcp_claim_host=getattr(mcp_development_host,'claim_host',None)
     server = make_server(args.db, key, args.tenant, args.principal,
