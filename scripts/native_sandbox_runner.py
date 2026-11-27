@@ -12,6 +12,7 @@ import re
 import signal
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import time
 from task_supervisor import Supervisor, canonical
@@ -185,12 +186,30 @@ def _blob(root,commit,path):
     return _git(root,'show',commit+':'+path)
 
 
-def plan_manifest(root,base_commit):
+def _python_runtime(python_executable=None):
+    # Host injection only; /usr is already read-only in the bwrap contract.
+    executable=os.path.realpath(sys.executable if python_executable is None else python_executable)
+    if not executable.startswith('/usr/') or not os.path.isfile(executable) or not os.access(executable,os.X_OK):
+        raise ValueError('FIXED_SYSTEM_PYTHON_REQUIRED')
+    probe=subprocess.run([executable,'-I','-B','-c',
+        'import json,sys;print(json.dumps(list(sys.version_info[:3])))'],
+        stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10,
+        env={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'})
+    try:version=json.loads(probe.stdout.decode())
+    except (ValueError,UnicodeError):raise ValueError('DECLARED_PYTHON_RUNTIME_REQUIRED') from None
+    if (probe.returncode!=0 or not isinstance(version,list) or len(version)!=3
+            or any(type(x) is not int for x in version) or tuple(version)<(3,11,0)):
+        raise ValueError('DECLARED_PYTHON_3_11_REQUIRED')
+    return {'executable':executable,'version':version,'sha256':sha(Path(executable).read_bytes())}
+
+
+def plan_manifest(root,base_commit,*,python_executable=None):
     if not isinstance(base_commit,str) or re.fullmatch('[0-9a-f]{40}',base_commit) is None:
         raise ValueError('PINNED_PLAN_BASE_REQUIRED')
     _git(root,'cat-file','-e',base_commit+'^{commit}')
     support={p:sha(_blob(root,base_commit,p)) for p in SUPPORT_FILES}
-    return {'schema':1,'plan':'TC_NATIVE_INTAKE_READONLY_V2','repository':REPOSITORY,'base_commit':base_commit,
+    return {'schema':1,'plan':'TC_NATIVE_INTAKE_READONLY_V3','repository':REPOSITORY,'base_commit':base_commit,
+        'python_runtime':_python_runtime(python_executable),
         'candidate_files':list(CANDIDATE_FILES),'support':support,'cases':list(CASES),'behavior_vectors_sha256':digest(challenges()),'harness_sha256':sha(HARNESS.encode()),
         'timeout_seconds':TIMEOUT,'memory_bytes':268435456,'output_bytes':65536,
         'filesystem':'READ_ONLY','network':'NONE','subprocesses':'DENIED'}
@@ -205,7 +224,7 @@ def process_identity(pid):
 
 
 class BubblewrapNativeRunner:
-    def __init__(self,db_path,repository_root,base_commit,test_plan_sha256):
+    def __init__(self,db_path,repository_root,base_commit,test_plan_sha256,*,python_executable=None):
         if not isinstance(repository_root,str) or os.path.realpath(repository_root)!=repository_root:
             raise ValueError('CANONICAL_PLAN_REPOSITORY_REQUIRED')
         origin=_git(repository_root,'remote','get-url','origin').decode().strip()
@@ -214,10 +233,9 @@ class BubblewrapNativeRunner:
         if not isinstance(db_path,str) or os.path.realpath(db_path)!=db_path or not os.path.isfile(db_path):
             raise ValueError('EXISTING_CANONICAL_RUNNER_LEDGER_REQUIRED')
         self.root=repository_root;self.base=base_commit;self.db_path=db_path
-        self.manifest=plan_manifest(repository_root,base_commit);self.plan=digest(self.manifest)
+        self.manifest=plan_manifest(repository_root,base_commit,python_executable=python_executable);self.plan=digest(self.manifest)
         if self.plan!=test_plan_sha256:raise ValueError('PINNED_FIXED_PLAN_DIGEST_REQUIRED')
-        self.python=os.path.realpath('/usr/bin/python3.6')
-        if not self.python.startswith('/usr/'):raise ValueError('FIXED_SYSTEM_PYTHON_REQUIRED')
+        self.python=self.manifest['python_runtime']['executable']
     def _db(self):
         db=sqlite3.connect('file:'+self.db_path+'?mode=rw',uri=True,timeout=5)
         db.row_factory=sqlite3.Row
@@ -306,6 +324,8 @@ class BubblewrapNativeRunner:
             raw=_blob(self.root,self.base,p)
             if len(raw)>1048576 or sha(raw)!=expected:raise ValueError('PINNED_SUPPORT_BYTES_REQUIRED')
             material[p]=raw
+        if sha(Path(self.python).read_bytes())!=self.manifest['python_runtime']['sha256']:
+            raise ValueError('PINNED_PYTHON_RUNTIME_CHANGED')
         # Commit send intent BEFORE spawning. Its existence forbids a second run.
         with self._db() as db:
             db.execute('BEGIN IMMEDIATE');self._request(db,cid,current=True)
