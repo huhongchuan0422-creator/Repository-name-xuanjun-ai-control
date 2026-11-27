@@ -151,7 +151,7 @@ function createDraftTestDriver({page,wx,config,now}) {
       let entry=null;
       try{
         const operation=body&&body.operation,params=body&&body.params;
-        if(category==='onboarding'&&['wechat_apply','wechat_status','wechat_read','read'].includes(operation)){
+        if(category==='onboarding'&&['wechat_apply','wechat_submit_review','wechat_status','wechat_read','read'].includes(operation)){
           if(!origin||origin.operation!==operation||requestScene!==(scene||'')||generation!==session.getGeneration()||!pageCurrent()||page.session!==session||!params||params.application!==application)contaminated=true;
           entry={operation,response_observed:false};observed.push(entry);
         }
@@ -181,14 +181,15 @@ function createDraftTestDriver({page,wx,config,now}) {
     }
     active();
     if(contaminated||generation!==session.getGeneration()||scene!==page.scene||page.data.pending)return receipt(action,'NOT_VERIFIED','UNATTRIBUTED_APPLICATION_OBSERVATION');
-    const operations=observed.filter(v=>['wechat_apply','wechat_status'].includes(v.operation)),last=observed[observed.length-1];
+    const observedSubmit=op=>['wechat_apply','wechat_submit_review'].includes(op);
+    const operations=observed.filter(v=>observedSubmit(v.operation)||v.operation==='wechat_status'),last=observed[observed.length-1];
     // These are observed original responses, not proof of real identity,
     // provider acceptance or financial activation. Never replay a lost response.
     const outcome=observed.some(v=>v.failed||v.response_observed&&!v.response_valid)?'NOT_VERIFIED':operations.some(v=>v.response_valid)?'PROVIDER_RESPONSE_OBSERVED':last&&last.response_valid?'ORIGINAL_READ_OBSERVED':'NOT_VERIFIED';
     return receipt(action,outcome,outcome==='NOT_VERIFIED'?'APPLICATION_RESULT_NOT_VERIFIED':null,{
       operations:observed,progress:[...observed].reverse().find(v=>v.progress)?.progress||null,
       provider_response_observed:operations.some(v=>v.response_valid),
-      original_submit_calls:operations.filter(v=>v.operation==='wechat_apply').length,
+      original_submit_calls:operations.filter(v=>observedSubmit(v.operation)).length,
       original_query_calls:operations.filter(v=>v.operation==='wechat_status').length,
       real_provider_acceptance:'NOT_ESTABLISHED_BY_THIS_REPORT'
     });

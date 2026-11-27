@@ -15,7 +15,7 @@ try:
  original_validate=MiniMerchant._validate_contact_for_submit
  injected=[False]
  def validate(mini,uid,body):
-  if body['operation']=='wechat_apply' and not injected[0] and case in ('platform-phone','stale-platform','legacy'):
+  if body['operation'] in ('wechat_apply','wechat_submit_review') and not injected[0] and case in ('platform-phone','stale-platform','legacy'):
    injected[0]=True
    current=fx.call('read')
    fx.fx.draft(current,fields={**current['fields'],'contact':'INVALID SYNTHETIC' if case in ('platform-phone','legacy') else '13800000000','store_name':'Synthetic concurrent edit'},sales_scenes_type=['SALES_SCENES_MINI_PROGRAM'])
@@ -31,6 +31,11 @@ try:
  state=fx.call('read');record=fx.read();posts=sum(c.args[1]=='POST' for c in fx.provider.call_args_list)
  if case in ('gate','platform-phone','stale-platform'):
   assert state['status']=='DRAFT';assert record['state']=='DRAFT';assert len(fx.attempts())==0;assert posts==0
+ elif case=='legacy':
+  # 两参（无冻结application_revision）旧形不会成为owner-direct正式提交；
+  # 现装route对此直接400 INVALID_MINI_SUBMIT_FIELDS，本carrier至多落入本站预审队列：
+  # 两侧共同不变量=零provider POST、零ATTEMPT、平台草稿未提交。
+  assert state['status']=='DRAFT';assert record['state']in ('DRAFT','PENDING_INTERNAL_REVIEW');assert len(fx.attempts())==0;assert posts==0
  elif case=='original-gap':
   assert state['status']=='SUBMITTED';assert record['state']=='DRAFT';assert len(fx.attempts())==0;assert posts==0
  else:

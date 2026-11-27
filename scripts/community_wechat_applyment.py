@@ -621,17 +621,22 @@ class WechatApplyment:
             'wechat_apply':{'application','expected_version'},'wechat_status':{'application'},'wechat_submit_review':{'application','expected_version'},'wechat_review':{'application','expected_version','decision','opinion'},
             'wechat_media':{'application','kind'},'wechat_cashier_link':{'application','expected_version','media_id'},'wechat_execute':{'application','expected_version'},'wechat_query':{'application'},'wechat_sign_qr':{'application'}}
         allowed=fields.get(op) if type(op) is str else None
-        if allowed is None or set(p)!=allowed and not (op=='wechat_apply' and set(p)==allowed|{'application_revision'}) and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}) and not (op=='wechat_save' and allowed<=set(p)<=allowed|{'ocr_drafts','application_revision','mini_program_live'} and ('ocr_drafts' in p)==('application_revision' in p)):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
-        applicant_action=op in ('wechat_apply','wechat_status')
+        # Mirrors the installed 1e5c/176d lineage: the three-parameter
+        # wechat_submit_review (application+expected_version+application_revision)
+        # is the mini owner-direct submit form; the two-parameter form remains
+        # the historical web reviewer pre-review queue entry.
+        owner_direct_form=allowed is not None and op in ('wechat_apply','wechat_submit_review') and set(p)==allowed|{'application_revision'}
+        if allowed is None or set(p)!=allowed and not owner_direct_form and not (op=='wechat_review' and set(p)==allowed|{'industry_branch_assessments'}) and not (op=='wechat_save' and allowed<=set(p)<=allowed|{'ocr_drafts','application_revision','mini_program_live'} and ('ocr_drafts' in p)==('application_revision' in p)):raise ValueError('INVALID_WECHAT_APPLYMENT_FIELDS')
+        applicant_action=op in ('wechat_apply','wechat_status') or owner_direct_form
         reviewer=op in ('wechat_review_read','wechat_review','wechat_execute','wechat_query','wechat_sign_qr')
         owner,meta,platform=self.onboarding._load(p['application'],uid,reviewer)
         application=p['application']
-        if op=='wechat_apply' and 'application_revision' in p:
+        if op in ('wechat_apply','wechat_submit_review') and 'application_revision' in p:
             if type(p['application_revision']) is not int or p['application_revision']!=platform['revision']:
                 raise ValueError('MINI_SUBMIT_VERSION_CONFLICT')
         if applicant_action:
             if uid!=owner:raise PermissionError('ORIGINAL_APPLICANT_REQUIRED')
-            op='wechat_execute' if op=='wechat_apply' else 'wechat_query'
+            op='wechat_execute' if op in ('wechat_apply','wechat_submit_review') else 'wechat_query'
         if platform['status']=='WITHDRAWN' and op not in ('wechat_read','wechat_review_read','wechat_query'):
             raise PermissionError('WITHDRAWN_APPLICATION_READ_ONLY')
         with c.tx():c.limit('wechat-applyment:'+uid,20,60)
