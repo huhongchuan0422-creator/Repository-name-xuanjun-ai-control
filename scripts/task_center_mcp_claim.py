@@ -86,17 +86,19 @@ class ClaimHost:
                 expected = {'owner_grant', 'developer_credential', 'caller', 'lock_root', 'valid_until'}
                 if not isinstance(custody, dict) or set(custody) != expected:
                     raise ValueError('EXISTING_REGISTRATION_CUSTODY_REQUIRED')
+                resources = g.canonical_resources(task_id)
+                def admission():
+                    check()
+                    verified = self.verifier.verify(custody['owner_grant'], custody['developer_credential'], task_id, b['contract_sha256'])
+                    if verified['owner'] != {'issuer': 'owner-auth', 'subject': s._task(task_id)['owner']}:
+                        raise ValueError('CANONICAL_OWNER_CLAIM_REQUIRED')
+                    policy.require_dispatch_ready(task_id)
+                    g.assert_start_allowed(context, task_id, resources)
+                    if service.write_admission is not None:
+                        service.write_admission()
+                admission()
                 fence = Fence(s, custody['lock_root'])
                 try:
-                    resources = g.canonical_resources(task_id)
-                    def admission():
-                        check()
-                        verified = self.verifier.verify(custody['owner_grant'], custody['developer_credential'], task_id, b['contract_sha256'])
-                        if verified['owner'] != {'issuer': 'owner-auth', 'subject': s._task(task_id)['owner']}:
-                            raise ValueError('CANONICAL_OWNER_CLAIM_REQUIRED')
-                        policy.require_dispatch_ready(task_id)
-                        g.assert_start_allowed(context, task_id, resources)
-                    admission()
                     fence.claim_first_development_writer(task_id, contract['entry'], custody['caller'], resources,
                         custody['valid_until'], custody['owner_grant'], custody['developer_credential'], admission_check=admission)
                 finally:

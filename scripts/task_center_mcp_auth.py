@@ -10,6 +10,7 @@ import base64
 import hashlib
 import json
 import secrets
+import threading
 import time
 from urllib.parse import urlencode,urlsplit
 
@@ -23,9 +24,15 @@ def _b64sha(value):
 
 
 class MCPAuthorizationStore(object):
-    def __init__(self,connection_factory,tenant_id,issuer,resource,clock=time.time):
+    def __init__(self,connection_factory,tenant_id,issuer,resource,clock=time.time,*,current_formal_session=None):
         self.connect=connection_factory;self.tenant_id=tenant_id
         self.issuer=issuer.rstrip('/');self.resource=resource;self.clock=clock
+        if current_formal_session is not None and not callable(current_formal_session):
+            raise ValueError('CURRENT_FORMAL_SESSION_CHECK_REQUIRED')
+        self._formal_check=current_formal_session
+        self._formal_bindings={}
+        self._formal_lock=threading.Lock()
+        self._next_prune=0
         db=self.connect()
         try:
             db.execute('''CREATE TABLE IF NOT EXISTS mcp_oauth_clients(
@@ -73,6 +80,36 @@ class MCPAuthorizationStore(object):
                   WHERE revoked_at IS NULL''',(self.clock(),))
             db.commit()
         finally:db.close()
+
+    def _credential_hash(self,value):
+        # Keep persisted digests disjoint from legacy even after a rollback.
+        return ('formal:' if self._formal_check is not None else '')+_hash(value)
+
+    def _assert_formal(self,session):
+        if (self._formal_check is not None and (session is None
+                or session.get('tenant_id')!=self.tenant_id or self._formal_check(session) is not True)):
+            raise ValueError('OAUTH_CURRENT_FORMAL_SESSION_REQUIRED')
+
+    def _bound_session(self,digest,principal_id):
+        if self._formal_check is None:return None
+        with self._formal_lock:
+            session=self._formal_bindings.get(digest)
+        if session is not None and session['principal_id']!=principal_id:
+            raise ValueError('OAUTH_CURRENT_FORMAL_SESSION_REQUIRED')
+        self._assert_formal(session)
+        return session
+
+    def _bind_credentials(self,session,*digests):
+        if self._formal_check is None:return
+        snapshot={key:session[key] for key in ('tenant_id','principal_id','session_hash','expires_at')}
+        snapshot['roles']=list(session['roles'])
+        now=self.clock()
+        with self._formal_lock:
+            if now>=self._next_prune:
+                self._formal_bindings={k:v for k,v in self._formal_bindings.items() if v['expires_at']>now}
+                self._next_prune=now+60
+            for digest in digests:
+                self._formal_bindings[digest]=snapshot
 
     @staticmethod
     def _redirect(uri):
@@ -133,6 +170,7 @@ class MCPAuthorizationStore(object):
         requested=set((params.get('scope') or 'task:read task:submit').split())
         if not requested or not requested.issubset(SCOPES):
             raise ValueError('OAUTH_SCOPE_REJECTED')
+        self._assert_formal(session)
         db=self.connect()
         try:
             row=db.execute('''SELECT redirect_uris_json FROM mcp_oauth_clients
@@ -141,12 +179,16 @@ class MCPAuthorizationStore(object):
             if row is None or params['redirect_uri'] not in json.loads(row[0]):
                 raise ValueError('OAUTH_CLIENT_OR_REDIRECT_REJECTED')
             code=secrets.token_urlsafe(32);now=self.clock()
+            digest=self._credential_hash(code)
             db.execute('INSERT INTO mcp_oauth_codes VALUES (?,?,?,?,?,?,?,?,?,?,NULL)',(
-              self.tenant_id,_hash(code),params['client_id'],params['redirect_uri'],
+              self.tenant_id,digest,params['client_id'],params['redirect_uri'],
               params['code_challenge'],self.resource,
               json.dumps(sorted(requested),separators=(',',':')),
-              session['principal_id'],'project-mcp',now+300));db.commit()
+              session['principal_id'],'project-mcp',now+300))
+            self._assert_formal(session)
+            db.commit()
         finally:db.close()
+        self._bind_credentials(session,digest)
         query=urlencode({'code':code,'state':params['state'],'iss':self.issuer})
         return params['redirect_uri']+('?' if '?' not in params['redirect_uri'] else '&')+query
 
@@ -158,10 +200,11 @@ class MCPAuthorizationStore(object):
         if any(not params.get(x) for x in required):raise ValueError('OAUTH_TOKEN_PARAMETERS_REQUIRED')
         if params['resource']!=self.resource:raise ValueError('OAUTH_RESOURCE_MISMATCH')
         now=self.clock();db=self.connect()
+        digest=self._credential_hash(params['code'])
         try:
             db.execute('BEGIN IMMEDIATE')
             row=db.execute('''SELECT * FROM mcp_oauth_codes WHERE tenant_id=?
-              AND code_hash=?''',(self.tenant_id,_hash(params['code']))).fetchone()
+              AND code_hash=?''',(self.tenant_id,digest)).fetchone()
             if (row is None or row['expires_at']<=now or
                     row['client_id']!=params['client_id'] or
                     row['redirect_uri']!=params['redirect_uri'] or
@@ -170,13 +213,15 @@ class MCPAuthorizationStore(object):
                 raise ValueError('OAUTH_CODE_OR_PKCE_REJECTED')
             if row['used_at'] is not None:
                 raise ValueError('OAUTH_CODE_REPLAY_REJECTED')
+            session=self._bound_session(digest,row['principal_id'])
             changed=db.execute('''UPDATE mcp_oauth_codes SET used_at=? WHERE
               tenant_id=? AND code_hash=? AND used_at IS NULL''',(now,
-              self.tenant_id,_hash(params['code']))).rowcount
+              self.tenant_id,digest)).rowcount
             if changed!=1:raise ValueError('OAUTH_CODE_REPLAY_REJECTED')
             token=secrets.token_urlsafe(40);expires=now+3600
+            digests=[self._credential_hash(token)]
             db.execute('INSERT INTO mcp_oauth_tokens VALUES (?,?,?,?,?,?,?,?,?,NULL)',(
-              self.tenant_id,_hash(token),row['client_id'],row['principal_id'],
+              self.tenant_id,digests[0],row['client_id'],row['principal_id'],
               row['project_id'],self.resource,row['scope_json'],now,expires))
             grants={item[0] for item in db.execute('''SELECT grant_type FROM
               mcp_oauth_client_grants WHERE tenant_id=? AND client_id=?''',(
@@ -184,16 +229,19 @@ class MCPAuthorizationStore(object):
             refresh=(secrets.token_urlsafe(48) if 'refresh_token' in grants else None)
             if refresh is not None:
                 family=secrets.token_urlsafe(24)
+                digests.append(self._credential_hash(refresh))
                 db.execute('''INSERT INTO mcp_oauth_refresh_tokens(
                   tenant_id,token_hash,client_id,principal_id,project_id,
                   resource,scope_json,created_at,expires_at,used_at,family_id,
                   revoked_at) VALUES (?,?,?,?,?,?,?,?,?,NULL,?,NULL)''',(
-                  self.tenant_id,_hash(refresh),
+                  self.tenant_id,digests[-1],
                   row['client_id'],row['principal_id'],row['project_id'],
                   self.resource,row['scope_json'],now,now+2592000,family))
+            self._assert_formal(session)
             db.commit()
         except Exception:db.rollback();raise
         finally:db.close()
+        self._bind_credentials(session,*digests)
         result={'access_token':token,'token_type':'Bearer','expires_in':3600,
           'scope':' '.join(json.loads(row['scope_json']))}
         if refresh is not None:result['refresh_token']=refresh
@@ -205,15 +253,17 @@ class MCPAuthorizationStore(object):
             raise ValueError('OAUTH_TOKEN_PARAMETERS_REQUIRED')
         if params['resource']!=self.resource:raise ValueError('OAUTH_RESOURCE_MISMATCH')
         now=self.clock();db=self.connect();replay=False;result=None
+        digest=self._credential_hash(params['refresh_token'])
         try:
             db.execute('BEGIN IMMEDIATE')
             row=db.execute('''SELECT * FROM mcp_oauth_refresh_tokens WHERE
               tenant_id=? AND token_hash=?''',(self.tenant_id,
-              _hash(params['refresh_token']))).fetchone()
+              digest)).fetchone()
             if (row is None or row['expires_at']<=now or
                     row['client_id']!=params['client_id'] or
                     row['resource']!=self.resource):
                 raise ValueError('OAUTH_REFRESH_REJECTED')
+            session=self._bound_session(digest,row['principal_id'])
             if row['used_at'] is not None:
                 # Commit family revocation before surfacing the replay error.
                 # Raising inside this transaction would roll the protection back.
@@ -227,11 +277,13 @@ class MCPAuthorizationStore(object):
                 changed=db.execute('''UPDATE mcp_oauth_refresh_tokens SET used_at=?
                   WHERE tenant_id=? AND token_hash=? AND used_at IS NULL AND
                   revoked_at IS NULL''',(now,self.tenant_id,
-                  _hash(params['refresh_token']))).rowcount
+                  digest)).rowcount
                 if changed!=1:raise ValueError('OAUTH_REFRESH_REPLAY_REJECTED')
                 access=secrets.token_urlsafe(40);refresh=secrets.token_urlsafe(48)
+                access_digest=self._credential_hash(access)
+                refresh_digest=self._credential_hash(refresh)
                 db.execute('''INSERT INTO mcp_oauth_tokens VALUES
-                  (?,?,?,?,?,?,?,?,?,NULL)''',(self.tenant_id,_hash(access),
+                  (?,?,?,?,?,?,?,?,?,NULL)''',(self.tenant_id,access_digest,
                   row['client_id'],row['principal_id'],row['project_id'],
                   self.resource,row['scope_json'],now,now+3600))
                 db.execute('''INSERT INTO mcp_oauth_refresh_tokens(
@@ -239,9 +291,10 @@ class MCPAuthorizationStore(object):
                   resource,scope_json,created_at,expires_at,used_at,family_id,
                   revoked_at) VALUES (?,?,?,?,?,?,?,?,?,NULL,?,NULL)''',(
                   self.tenant_id,
-                  _hash(refresh),row['client_id'],row['principal_id'],
+                  refresh_digest,row['client_id'],row['principal_id'],
                   row['project_id'],self.resource,row['scope_json'],now,
                   now+2592000,row['family_id']))
+                self._assert_formal(session)
                 db.commit()
                 result={'access_token':access,'refresh_token':refresh,
                   'token_type':'Bearer','expires_in':3600,
@@ -249,6 +302,7 @@ class MCPAuthorizationStore(object):
         except Exception:db.rollback();raise
         finally:db.close()
         if replay:raise ValueError('OAUTH_REFRESH_REPLAY_REJECTED')
+        self._bind_credentials(session,access_digest,refresh_digest)
         return result
 
     def authenticate(self,authorization,required_scope):
@@ -256,17 +310,29 @@ class MCPAuthorizationStore(object):
             return None
         token=authorization[7:].strip();now=self.clock();db=self.connect()
         try:
+            digest=self._credential_hash(token)
             row=db.execute('''SELECT * FROM mcp_oauth_tokens WHERE tenant_id=?
-              AND token_hash=?''',(self.tenant_id,_hash(token))).fetchone()
+              AND token_hash=?''',(self.tenant_id,digest)).fetchone()
             if (row is None or row['revoked_at'] is not None or
                     row['expires_at']<=now or row['resource']!=self.resource):
                 return None
             scopes=set(json.loads(row['scope_json']))
             if required_scope not in scopes:return None
+            try:session=self._bound_session(digest,row['principal_id'])
+            except ValueError:return None
+            expires=row['expires_at'] if session is None else min(row['expires_at'],session['expires_at'])
             return {'tenant_id':self.tenant_id,'principal_id':row['principal_id'],
               'project_id':row['project_id'],'scopes':sorted(scopes),
-              'expires_at':row['expires_at']}
+              'expires_at':expires}
         finally:db.close()
+
+    def bind_write_admission(self,authorization,identity):
+        if self._formal_check is None:return None
+        expected=dict(identity,scopes=list(identity['scopes']))
+        def require_current():
+            if self.authenticate(authorization,'task:submit')!=expected:
+                raise ValueError('OAUTH_CURRENT_FORMAL_SESSION_REQUIRED')
+        return require_current
 
     def protected_resource_metadata(self):
         return {'resource':self.resource,'authorization_servers':[self.issuer],

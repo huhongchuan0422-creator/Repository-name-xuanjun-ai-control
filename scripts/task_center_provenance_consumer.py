@@ -6,6 +6,7 @@ loses formal status (never reconstruct it from a row or a string reference).
 No registered production source or atomic cross-runtime bridge ships here.
 """
 import copy
+import json
 import math
 import time
 from task_center_handoff_host import FormalHandoffIdentityProvider, ID
@@ -17,11 +18,16 @@ class GuardedProvenanceConsumer(FormalHandoffIdentityProvider):
     FIELDS = {'source_ref','source_version','subject','incarnation',
               'tenant_id','principal_id','expires_at'}
 
+    @classmethod
+    def validate_source(cls, source, mapper):
+        if not callable(mapper) or any(not callable(getattr(source, name, None)) for name in
+                                      ('verify_login','current_provenance','assert_effect_current')):
+            raise ValueError(cls.ERROR)
+
     def __init__(self, sessions, source, mapper, clock=time.time):
-        if (not isinstance(sessions, SessionStore) or not callable(mapper)
-                or any(not callable(getattr(source, name, None)) for name in
-                       ('verify_login','current_provenance','assert_effect_current'))):
+        if not isinstance(sessions, SessionStore):
             raise ValueError(self.ERROR)
+        self.validate_source(source, mapper)
         self.sessions=sessions; self.source=source; self.mapper=mapper
         self.clock=clock; self._bindings={}
 
@@ -51,11 +57,13 @@ class GuardedProvenanceConsumer(FormalHandoffIdentityProvider):
         # Bare verify cannot safely carry a live capability across login/create.
         return None
 
-    def _current(self, binding, session):
+    def _current(self, binding, session, expected_roles):
         binding=self._binding(binding)
         current=self._binding(self.source.current_provenance(
             copy.deepcopy(binding),copy.deepcopy(session)))
-        if current!=binding or self._identity(current)['principal_id']!=session['principal_id']:
+        identity=self._identity(current)
+        if (current!=binding or identity['principal_id']!=session['principal_id']
+                or set(identity['roles'])!=set(expected_roles)):
             raise ValueError(self.ERROR)
         return current
 
@@ -71,7 +79,7 @@ class GuardedProvenanceConsumer(FormalHandoffIdentityProvider):
             binding=self._binding(self.source.verify_login(username,password))
             identity=self._identity(binding)
             def admission(session):
-                self._current(binding,session)
+                self._current(binding,session,identity['roles'])
                 # Must raise on invalidation. No await or source calls may be
                 # inserted between this synchronous guard and DB commit.
                 self._guard()
@@ -88,7 +96,7 @@ class GuardedProvenanceConsumer(FormalHandoffIdentityProvider):
             # Re-read the canonical row: caller snapshots never undo logout.
             db=self.sessions.connection_factory()
             try:
-                row=db.execute('''SELECT principal_id,expires_at,revoked_at
+                row=db.execute('''SELECT principal_id,roles_json,expires_at,revoked_at
                   FROM task_center_sessions WHERE tenant_id=? AND session_hash=?''',
                   (self.sessions.tenant_id,key)).fetchone()
                 if (row is None or row['revoked_at'] is not None
@@ -98,7 +106,9 @@ class GuardedProvenanceConsumer(FormalHandoffIdentityProvider):
                         or session['expires_at']<=self.clock()
                         or session['expires_at']>row['expires_at']):return False
             finally:db.close()
-            self._current(binding,session)
+            roles=json.loads(row['roles_json'])
+            if set(session['roles'])!=set(roles):return False
+            self._current(binding,session,roles)
             self._guard()
             return True
         except Exception:return False

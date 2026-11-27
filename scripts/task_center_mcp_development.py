@@ -125,6 +125,7 @@ class DevelopmentHost:
         s,g,_,_=service._open()
         try:
             c=ModelControl(g,g.tenants.issue(service.tenant_id,identity['principal_id']),service.master_key)
+            plan=self.native_executor.plan if self.native_executor is not None else None
             def check(audit=False):
                 g.assert_task_context(c.context,a['task_id']);c._assert_expected_project(a['task_id'],b['project_id'])
                 task=s._task(a['task_id']);contract=s.development_contract(a['task_id'])
@@ -132,7 +133,7 @@ class DevelopmentHost:
                     or hashlib.sha256(canonical(contract).encode()).hexdigest()!=b['contract_sha256']):raise ValueError('CURRENT_PINNED_DEVELOPMENT_SCOPE_REQUIRED')
                 row=s.db.execute('''SELECT r.phase,r.review_kind,r.enabled,a.principal_id,a.role_version,r.writer_allowed FROM model_assignments a JOIN role_templates r
                     ON r.tenant_id=a.tenant_id AND r.role_id=a.role_id AND r.version=a.role_version
-                    WHERE a.tenant_id=? AND a.task_id=? AND a.attempt_id=? AND a.role_id=?''',
+                    WHERE a.tenant_id=? AND a.task_id=? AND a.attempt_id=? AND a.role_id=? AND a.state='ASSIGNED' ''',
                     (service.tenant_id,a['task_id'],a['attempt_id'],b['role_id'])).fetchone()
                 if row is None or tuple(row)!=(b['phase'],b['review_kind'],1,b['principal_id'],b['role_version'],1 if b['phase']=='EXECUTOR' else 0):raise ValueError('CURRENT_DEVELOPMENT_ROLE_REQUIRED')
                 who=b['authority_identity'];reviewers=[{k:r[k] for k in ('issuer','subject')} for r in contract['trusted_reviewers']]
@@ -141,6 +142,8 @@ class DevelopmentHost:
                     (b['phase']=='ACCEPTOR' and (who==contract['developer'] or who in reviewers))):raise ValueError('CANONICAL_DEVELOPMENT_IDENTITY_REQUIRED')
                 if audit and s.db.in_transaction:c._audit(b['principal_id'],'AUTHENTICATED_MCP_DEVELOPMENT',a['task_id'],
                     {'source_kind':'AUTHENTICATED_MCP','action':name,'attempt_id':a['attempt_id']},s.clock())
+                if name!='task_development_status' and service.write_admission is not None:
+                    service.write_admission()
                 return task,contract
             task,contract=check()
             if name=='task_development_apply' and b['executor_profile'] is None:
@@ -184,13 +187,13 @@ class DevelopmentHost:
                 finally:fence.close()
             elif name=='task_development_review':
                 candidate=s.development_candidate(a['task_id'],a['candidate_event_id'])
-                s._require_development_execution_ready(candidate)
+                s._require_development_execution_ready(candidate,plan)
                 if self.review_keys_provider is None:raise ValueError('HOLD_TRUSTED_REVIEW_KEYS_UNAVAILABLE')
                 keys=self.review_keys_provider(a['task_id'],tuple(x['key_id'] for x in contract['trusted_reviewers']))
                 files=_controlled_candidate_files(s,{'task_id':a['task_id'],'target_repository':contract['target_repository'],'code_commit':candidate['code_commit']},b['candidate_root'])
-                result=complete_reviewed_candidate(s,a['task_id'],a['candidate_event_id'],files,a['reviews'],keys,a['reviewed_event_id'],admission_check=lambda:check(True))
+                result=complete_reviewed_candidate(s,a['task_id'],a['candidate_event_id'],files,a['reviews'],keys,a['reviewed_event_id'],admission_check=lambda:check(True),native_test_plan_sha256=plan)
             elif name=='task_development_finalize':
-                result=finalize_reviewed_candidate(s,a['task_id'],a['reviewed_event_id'],a['completion_event_id'],admission_check=lambda:check(True))
+                result=finalize_reviewed_candidate(s,a['task_id'],a['reviewed_event_id'],a['completion_event_id'],admission_check=lambda:check(True),native_test_plan_sha256=plan)
             else:
                 candidates=list(s.db.execute("SELECT payload_json FROM events WHERE task_id=? AND attempt_id=? AND kind='DEVELOPMENT_CANDIDATE'",(a['task_id'],a['attempt_id'])))
                 local=any(json.loads(x[0]).get('source_kind')=='LOCAL_ONLY_CONFIRMED_OPERATION' for x in candidates)

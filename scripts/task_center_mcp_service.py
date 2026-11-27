@@ -146,7 +146,7 @@ class MCPTaskService(object):
     """Authenticated, project-scoped adapter for the minimal MCP journey."""
     def __init__(self, db_path, authority_key, tenant_id, master_key,
                  principal_id, project_id, clock=None,phase_hook=None,
-                 execution_enabled=True,gateway_runtime=None):
+                 execution_enabled=True,gateway_runtime=None,*,write_admission=None):
         self.db_path=db_path;self.authority_key=authority_key
         self.tenant_id=tenant_id;self.master_key=master_key
         self.principal_id=principal_id;self.project_id=project_id
@@ -155,6 +155,7 @@ class MCPTaskService(object):
         self.execution_enabled=bool(execution_enabled)
         self.intake_guard=None
         self.gateway_runtime=gateway_runtime
+        self.write_admission=write_admission
 
     def _open(self):
         supervisor=Supervisor(self.db_path)

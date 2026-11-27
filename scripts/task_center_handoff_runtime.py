@@ -26,12 +26,16 @@ class HostIdentityProvider(FormalHandoffIdentityProvider):
     Nothing here converts a development owner grant into handoff authority.
     """
     def __init__(self,tenant_id,backend,clock=time.time):
+        self.validate_backend(tenant_id,backend)
+        self.tenant_id=tenant_id;self.backend=backend;self.clock=clock
+
+    @staticmethod
+    def validate_backend(tenant_id,backend):
         if not isinstance(tenant_id,str) or not ID.fullmatch(tenant_id):
             raise ValueError('FORMAL_HOST_TENANT_REQUIRED')
         if backend is None or any(not callable(getattr(backend,k,None))
                 for k in ('verify','current_session','authorize')):
             raise ValueError('FORMAL_IDENTITY_BACKEND_UNAVAILABLE')
-        self.tenant_id=tenant_id;self.backend=backend;self.clock=clock
 
     @property
     def guarded_login(self):
@@ -129,19 +133,78 @@ class HostActionAdapter(HostAuthAdapter):
         return self._evidence('assess_candidate_bundle',(binding,))
 
 
+class FormalSessionStore(SessionStore):
+    """Keep the canonical session store, with a live provenance check on read."""
+    _digest_prefix='formal:'
+    _formal_identity=None
+
+    @classmethod
+    def _hash(cls,value):
+        # A legacy process only queries unprefixed SHA-256 session digests.
+        return cls._digest_prefix+super()._hash(value)
+
+    def bind_identity(self,identity):
+        if (self._formal_identity is not None or type(identity) is not HostIdentityProvider
+                or identity.tenant_id!=self.tenant_id):
+            raise ValueError('EXACT_FORMAL_SESSION_IDENTITY_REQUIRED')
+        self._formal_identity=identity
+
+    def get(self,token):
+        session=super().get(token)
+        if self.is_current_formal_session(session):
+            return session
+        return None
+
+    def is_current_formal_session(self,session):
+        return (session is not None and self._formal_identity is not None
+                and session.get('session_hash','').startswith(self._digest_prefix)
+                and self._formal_identity.is_formal_session(session) is True)
+
+    def management_context(self,session,required_role):
+        return FormalManagementContext(self._formal_identity,session,required_role)
+
+
+class FormalManagementContext:
+    """Adapt one verified management request to the existing gateway context."""
+    def __init__(self,identity,session,required_role):
+        if identity is None or session is None:
+            raise ValueError('CURRENT_FORMAL_MANAGEMENT_SESSION_REQUIRED')
+        self._identity=identity
+        self._session=copy.deepcopy(session)
+        self._role=required_role or 'TASK_CENTER_ADMIN'
+        principal=session['principal_id']
+        if required_role is not None and principal.startswith('admin:'):
+            raise ValueError('EXACT_FORMAL_MANAGEMENT_ACTOR_REQUIRED')
+        self._binding=dict(tenant_id=identity.tenant_id,
+            principal_id='admin:'+principal if required_role is None else principal)
+        self.context=dict(self._binding)
+        self.verify(self.context)
+
+    def verify(self,context):
+        if (context is not self.context or context!=self._binding
+                or self._role not in self._session['roles']
+                or self._identity.is_formal_session(self._session) is not True):
+            raise ValueError('CURRENT_FORMAL_MANAGEMENT_SESSION_REQUIRED')
+        return self._binding['tenant_id']
+
+
 def main(argv=None, *, db=None,tenant_id=None,issuer=None,identity_backend=None,identity_provider=None,
          session_store=None,evidence=None,role_contract=None,mcp_config=None,
          lifecycle_root=None,ledger_root=None,namespace=None,writer=None,
          gateway_runtime=None,mcp_claim_host=None,mcp_development_host=None,
-         execution_provider=None,provenance_source=None,principal_mapper=None):
+         execution_provider=None,provenance_source=None,principal_mapper=None,
+         handoff_binding_projection_enabled=False):
     """Original host startup calls this with custodied objects, never RPC data.
 
     SessionStore uses the existing canonical DB. app.main performs its existing
     tenant/DB/CSRF/MCP checks; no listener can bind with absent authority.
     """
-    if provenance_source is not None or principal_mapper is not None:
+    guarded=provenance_source is not None or principal_mapper is not None
+    if guarded:
         if identity_backend is not None or identity_provider is not None:
             raise ValueError('SINGLE_IDENTITY_SOURCE_REQUIRED')
+        if not isinstance(session_store,FormalSessionStore):
+            raise ValueError('FORMAL_PROVENANCE_SESSION_STORE_REQUIRED')
         from task_center_provenance_consumer import GuardedProvenanceConsumer
         identity_provider=GuardedProvenanceConsumer(
             session_store,provenance_source,principal_mapper)
@@ -151,6 +214,8 @@ def main(argv=None, *, db=None,tenant_id=None,issuer=None,identity_backend=None,
     identity=HostIdentityProvider(tenant_id,identity_backend)
     if not isinstance(session_store,SessionStore) or session_store.tenant_id!=tenant_id:
         raise ValueError('HOST_SESSION_STORE_REQUIRED')
+    if guarded:
+        session_store.bind_identity(identity)
     if db is None or role_contract is None:
         raise ValueError('HOST_DATABASE_AND_ROLE_CONTRACT_REQUIRED')
     if (not isinstance(lifecycle_root,str) or not os.path.isabs(lifecycle_root)
@@ -164,7 +229,8 @@ def main(argv=None, *, db=None,tenant_id=None,issuer=None,identity_backend=None,
     from task_center_app import main as app_main
     return app_main(argv,gateway_runtime,identity_provider=identity,session_store=session_store,
         handoff_host=host,ledger_bridge=bridge,mcp_claim_host=mcp_claim_host,
-        mcp_development_host=mcp_development_host,execution_provider=execution_provider)
+        mcp_development_host=mcp_development_host,execution_provider=execution_provider,
+        handoff_binding_projection_enabled=handoff_binding_projection_enabled)
 
 
 if __name__=='__main__':

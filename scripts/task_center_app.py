@@ -640,12 +640,13 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
               'CODE_RESPONSE_ONLY','OAUTH_TOKEN_PARAMETERS_REQUIRED',
               'OAUTH_GRANT_REJECTED','OAUTH_RESOURCE_MISMATCH',
               'OAUTH_CODE_OR_PKCE_REJECTED','OAUTH_CODE_REPLAY_REJECTED',
-              'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED',
+              'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED','OAUTH_CURRENT_FORMAL_SESSION_REQUIRED',
               'MCP_DISPATCH_HOST_BINDING_REQUIRED','MCP_DISPATCH_WORKER_DISABLED',
               'TASK_DISPATCH_ROLE_NOT_SUPPORTED','TASK_DISPATCH_EXISTING_REQUEST_REQUIRED',
               'MCP_WORKER_TRUSTED_PLAN_REQUIRED','MCP_WORKER_AUTHORITY_CHANGED',
               'MCP_WORKER_PERMISSION_REVOKED','MCP_WORKER_BINDING_REQUIRED',
               'TASK_CONTRACT_UNKNOWN',
+              'HOLD_APPROVED_NATIVE_TEST_PLAN_REQUIRED',
               'MCP_DISPATCH_SUBMIT_SCOPE_REQUIRED','STALE_TASK_ATTEMPT',
               'PROJECT_TASK_NOT_VISIBLE','ROLE_NOT_ALLOWED_BY_HOST',
               'CURRENT_ADMITTED_WRITER_REQUIRED','CURRENT_WRITER_AUTHORITY_REQUIRED',
@@ -692,6 +693,8 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
               'TOKEN' if path=='/oauth/token' else 'MCP')
             sys.stderr.write('task-center-app: reject stage=%s code=%s\n'%(
               stage,detail))
+            if path=='/mcp' and detail=='OAUTH_CURRENT_FORMAL_SESSION_REQUIRED':
+                self._mcp_challenge('task:submit',close=True);return
             if path=='/oauth/register':
                 error=('invalid_redirect_uri' if detail in (
                   'DCR_REDIRECT_URIS_REQUIRED','CHATGPT_REDIRECT_URI_REQUIRED')
@@ -700,7 +703,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                       'error_description':detail}
             elif path=='/oauth/token' and detail in (
                     'OAUTH_CODE_OR_PKCE_REJECTED','OAUTH_CODE_REPLAY_REJECTED',
-                    'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED'):
+                    'OAUTH_REFRESH_REJECTED','OAUTH_REFRESH_REPLAY_REJECTED','OAUTH_CURRENT_FORMAL_SESSION_REQUIRED'):
                 body={'error':'invalid_grant','error_description':detail}
             else:
                 body={'error':'invalid_request','error_description':detail}
@@ -1122,16 +1125,23 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                             'TASK_CENTER_ADMIN' not in session['roles']):
                         self._send(403,_json_bytes({'error':'ADMIN_REQUIRED'}),
                           'application/json; charset=utf-8');return
-                supervisor, control=self._model_control()
+                formal_management=getattr(session_store,'management_context',None)
+                authority=formal_management(session,required_role) if callable(formal_management) else None
+                if authority is not None and action in ('GRANT_APPROVAL_ROLE','ADD_TEST_AUTHORIZATION',
+                        'START_TEST_ONLY_TASK','REPORT_TEST_ONLY_PROGRESS','SAVE_TEST_ONLY_CHECKPOINT'):
+                    self._send(403,_json_bytes({'error':'LEGACY_AUTHORITY_ACTION_UNAVAILABLE'}),
+                      'application/json; charset=utf-8');return
+                supervisor, control=self._model_control(authority)
                 try:
                     actor=None
                     if required_role is not None:
-                        actor=self._actor_principal()
+                        actor=session['principal_id'] if authority is not None else self._actor_principal()
                         if actor is None:
                             raise ValueError('AUTHENTICATED_ACTOR_REQUIRED')
-                        control=ModelControl(control.gateway,
-                          control.gateway.tenants.issue(tenant_id,actor),
-                          model_master_key,gateway_runtime=gateway_runtime)
+                        if authority is None:
+                            control=ModelControl(control.gateway,
+                              control.gateway.tenants.issue(tenant_id,actor),
+                              model_master_key,gateway_runtime=gateway_runtime)
                     if action in ('PREPARE_RESULT_RECOVERY','REVIEW_RESULT_RECOVERY','ACCEPT_RESULT_RECOVERY','RESULT_RECOVERY_STATUS'):
                         from task_center_mcp_result_recovery import ResultRecoveryMCP
                         names={'PREPARE_RESULT_RECOVERY':'task_prepare_result_recovery','REVIEW_RESULT_RECOVERY':'task_review_result_recovery','ACCEPT_RESULT_RECOVERY':'task_accept_result_recovery','RESULT_RECOVERY_STATUS':'task_result_recovery_status'}
@@ -1566,13 +1576,15 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 scope=('task:submit' if method=='tools/call' and
                   (value.get('params') or {}).get('name') in WRITE_TOOLS
                   else 'task:read')
-                identity=mcp_auth_store.authenticate(
-                  self.headers.get('Authorization'),scope)
+                authorization=self.headers.get('Authorization')
+                identity=mcp_auth_store.authenticate(authorization,scope)
                 if identity is None:
                     self._mcp_challenge(scope);return
                 service=MCPTaskService(db_path,authority_key,tenant_id,
                   model_master_key,identity['principal_id'],identity['project_id'],
-                  execution_enabled=mcp_model_worker_enabled,gateway_runtime=gateway_runtime)
+                  execution_enabled=mcp_model_worker_enabled,gateway_runtime=gateway_runtime,
+                  write_admission=(mcp_auth_store.bind_write_admission(authorization,identity)
+                    if scope=='task:submit' else None))
                 if method=='tools/call' and (value.get('params') or {}).get('name')=='task_submit':
                     import secrets
                     self._mcp_request_ref=secrets.token_hex(16)
@@ -1669,16 +1681,22 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                 self._send(401,_json_bytes({'error':type(exc).__name__,
                   'detail':str(exc)}),'application/json; charset=utf-8')
 
-        def _model_control(self):
+        def _model_control(self,authority=None):
             if model_master_key is None:raise ValueError('MODEL_ADMIN_DISABLED')
+            if authority is None:
+                authority=TestTenantAuthority(authority_key)
+                session=self._session()
+                current=session['principal_id'] if session is not None else principal_id
+                context=authority.issue(tenant_id,'admin:'+current)
+            else:
+                context=authority.context
             supervisor=Supervisor(db_path)
-            authority=TestTenantAuthority(authority_key)
-            gateway=GatewayKernel(supervisor,authority)
-            session=self._session()
-            current=(session['principal_id'] if session is not None else
-                     principal_id)
-            context=authority.issue(tenant_id,'admin:'+current)
-            return supervisor,ModelControl(gateway,context,model_master_key,gateway_runtime=gateway_runtime)
+            try:
+                gateway=GatewayKernel(supervisor,authority)
+                return supervisor,ModelControl(gateway,context,model_master_key,gateway_runtime=gateway_runtime)
+            except Exception:
+                supervisor.close()
+                raise
 
     return TaskCenterHandler
 
@@ -1742,7 +1760,8 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         normalized_base=_normalize_base_path(base_path)
         issuer=external_origin+(normalized_base[:-1] if normalized_base!='/' else '')
         resource=external_origin+(normalized_base if normalized_base!='/' else '/')+'mcp'
-        mcp_auth_store=MCPAuthorizationStore(mcp_connect,tenant_id,issuer,resource)
+        mcp_auth_store=MCPAuthorizationStore(mcp_connect,tenant_id,issuer,resource,
+            current_formal_session=getattr(session_store,'is_current_formal_session',None))
         mcp_db=mcp_connect()
         try:ensure_mcp_task_schema(mcp_db)
         finally:mcp_db.close()
@@ -1956,7 +1975,8 @@ def main(argv=None, gateway_runtime=None, *, mcp_claim_host=None, mcp_developmen
                                                 'DISABLED'),
                'model_admin_api': ('TEST_ONLY_ENABLED' if model_key else
                                    'DISABLED'),
-               'authentication': ('HOST_INJECTED_IDENTITY' if host_identity_injected else
+               'authentication': ('HOST_GUARDED_PROVENANCE' if callable(getattr(session_store,'is_current_formal_session',None))
+                                  else 'HOST_INJECTED_IDENTITY' if host_identity_injected else
                                   'INJECTED_TEST_IDENTITY' if identity_provider else 'LEGACY_TEST_TOKEN'),
                'real_outbound': ('TEST_FIXTURE_ONLY' if
                                   args.allow_loopback_fixture_outbound else

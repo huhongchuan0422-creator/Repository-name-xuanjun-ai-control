@@ -804,12 +804,16 @@ class Supervisor(object):
             raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
         return json.loads(row['payload_json'])
 
-    def _require_development_execution_ready(self,candidate):
+    def _require_development_execution_ready(self,candidate,native_test_plan_sha256=None):
         if not (candidate.get('source_kind') == 'LOCAL_ONLY_CONFIRMED_OPERATION'
                 or 'source_operation_id' in candidate):
             if candidate.get('execution_required') is True or 'source_comment_id' in candidate:
-                from native_development_executor import require_execution
-                require_execution(self,candidate)
+                from native_development_executor import NativeDevelopmentExecutor, require_execution
+                if not NativeDevelopmentExecutor.valid_plan(native_test_plan_sha256):
+                    profile = self.db.execute('SELECT profile FROM authority_runtime_profile WHERE singleton=1').fetchone()
+                    if profile is None or profile[0]!='TEST_ONLY':
+                        raise ValueError('HOLD_APPROVED_NATIVE_TEST_PLAN_REQUIRED')
+                require_execution(self,candidate,native_test_plan_sha256)
             return
         from producer_http_contract import REFERENCE_SHA256,REPOSITORY,ALLOWED_FILE
         task_id=candidate.get('task_id');attempt=candidate.get('attempt_id')
@@ -842,7 +846,7 @@ class Supervisor(object):
 
     def record_development_review(self, task_id, candidate_event_id, files,
                                   bundle_sha256, review_record_ids,
-                                  reviewed_event_id, admission_check=None):
+                                  reviewed_event_id, admission_check=None, *, native_test_plan_sha256=None):
         if (not isinstance(files, dict) or not files
                 or not isinstance(bundle_sha256, str)
                 or re.fullmatch(r'[0-9a-f]{64}', bundle_sha256) is None
@@ -869,7 +873,7 @@ class Supervisor(object):
                     or candidate_row['kind'] != 'DEVELOPMENT_CANDIDATE'):
                 raise ValueError('CURRENT_DEVELOPMENT_CANDIDATE_REQUIRED')
             candidate = json.loads(candidate_row['payload_json'])
-            self._require_development_execution_ready(candidate)
+            self._require_development_execution_ready(candidate,native_test_plan_sha256)
             contract = self.development_contract(task_id)
             if (candidate['attempt_id'] != task['attempt_id']
                     or candidate['lease_id'] != task['lease_id']
@@ -946,7 +950,8 @@ class Supervisor(object):
 
     def complete_development_candidate(self, task_id, reviewed_event_id,
                                        completion_event_id,
-                                       next_action='DEPENDENCIES_RECHECK', admission_check=None):
+                                       next_action='DEPENDENCIES_RECHECK', admission_check=None, *,
+                                       native_test_plan_sha256=None):
         if (not isinstance(reviewed_event_id, str)
                 or not reviewed_event_id.strip()
                 or not isinstance(completion_event_id, str)
@@ -978,7 +983,7 @@ class Supervisor(object):
                        != reviewed['candidate_sha256']):
                 raise ValueError('CANONICAL_REVIEW_CANDIDATE_MISMATCH')
             candidate = json.loads(candidate_row['payload_json'])
-            self._require_development_execution_ready(candidate)
+            self._require_development_execution_ready(candidate,native_test_plan_sha256)
             contract = self.development_contract(task_id)
             exact = (
                 candidate['attempt_id'] == task['attempt_id']
@@ -1067,6 +1072,16 @@ class Supervisor(object):
             return {'duplicate': False, 'state': 'SUCCESS',
                     'completion': completion}
 
+    def _attempt_id_used(self, task, attempt_id):
+        if attempt_id in (UNKNOWN, task['attempt_id']):
+            return True
+        binding = (task['task_id'], attempt_id)
+        return self.db.execute('''SELECT 1 FROM events
+          WHERE task_id=? AND attempt_id=?
+          UNION ALL SELECT 1 FROM revocation_drains
+          WHERE task_id=? AND attempt_id=? LIMIT 1''',
+          binding + binding).fetchone() is not None
+
     def claim(self, task_id, attempt_id, owner, entry, run_id, session_id,
               lease_id, fence, epoch, now=None, deadlines=None):
         now = self.clock() if now is None else now
@@ -1099,6 +1114,8 @@ class Supervisor(object):
                 raise ValueError('FRESH_ATTEMPT_DEADLINES_REQUIRED')
             if fence <= task['max_fence'] or epoch <= task['max_epoch']:
                 raise ValueError('MONOTONIC_FENCE_EPOCH_REQUIRED')
+            if self._attempt_id_used(task, attempt_id):
+                raise ValueError('FRESH_ATTEMPT_ID_REQUIRED')
             values = deadlines or {n: task[n] for n in deadline_names}
             # Same task+stage is represented by one primary row, so a second
             # writer cannot be claimed concurrently.
@@ -1367,6 +1384,8 @@ class Supervisor(object):
             if (task['authority_state'] != 'NONE' or task['state'] != 'READY'
                     or not self._dependencies_done(task)):
                 raise ValueError('WRITER_AUTHORITY_NOT_CLAIMABLE')
+            if self._attempt_id_used(task, attempt_id):
+                raise ValueError('FRESH_ATTEMPT_ID_REQUIRED')
             conflicts = self.db.execute(
                 'SELECT resource_key FROM resource_claims WHERE resource_key IN (%s)'
                 % ','.join('?' for _ in keys), keys).fetchall()
@@ -1668,19 +1687,33 @@ class Supervisor(object):
             row = self.db.execute(
                 'SELECT * FROM writer_operations WHERE operation_id=?',
                 (operation_id,)).fetchone()
-            if row is None or row['state'] not in (
-                    'PREPARED','DISPATCHING','UNKNOWN'):
+            if row is None:
                 raise ValueError('OPERATION_NOT_RECONCILABLE')
-            if row['state'] == 'PREPARED' and outcome != 'NOT_APPLIED':
+            state = row['state']
+            reconcilable = state in ('PREPARED', 'DISPATCHING', 'UNKNOWN')
+            if not reconcilable and state != outcome:
+                raise ValueError('OPERATION_NOT_RECONCILABLE')
+            if state == 'PREPARED' and outcome != 'NOT_APPLIED':
                 raise ValueError('UNDISPATCHED_OPERATION_ONLY_NOT_APPLIED')
             body = canonical(evidence)
             existing = self.db.execute('''SELECT * FROM writer_reconcile_evidence
               WHERE operation_id=? AND evidence_id=?''',
               (operation_id, context['evidence_id'])).fetchone()
             if existing is not None:
-                if existing['outcome'] == outcome and existing['evidence_json'] == body:
-                    return {'duplicate': True, 'state': row['state']}
-                raise ValueError('RECONCILE_EVIDENCE_CONFLICT')
+                if existing['outcome'] != outcome or existing['evidence_json'] != body:
+                    raise ValueError('RECONCILE_EVIDENCE_CONFLICT')
+                if not reconcilable:
+                    receipt_body = canonical(
+                        self._validate_operation_receipt(row, outcome, receipt))
+                    receipt_sha = hashlib.sha256(receipt_body.encode('utf-8')).hexdigest()
+                    stored = self.db.execute('''SELECT receipt_json, receipt_sha256
+                      FROM writer_receipts WHERE operation_id=?''', (operation_id,)).fetchone()
+                    if (stored is None or stored['receipt_json'] != receipt_body
+                            or stored['receipt_sha256'] != receipt_sha):
+                        raise ValueError('FINAL_RECEIPT_CONFLICT')
+                return {'duplicate': True, 'state': state}
+            if not reconcilable:
+                raise ValueError('OPERATION_NOT_RECONCILABLE')
             self.db.execute('''INSERT INTO writer_reconcile_evidence
               VALUES (?,?,?,?,?)''',
               (operation_id, context['evidence_id'], outcome, body, now))
@@ -1976,18 +2009,33 @@ class Supervisor(object):
                 'checkpoint_sha256': task['checkpoint_sha256']}
             if any(ack[k] != v for k, v in expected.items()):
                 raise ValueError('RECEIVER_ACK_BINDING_MISMATCH')
+            if self._attempt_id_used(task, ack['new_attempt_id']):
+                raise ValueError('FRESH_ATTEMPT_ID_REQUIRED')
             body = canonical(ack)
             sha = hashlib.sha256(body.encode('utf-8')).hexdigest()
-            if task['receiver_ack_sha256'] != UNKNOWN:
-                if (task['receiver_ack_sha256'] == sha
-                        and task['receiver_ack_json'] == body):
+            prior_sha = task['receiver_ack_sha256']
+            if prior_sha != UNKNOWN:
+                prior_body = task['receiver_ack_json']
+                if prior_sha == sha and prior_body == body:
                     return {'duplicate': True,
                             'receiver_ack_sha256': sha}
-                raise ValueError('RECEIVER_ACK_CONFLICT')
+                # A pre-upgrade acknowledgement may name a retired attempt.
+                # Allow correction of that unusable acknowledgement only.
+                try:
+                    prior_ack = json.loads(prior_body)
+                    prior_attempt = prior_ack['new_attempt_id']
+                except (KeyError, TypeError, ValueError):
+                    raise ValueError('RECEIVER_ACK_CONFLICT') from None
+                if (not isinstance(prior_body, str)
+                        or hashlib.sha256(prior_body.encode('utf-8')).hexdigest() != prior_sha
+                        or not isinstance(prior_attempt, str)
+                        or any(prior_ack.get(k) != v for k, v in expected.items())
+                        or not self._attempt_id_used(task, prior_attempt)):
+                    raise ValueError('RECEIVER_ACK_CONFLICT')
             self.db.execute('''UPDATE tasks SET receiver_ack_json=?,
               receiver_ack_sha256=?,updated_at=? WHERE task_id=? AND
               receiver_ack_sha256=?''',
-              (body, sha, now, task_id, UNKNOWN))
+              (body, sha, now, task_id, prior_sha))
             if self.db.execute('SELECT changes()').fetchone()[0] != 1:
                 raise ValueError('RECEIVER_ACK_CAS_FAILED')
             return {'duplicate': False, 'receiver_ack_sha256': sha}
@@ -2008,6 +2056,8 @@ class Supervisor(object):
                        != task['resource_scope_digest']
                     or ack.get('coverage_digest') != task['coverage_digest']):
                 raise ValueError('TAKEOVER_PREREQUISITES_INCOMPLETE')
+            if self._attempt_id_used(task, ack['new_attempt_id']):
+                raise ValueError('FRESH_ATTEMPT_ID_REQUIRED')
             keys = self._exact_resource_keys(
                 json.loads(task['resource_scope_json']))
             claims = [dict(r) for r in self.db.execute('''SELECT * FROM

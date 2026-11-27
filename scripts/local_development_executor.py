@@ -345,11 +345,13 @@ class LocalDevelopmentExecutor:
                 return {'execution_state':'UNKNOWN','execution_evidence_verified':False,
                         'next_action':'RECONCILE_WITH_TRUSTED_QUERY_PROVIDER',
                         'reconciliation_state':'NO_QUERY_CAPABILITY_NO_REPLAY'}
+            if self.admission_check is not None:self.admission_check()
             observation=query(intent)
             if observation is None:
                 return {'execution_state':'UNKNOWN','execution_evidence_verified':False,
                         'next_action':'RECONCILE_ORIGINAL_EXECUTION'}
         else:
+            if self.admission_check is not None:self.admission_check()
             observation=provider(intent,raw)
         if (not isinstance(observation,dict) or set(observation)!={'intent_sha256','result','test_reference_sha256','source_sha256','artifact_sha256'}
             or observation['intent_sha256']!=intent_digest
