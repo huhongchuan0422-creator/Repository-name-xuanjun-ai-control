@@ -1,0 +1,46 @@
+{
+  "kind": "OWNER_DECISION_REQUEST_NOT_RUNTIME_CONFIG",
+  "approval": null,
+  "task_id": "tc-real-development-20261123-4d99c26f2b07",
+  "immutable_spec_sha256": "4d99c26f2b07beebb2863f141cfa0d959ef1e6144830d85da84e6451c77b2e7c",
+  "checkpoint_sha256": "b4fed6497d0cebe9042b3456c28feb4b45c59ffd61adcd62be49818a32129a00",
+  "project_isolation_only": true,
+  "scope": [
+    "READ_SOURCE",
+    "WRITE_SOURCE",
+    "RUN_TEST"
+  ],
+  "allowed_files": [
+    "scripts/development_entry_intake.py",
+    "tests/test_development_entry_intake.py"
+  ],
+  "initial_trust": {
+    "existing_authorized_public_key_ref": null,
+    "or_authorize_first_project_root": null,
+    "named_signer_custodian": null,
+    "proposed_custodian_role_not_authorized": "小维ed43，仅Owner确认后托管本TC项目root，不自动成为业务Owner",
+    "canonical_owner_alias": "developer",
+    "actual_owner_identity_ref": null
+  },
+  "business_binding": {
+    "developer_identity_ref": null,
+    "qa_identity_and_key_ref": null,
+    "security_identity_and_key_ref": null
+  },
+  "caller": {
+    "trusted_host_source_ref": null,
+    "or_authorize_project_local_python_caller_issuer": null,
+    "grant_or_lease_valid_until": null
+  },
+  "data_handoff": {
+    "approve_source_preserving_same_task_handoff": null,
+    "implementation_owner": "原Python developer6a",
+    "execution_owner": "小维ed43",
+    "create_new_task": false,
+    "sql_profile_flip": false,
+    "promote_test_credentials_or_history": false
+  },
+  "secrets_in_response": false,
+  "creates_grant_or_signature": false,
+  "requires_author_installation_permission": false
+}
