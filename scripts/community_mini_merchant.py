@@ -110,7 +110,7 @@ class MiniMerchant:
         if op not in ('submit','wechat_submit_review','wechat_apply'):return
         params=body['params']
         version_key='revision' if op=='submit' else 'expected_version'
-        if type(params) is not dict or (set(params)!={'application',version_key} and not (op=='wechat_apply' and set(params)=={'application',version_key,'application_revision'})):
+        if type(params) is not dict or (set(params)!={'application',version_key} and not (op in ('wechat_apply','wechat_submit_review') and set(params)=={'application',version_key,'application_revision'})):
             raise ValueError('INVALID_MINI_SUBMIT_FIELDS')
         _,meta,platform=self.onboarding._load(params['application'],uid)
         if op=='submit':
@@ -127,7 +127,7 @@ class MiniMerchant:
             raise ValueError('MINI_SUBMIT_VERSION_CONFLICT')
         if type(mobile) is not str or not re.fullmatch(r'[0-9]{11}',mobile):
             raise ValueError('INVALID_MINI_CONTACT_MOBILE')
-        if op=='wechat_apply' and 'application_revision' in params and platform['status'] in ('DRAFT','CORRECTION_REQUIRED'):
+        if op in ('wechat_apply','wechat_submit_review') and 'application_revision' in params and platform['status'] in ('DRAFT','CORRECTION_REQUIRED'):
             # Preserve the platform-phone check of the former separate Mini submit.
             self._validate_contact_for_submit(uid,{'operation':'submit','params':{
                 'application':params['application'],'revision':platform['revision']}})

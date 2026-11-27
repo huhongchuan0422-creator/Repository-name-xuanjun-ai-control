@@ -63,7 +63,9 @@ function createSession(wx, baseUrl, now=()=>Math.floor(Date.now()/1000)) {
         if(path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='upload'&&[408,502,503,504].includes(r.statusCode))error.uploadResultUnknown=true;
         if(path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&data.params.operation==='wechat_media'&&((r.statusCode===409&&r.data&&r.data.error==='WECHAT_MEDIA_RESULT_UNKNOWN')||[408,502,503,504].includes(r.statusCode)))error.mediaCode='WECHAT_MEDIA_RESULT_UNKNOWN';
         // Keep definite access refusal distinct from transport uncertainty. Never expose its body.
-        if(r.statusCode===401||r.statusCode===403)error.code='ACCESS_DENIED';
+        // Record the exact status: the page uses it to distinguish expired-login 401
+        // from permission-denied 403 instead of claiming a generic unconfirmed refusal.
+        if(r.statusCode===401||r.statusCode===403){error.code='ACCESS_DENIED';error.accessHttpStatus=r.statusCode;}
         if(path==='/mini/merchant'&&data.operation==='ocr'&&['OCR_SOURCE_CHANGED','OCR_AUTH_DENIED','OCR_UNAVAILABLE','OCR_REQUEST_PENDING'].includes(r.data&&r.data.error))error.ocrCode=r.data.error;
         if(r.statusCode===400&&path==='/mini/merchant'&&data.operation==='onboarding'&&data.params&&['submit','wechat_submit_review','wechat_apply'].includes(data.params.operation)&&r.data&&r.data.error==='MINI_LICENSE_REGION_INVALID'&&['INVALID_ADDRESS','INCOMPLETE_ADDRESS','UNRECOGNIZED_ADDRESS','DIRECTORY_MISMATCH','AMBIGUOUS_ADDRESS','INVALID_REGION_CODE','REGION_CODE_MISMATCH'].includes(r.data.reason))error.regionReason=r.data.reason;
         // Preserve a credential only for exact typed operation-local failures.
