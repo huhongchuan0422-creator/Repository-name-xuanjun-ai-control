@@ -30,7 +30,7 @@
   </view>
   <text wx:if="{{materialPreviewHints[item.id]}}" class="hint">{{materialPreviewHints[item.id]}}</text>
   <text wx:if="{{materialOcrErrors[item.id]}}" class="field-error material-ocr-error" aria-live="polite">{{materialOcrErrors[item.id].text}}</text>
-  <text wx:if="{{step!==1||item.uploaded||item.synced}}" class="material-state">{{item.uploaded?'原申请已上传':'未选择材料'}} · {{item.synced?'资料处理已完成':'提交时自动处理'}}{{item.uploaded?' · 审核：'+(stateLabels[item.review]||'状态待核对'):''}}</text>
+  <text wx:if="{{step!==1||item.uploaded||item.synced}}" class="material-state">{{item.uploaded?'原申请已上传':'未选择材料'}} · {{item.synced?'资料处理已完成':'提交时自动处理'}}</text>
   <button wx:if="{{group.industryMaterials&&item.synced}}" class="text-link" data-kind="{{item.id}}" bindtap="removeIndustryMaterial" disabled="{{pending||!canEditWechat}}">取消本槽选用（保留原文件）</button>
   <button wx:if="{{group.photos&&item.synced&&item.id!=='cashier_photo'}}" class="text-link" data-kind="{{item.id}}" bindtap="removeScenePhoto" disabled="{{pending||!canEditWechat}}">取消选用（保留原照片）</button>
   <button wx:if="{{item.id==='cashier_photo'&&item.uploaded}}" class="text-link" bindtap="removeCashierPhoto" disabled="{{pending||!canEditPlatform}}">移除本次收银台材料（历史保留）</button>
@@ -51,7 +51,7 @@
 <view wx:if="{{step===3}}">
  <view wx:if="{{wechatReviewState==='SUBMITTED_TO_PROVIDER'&&wechatState!=='APPLYMENT_STATE_REJECTED'&&wechatState!=='APPLYMENT_STATE_EDITTING'&&wechatState!=='APPLYMENT_STATE_EDITING'}}" class="card"><text class="section-title">{{(wechatState==='APPLYMENT_STATE_TO_BE_SIGNED'||wechatState==='APPLYMENT_STATE_SIGNING'||wechatState==='APPLYMENT_STATE_FINISHED')?'资料已由微信支付确认':'资料已提交微信支付'}}</text></view>
  <block wx:else>
- <text class="hint">{{canEditPlatform?'平台申请资料可返回修改。':'平台申请当前只读；审核中的资料须由审核方退回补正后修改。'}}{{canEditWechat?'微信资料草稿可返回修改。':'微信资料当前只读。'}}</text>
+ <text class="hint">资料直接交微信审核，本站不预审；微信退回后可直接修改对应资料。{{canEditWechat?'微信资料草稿可返回修改。':'微信资料当前只读。'}}</text>
  <button class="edit-group" data-step="0" data-group="license" bindtap="returnMaterial" disabled="{{pending}}">修改资料</button>
  <view class="card"><text class="section-title">爱心捐赠比例</text><text>申请比例：{{requestedSplitLabel}}</text><text>审核生效比例：{{effectiveSplitLabel}}</text></view>
  <view class="card"><text class="section-title">爱心积分抵扣收款金额比例</text><text>爱心积分抵扣收款金额比例（申请值）：{{application&&application.redemption_percent?application.redemption_percent:0}}%</text></view>

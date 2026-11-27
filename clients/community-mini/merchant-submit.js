@@ -39,19 +39,19 @@ async function submitApplicantApplication({read,current,prepareMaterials,preflig
  const valid=s=>s&&s.application===id&&Number.isSafeInteger(s.version)&&Number.isSafeInteger(s.revision);
  if(!id||!valid(state))throw Error('申请版本未确认，请刷新原申请');
  if(state.reviewState==='SUBMISSION_UNKNOWN'||state.reviewState==='SUBMITTED_TO_PROVIDER'){
-  // Existing submission is reconciled by the original server GET-only worker.
-  // Never turn a status-refresh click into a fresh POST intent.
-  if(state.reviewState==='SUBMITTED_TO_PROVIDER')await queryProvider({application:id});
+  // Both unresolved states actively reconcile through the original GET-only
+  // status query; a status-refresh click never becomes a fresh POST intent.
+  await queryProvider({application:id});
   if(!current())return {cancelled:true};
   const latest=await read();return current()&&latest.application===id?latest:{cancelled:true};
  }
  if(!['DRAFT','CORRECTION','PENDING_INTERNAL_REVIEW','INTERNAL_APPROVED'].includes(state.reviewState))throw Error('申请状态未确认，未发送微信');
  if(['DRAFT','CORRECTION'].includes(state.reviewState)&&prepareMaterials){
-  await prepareMaterials(state,{platform:['DRAFT','CORRECTION_REQUIRED'].includes(state.platformState),wechat:true});
+  await prepareMaterials(state,{platform:false,wechat:true});
   if(!current())return {cancelled:true};state=await read();
  }
  if(!current())return {cancelled:true};if(!valid(state))throw Error('申请或版本已变化，请重新核对');
- if(preflight)await preflight(state,{platform:['DRAFT','CORRECTION_REQUIRED'].includes(state.platformState),wechat:true});
+ if(preflight)await preflight(state,{platform:false,wechat:true});
  if(!current())return {cancelled:true};
  const frozen={application:id,version:state.version,revision:state.revision,reviewState:state.reviewState};
  if(typeof confirm!=='function')throw Error('请本人确认当前版本后提交');
