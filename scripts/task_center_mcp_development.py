@@ -99,7 +99,12 @@ class DevelopmentHost:
             any(not any(b['review_kind']==p['role'] and b['authority_identity']=={'issuer':p['issuer'],'subject':p['subject']} for b in reviewers) for p in policies)):
             raise ValueError('CANONICAL_DEVELOPMENT_IDENTITY_REQUIRED')
         profile=executors[0]['executor_profile']
-        if profile is None or profile['repository']!=contract['target_repository'] or contract['allowed_files']!=[profile['allowed_file']]:
+        if profile is None:
+            # Native apply already consumes the host's exact source provider;
+            # registering its pinned contract must not require a local writer.
+            if self.native_source_provider is None:
+                raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
+        elif profile['repository']!=contract['target_repository'] or contract['allowed_files']!=[profile['allowed_file']]:
             raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
         return control.gateway.supervisor.register_development_contract(task_id,contract)
 
