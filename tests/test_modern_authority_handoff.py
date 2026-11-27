@@ -454,6 +454,119 @@ class HandoffTests(HandoffFixture):
             handoff.rollback(pointer, str(self.trust_key))
 
 
+MODEL_PROVIDERS_DDL = '''CREATE TABLE IF NOT EXISTS model_providers(
+  tenant_id TEXT NOT NULL,provider_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,adapter_type TEXT NOT NULL,
+  base_url TEXT NOT NULL,enabled INTEGER NOT NULL,
+  price_state TEXT NOT NULL,rate_limit_per_min INTEGER NOT NULL,
+  concurrency_limit INTEGER NOT NULL,timeout_seconds REAL NOT NULL,
+  retry_limit INTEGER NOT NULL,secret_cipher BLOB,secret_mask TEXT,
+  config_version INTEGER NOT NULL,circuit_state TEXT NOT NULL,
+  failure_count INTEGER NOT NULL,next_probe_at REAL,
+  created_at REAL NOT NULL,updated_at REAL NOT NULL,
+  PRIMARY KEY(tenant_id,provider_id))'''
+SERVICE_CONNECTIONS_DDL = '''CREATE TABLE IF NOT EXISTS service_connections(
+  tenant_id TEXT NOT NULL,connection_id TEXT NOT NULL,
+  provider_id TEXT NOT NULL,purpose TEXT NOT NULL,auth_type TEXT NOT NULL,
+  destination_origin TEXT NOT NULL,issuer TEXT,
+  authorization_endpoint TEXT,token_endpoint TEXT,revocation_endpoint TEXT,
+  redirect_uri TEXT,client_id TEXT,scopes_json TEXT NOT NULL,
+  supports_refresh INTEGER NOT NULL,status TEXT NOT NULL,
+  config_version INTEGER NOT NULL,secret_cipher BLOB,secret_mask TEXT,
+  refresh_cipher BLOB,access_expires_at REAL,refresh_lease TEXT,
+  refresh_lease_until REAL,credential_generation INTEGER NOT NULL DEFAULT 0,
+  connection_mutation_epoch INTEGER NOT NULL DEFAULT 0,
+  stable_prior_status TEXT NOT NULL DEFAULT 'CONFIGURED',
+  created_at REAL NOT NULL,updated_at REAL NOT NULL,
+  PRIMARY KEY(tenant_id,connection_id))'''
+
+
+class BlobSchemaDrillTests(HandoffFixture):
+    """BUG-3147: real ledger has BLOB cells (secret_cipher 164B)."""
+
+    def add_blob_tables(self):
+        db = sqlite3.connect(self.source)
+        db.execute(MODEL_PROVIDERS_DDL)
+        db.execute(SERVICE_CONNECTIONS_DDL)
+        self.blob = b'K' * 164
+        db.execute('INSERT INTO model_providers VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            ('tenant-a', 'p1', 'n', 'a', 'u', 1, 's', 10, 2, 30.5, 3,
+             self.blob, '****', 1, 'CLOSED', 0, None, 1.0, 2.0))
+        cols = [row[1] for row in db.execute('PRAGMA table_info(service_connections)')]
+        values = {'tenant_id': 'tenant-a', 'connection_id': 'c1', 'provider_id': 'p1',
+            'purpose': 'pp', 'auth_type': 'aa', 'destination_origin': 'o',
+            'scopes_json': '[]', 'supports_refresh': 1, 'status': 'OK',
+            'config_version': 1, 'secret_cipher': self.blob, 'secret_mask': '****',
+            'refresh_cipher': self.blob, 'credential_generation': 0,
+            'connection_mutation_epoch': 0, 'stable_prior_status': 'CONFIGURED',
+            'created_at': 1.0, 'updated_at': 2.0}
+        db.execute('INSERT INTO service_connections(%s) VALUES(%s)' % (
+            ','.join(cols), ','.join('?' * len(cols))),
+            [values.get(column) for column in cols])
+        db.commit()
+        tables = {row[0] for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+        db.close()
+        self.source_tables = sorted(tables - handoff.DISALLOWED_CARRY)
+
+    def test_freeze_handles_blob_rows_deterministically_without_leaking_content(self):
+        import base64
+        self.add_blob_tables()
+        body = self.make_freeze()
+        manifest_text = Path(self.manifest_path).read_text()
+        freeze_text = Path(self.freeze_path).read_text()
+        self.assertNotIn('KKKK', manifest_text)
+        self.assertNotIn('KKKK', freeze_text)
+        self.assertNotIn(base64.b64encode(self.blob).decode(), manifest_text)
+        self.assertNotIn(base64.b64encode(self.blob).decode(), freeze_text)
+        # determinism: identical source -> identical manifest digest
+        self.assertEqual(self.make_freeze()['manifest_digest'], body['manifest_digest'])
+        # same-length byte mutation must change the digest (type-tag+length+sha256)
+        db = sqlite3.connect(self.source)
+        db.execute('UPDATE model_providers SET secret_cipher=? WHERE provider_id=?',
+                   (b'J' * 164, 'p1'))
+        db.commit(); db.close()
+        self.assertNotEqual(self.make_freeze()['manifest_digest'], body['manifest_digest'])
+
+    def test_type_tags_keep_null_text_int_float_blob_distinct(self):
+        self.add_blob_tables()
+        rows = [self.blob, None, 1, 1.0, '1']
+        db = sqlite3.connect(self.source)
+        db.execute('CREATE TABLE blob_type_probe(a BLOB,b,c,d,e)')
+        db.execute('INSERT INTO blob_type_probe VALUES(?,?,?,?,?)', rows)
+        db.commit()
+        manifest = handoff.table_manifest(db)
+        encoded = json.loads(handoff.encode_row(rows))
+        db.close()
+        self.assertEqual(encoded, [["b", 164, hashlib.sha256(self.blob).hexdigest()],
+                                   ["n"], ["i", 1], ["f", 1.0], ["s", "1"]])
+        self.assertTrue(manifest['blob_type_probe']['count'] >= 1)
+        with self.assertRaises(ValueError) as caught:
+            handoff.encode_cell(object())
+        self.assertEqual(str(caught.exception), 'CELL_TYPE_UNSUPPORTED')
+
+    def test_full_chain_with_blob_tables_carry_switch_reconcile_rollback(self):
+        self.add_blob_tables()
+        receipt = self.run_handoff()
+        target = str(self.root / 'formal.sqlite')
+        db = sqlite3.connect('file:%s?mode=ro' % target, uri=True)
+        # live carry keeps exact ciphertext bytes for the formal ledger
+        self.assertEqual(db.execute(
+            'SELECT secret_cipher FROM model_providers').fetchone()[0], self.blob)
+        # provenance/receipt never contain the ciphertext content
+        leak = 0
+        for (row_json,) in db.execute('SELECT row_json FROM authority_handoff_provenance'):
+            if 'KKKK' in row_json:
+                leak += 1
+        db.close()
+        self.assertEqual(leak, 0)
+        self.assertEqual(handoff.query(target, 'op-1743'), receipt)
+        pointer = str(self.root / 'authority-reference.json')
+        handoff.switch(pointer, str(self.trust_key), target, self.source, 'op-1743')
+        self.assertEqual(handoff.reconcile(pointer, str(self.trust_key))['state'], 'ISOLATED')
+        self.assertFalse(handoff.rollback(pointer, str(self.trust_key))['data_destructive'])
+
+
 class F4FormalClaimOnTargetTests(HandoffFixture):
     def assembly(self):
         contract = {'task_id': TASK, 'spec_sha256': SPEC, 'checkpoint_sha256': CHECKPOINT,

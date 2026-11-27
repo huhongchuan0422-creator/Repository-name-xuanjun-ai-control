@@ -82,6 +82,34 @@ def canon(value):
                       ensure_ascii=False, allow_nan=False)
 
 
+# BUG-3147: the real ledger carries BLOB cells (model_providers.
+# secret_cipher / service_connections.secret_cipher etc.). Rows are pinned
+# with a deterministic type-tag encoding: NULL/text/int/float keep their
+# distinct tags; BLOB is pinned by ["b", byte-length, sha256] so ciphertext
+# CONTENT never enters the before manifest, freeze receipt, or target
+# provenance rows, while any same-length byte change still flips the digest.
+# str(bytes), skipped columns, or dropped rows are never used to pass tests.
+def encode_cell(value):
+    if value is None:
+        return ['n']
+    if isinstance(value, (bytes, bytearray)):
+        raw = bytes(value)
+        return ['b', len(raw), hashlib.sha256(raw).hexdigest()]
+    if isinstance(value, bool):
+        return ['i', int(value)]
+    if isinstance(value, int):
+        return ['i', value]
+    if isinstance(value, float):
+        return ['f', value]
+    if isinstance(value, str):
+        return ['s', value]
+    raise ValueError('CELL_TYPE_UNSUPPORTED')
+
+
+def encode_row(values):
+    return canon([encode_cell(value) for value in values])
+
+
 def digest(value):
     return hashlib.sha256(canon(value).encode('utf-8')).hexdigest()
 
@@ -177,7 +205,7 @@ def table_manifest(db):
         columns = columns_of(db, name)
         if not columns:
             raise ValueError('TABLE_COLUMNS_REQUIRED')
-        rows = [canon(row) for row in ordered_rows(db, name, columns)]
+        rows = [encode_row(row) for row in ordered_rows(db, name, columns)]
         manifest[name] = {'count': len(rows),
                           'digest': hashlib.sha256(''.join(rows).encode('utf-8')).hexdigest()}
     return manifest
@@ -497,7 +525,7 @@ def handoff(db_path, backup, freeze_path, manifest_path, trust_key_file,
             rows_sha = hashlib.sha256()
             count = 0
             for values in ordered_rows(snapshot, name, columns_of(snapshot, name)):
-                row = canon(values)
+                row = encode_row(values)
                 db.execute('INSERT INTO authority_handoff_provenance(source_table,row_ordinal,row_json,row_sha256) VALUES(?,?,?,?)',
                            (name, count, row, hashlib.sha256(row.encode('utf-8')).hexdigest()))
                 rows_sha.update(row.encode('utf-8'))
