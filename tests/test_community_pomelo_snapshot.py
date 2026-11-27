@@ -29,9 +29,9 @@ class PomeloSnapshot(unittest.TestCase):
         files = json.loads((p / 'manifest.json').read_bytes())['files']
         changed = ['pages/checkout/index.js', 'pages/checkout/index.wxml', 'pages/checkout/index.wxss']
         untouched = {k: v for k, v in files.items() if k not in changed}
-        # 5fbb61c4: preserve exact 54 non-checkout entries including the independent OCR delta.
+        # f0cafa5 rebind: exact 54 non-checkout entries including owner-direct submit contract bytes.
         digest = hashlib.sha256(json.dumps(untouched, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-        self.assertEqual(digest, 'd2ca20805144b0d1111d364e7716f3badaae73e17cb1c60a8d341553a302d07f')
+        self.assertEqual(digest, 'da790b6bdceb89e280c3bbe7149bc45d95df424efe66083ee65a29799c4d2964')
         self.assertEqual(len(files), 57)
 
 if __name__ == '__main__':

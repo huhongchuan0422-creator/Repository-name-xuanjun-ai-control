@@ -1,9 +1,9 @@
 """Original workflow test-job artifact builder; no network, secrets or deployment."""
 import hashlib,json,pathlib,os,re,shutil
-MANIFEST='61b3bc1090215b2b5806ddf50d60c6f471b585bf87a12ea291092a54218926c0'
-ARCHIVE='1180ff1aa623c163febffa916fa393046eb35a7bfe9315069a7e8607ec29f907'
+MANIFEST='92f51eb74e8db9a410a682d2d3c51d4a4301ee9dfd1cd628dfbfafecfbfad03d'
+ARCHIVE='be88556548d9b3043de380dc0a422f8053103aee492652e51daaad60b100f249'
 # Must be frozen from real reviewed backend evidence after P3 stabilizes.
-BACKEND_PAIR_SHA256='9a3f7a937aeedec50e224e72c77049d79a9cba8f13f5685804b125aa0d3e55dc'
+BACKEND_PAIR_SHA256='a5f2397313807e53e8e4c68617685de964bc3a1544c276906c552f057ff4e37d'
 REPO='huhongchuan0422-creator/Repository-name-xuanjun-ai-control'
 REF='refs/heads/feature/chatgpt-community-wechat-sp-offline-20261017'
 def sha(b):return hashlib.sha256(b).hexdigest()

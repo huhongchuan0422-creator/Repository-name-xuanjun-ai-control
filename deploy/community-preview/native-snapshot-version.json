@@ -1,10 +1,10 @@
 {
-  "evidence": "f54c frontend bytes unchanged; reader-scope per-record routing installed 01:51 (applyment0a281f55/host589454d7/readersf2f13174, tests 16/16, preflight pass, PID2071514). Success-era legacy provider restored for unbound records via key proof (11/25 receipts legacy vs 21:37 3578). Real material return/final submit NOT accepted.",
-  "frontend_archive_sha256": "1180ff1aa623c163febffa916fa393046eb35a7bfe9315069a7e8607ec29f907",
-  "frontend_manifest_sha256": "61b3bc1090215b2b5806ddf50d60c6f471b585bf87a12ea291092a54218926c0",
+  "evidence": "f0cafa5 owner-direct frontend bytes; wechat-only direct-apply five-file delta installed 14:34 (applyment6b34->1e5c455f plus mini_merchant/ocr_bridge/onboarding/ocr_host overlays) via original native_lifecycle; PID2419372; 210 startup pins==disk and postcheck pass per mini-native-install-20261127-1434/RESULT.md; real material return/final submit NOT accepted.",
+  "frontend_archive_sha256": "be88556548d9b3043de380dc0a422f8053103aee492652e51daaad60b100f249",
+  "frontend_manifest_sha256": "92f51eb74e8db9a410a682d2d3c51d4a4301ee9dfd1cd628dfbfafecfbfad03d",
   "purpose": "DEVELOPMENT_ONLY_NO_CATALOG_OR_SINGLE_REVISION_ACCEPTANCE",
   "runtime_source_sha": "17ecb128e8e0407e0a99259959babd0fbeea6085",
   "source_coverage": "BASELINE_COMMIT_PLUS_UNCOMMITTED_OVERLAYS_NOT_A_SINGLE_GIT_REVISION",
-  "startup_source_manifest_sha256": "a57cf87cb8db399cea12d7dccaed28271584b7cb4d5137b09f61bb785d53f84c",
+  "startup_source_manifest_sha256": "524c761e8e96f37cd28663e1868394cafd96d7247c75073501fbfdcb63dc7b0d",
   "version_source": "NATIVE_PROCESS_ENV_BASELINE_WITH_STARTUP_SOURCE_PINS"
 }
