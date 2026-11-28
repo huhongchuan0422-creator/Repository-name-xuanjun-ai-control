@@ -2,9 +2,11 @@
 
 Covers exactly three pinned layout facts, fail-closed elsewhere:
 1. /usr/bin/sudo canonical 0o4111 (AL8/Anolis) instead of the old 0755/4755-only tuple.
-2. __pycache__/*.pyc with st_nlink==2 (dnf hardlink dedup) tolerated ONLY inside
-   declared fixed roots / declared vendor package directories; every other file
-   stays nlink==1 and the closure equality is unchanged.
+2. __pycache__/*.pyc with st_nlink==2 (dnf hardlink dedup) and the declared
+   config-3.11-x86_64-linux-gnu python-config cache st_nlink==3 tolerated ONLY
+   inside declared fixed roots / declared vendor package directories; every
+   other file stays nlink==1 (nlink>=4 never) and the closure equality is
+   unchanged.
 3. ldd alias paths normalize only through /lib64->usr/lib64 and /lib->usr/lib.
 No host mutation, no root, all fixtures synthetic.
 """
@@ -45,8 +47,10 @@ class ProtectedInputShape(unittest.TestCase):
         self.assertTrue(_protected_input_ok(frow(0o644),1000))
         self.assertTrue(_protected_input_ok(frow(0o644,nlink=2),1000,declared_pyc=True))
         self.assertFalse(_protected_input_ok(frow(0o644,nlink=2),1000))
-        self.assertFalse(_protected_input_ok(frow(0o644,nlink=3),1000,declared_pyc=True))
-        self.assertFalse(_protected_input_ok(frow(0o664,nlink=2),1000,declared_pyc=True))
+        self.assertTrue(_protected_input_ok(frow(0o644,nlink=3),1000,declared_pyc=True))
+        self.assertFalse(_protected_input_ok(frow(0o644,nlink=3),1000))
+        self.assertFalse(_protected_input_ok(frow(0o644,nlink=4),1000,declared_pyc=True))
+        self.assertFalse(_protected_input_ok(frow(0o664,nlink=3),1000,declared_pyc=True))
         self.assertFalse(_protected_input_ok(frow(0o4644,nlink=2),1000,declared_pyc=True))
         self.assertFalse(_protected_input_ok(frow(0o644,nlink=2,uid=1000),1000,declared_pyc=True))
         self.assertFalse(_protected_input_ok(frow(0o644,size=1001),1000))

@@ -104,12 +104,14 @@ def _is_declared_pyc(path):
 
 def _protected_input_ok(a,limit,declared_pyc=False):
     # Verified hosts (dnf/hawkey hardlink dedup) ship stdlib/site-packages
-    # __pycache__/*.pyc with st_nlink==2. Accepting exactly nlink 2 for declared
+    # __pycache__/*.pyc with st_nlink==2, and the declared
+    # config-3.11-x86_64-linux-gnu/__pycache__/python-config.*.pyc layout
+    # dedups to st_nlink==3. Accepting exactly nlink 2 or 3 for declared
     # pyc files inside fixed canonical roots is a pinned layout fact, not a
     # general hardlink permission: root:root, regular, no setgid/world-write
     # and the size bound all still apply, everything else stays nlink==1.
     return (stat.S_ISREG(a.st_mode) and a.st_uid==a.st_gid==0 and
-            (a.st_nlink==1 or (declared_pyc and a.st_nlink==2)) and
+            (a.st_nlink==1 or (declared_pyc and a.st_nlink in (2,3))) and
             not a.st_mode&0o6022 and 0<=a.st_size<=limit)
 
 def _protected_bytes(path,limit=50000000,allow_declared_pyc=False):

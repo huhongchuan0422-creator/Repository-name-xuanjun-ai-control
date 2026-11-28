@@ -120,7 +120,7 @@ class PreparationBridgeTests(unittest.TestCase):
 
     def test_runtime_module_matches_reviewed_per_mutation_lease_guard_revision(self):
         self.assertEqual(digest(Path(runtime.__file__).read_bytes()),
-                         '52398dad28efe9afe2d3aaf0aeaf5863fcdeaf4abb84a544b508eb0392e7e3f6')
+                         '70c811656ab62953c30285e24be2f6a13247899684141e9ecf3b7aba3a6c0df0')
 
     def test_account_delegates_original_writer_and_preserves_success_evidence(self):
         lease = self.account_lease()
