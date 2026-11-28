@@ -67,15 +67,32 @@ def owner():need(os.geteuid()==0 and os.uname().nodename==HOST and os.environ.ge
 
 def unpack(raw):
     need(len(raw)<=10000000,'TAR_SIZE');out={}
+    PREFIX='customer-center/'
     with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as t:
-        members=t.getmembers();need(1<len(members)<=100,'TAR_COUNT')
+        members=t.getmembers()
+        # The reviewed manifest closure IS the member bound. The old fixed
+        # 1<len(members)<=100 cap predates the 267+1-file Hosted release and
+        # rejected the official archive at plan; no new count magic replaces it.
+        # Before any member payload is read: the embedded manifest must exist
+        # as one regular bounded member, its declared relative paths must
+        # equal the member set exactly (unique, no extra/undeclared/missing),
+        # and total declared volume stays bounded by the unchanged 10MB bound.
+        # Per-member shape checks and per-entry size/hash equality stay; old
+        # smaller archives therefore keep reading, arbitrary members still HOLD.
+        need(1<len(members),'TAR_COUNT')
+        names=[m.name for m in members]
+        mm=t.getmember(PREFIX+'CUSTOMER_MANIFEST.json') if PREFIX+'CUSTOMER_MANIFEST.json' in names else None
+        need(mm is not None and mm.isfile() and mm.size<=8000000,'MANIFEST_SET')
+        raw_manifest=t.extractfile(mm).read()
+        manifest=json.loads(raw_manifest)
+        expected={x['path'] for x in manifest['files']}|{'CUSTOMER_MANIFEST.json'}
+        need(len(manifest['files'])==len(expected)-1 and len(names)==len(set(names)) and {n[len(PREFIX):] for n in names}==expected,'MANIFEST_SET')
+        need(sum(m.size for m in members)<=10000000,'TAR_TOTAL')
         for m in members:
-            need(m.isfile() and m.name.startswith('customer-center/') and '..' not in Path(m.name).parts and m.name not in out and m.size<=8000000,'TAR_PATH_TYPE')
+            need(m.isfile() and m.name.startswith(PREFIX) and '..' not in Path(m.name).parts and m.size<=8000000,'TAR_PATH_TYPE')
             out[m.name]=t.extractfile(m).read()
-    raw_manifest=out.pop('customer-center/CUSTOMER_MANIFEST.json');manifest=json.loads(raw_manifest)
-    files={x['path']:out.get('customer-center/'+x['path']) for x in manifest['files']}
-    need(len(files)==len(manifest['files']) and len(files)==len(out),'MANIFEST_SET')
-    for x in manifest['files']:need(files[x['path']] is not None and len(files[x['path']])==x['size'] and sha(files[x['path']])==x['sha256'],'MANIFEST_HASH')
+    files={x['path']:out[PREFIX+x['path']] for x in manifest['files']}
+    for x in manifest['files']:need(len(files[x['path']])==x['size'] and sha(files[x['path']])==x['sha256'],'MANIFEST_HASH')
     files['CUSTOMER_MANIFEST.json']=raw_manifest
     return files,manifest,sha(raw_manifest)
 

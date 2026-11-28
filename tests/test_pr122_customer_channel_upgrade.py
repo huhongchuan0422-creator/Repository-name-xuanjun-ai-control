@@ -23,6 +23,54 @@ def archive(files,commit):
             x=tarfile.TarInfo('customer-center/'+p);x.size=len(b);t.addfile(x,io.BytesIO(b))
     return out.getvalue(),manifest
 
+class FullClosureReaderIntegration(unittest.TestCase):
+    """Delta-3 direct regression (20261129): the REAL complete closure built by the
+    original package builder from this exact tree (the 267 bound files +
+    CUSTOMER_MANIFEST.json, i.e. the same 268-member shape as the Hosted archive
+    that failed plan with HOLD:TAR_COUNT) goes straight through the shared reader.
+    Pure bytes in/out: no root, no filesystem target paths. Small synthetic
+    fixtures above never exercised >100 members, so this combination was untested
+    while CI passed.
+    """
+    def _real_closure(self):
+        from scripts.pr122_customer_package import build
+        with tempfile.TemporaryDirectory() as td:
+            build(td,'a'*40,'c'*40)
+            raw=(Path(td)/u.ARCHIVE).read_bytes()
+            receipt=json.loads((Path(td)/'CUSTOMER_PACKAGE_RECEIPT.json').read_bytes())
+        return raw,receipt
+    def test_real_full_closure_unpacks_and_matches_receipt(self):
+        raw,receipt=self._real_closure()
+        files,manifest,msha=u.unpack(raw)
+        self.assertGreater(len(files),100)
+        self.assertEqual(len(files),receipt['members'])
+        self.assertEqual(len(manifest['files']),receipt['bound_files'])
+        self.assertEqual(msha,receipt['manifest_sha256'])
+        self.assertEqual({p for p in files},{'CUSTOMER_MANIFEST.json',*[x['path'] for x in manifest['files']]})
+    def test_undeclared_extra_member_holds(self):
+        raw,receipt=self._real_closure()
+        import tarfile as tf
+        out=io.BytesIO()
+        with tf.open(fileobj=out,mode='w:gz') as t:
+            with tf.open(fileobj=io.BytesIO(raw),mode='r:gz') as s:
+                for m in s.getmembers():
+                    t.addfile(m,s.extractfile(m))
+            b=b'injected\n';x=tf.TarInfo('customer-center/scripts/UNDECLARED.py');x.size=len(b);t.addfile(x,io.BytesIO(b))
+        with self.assertRaises(RuntimeError) as ctx:u.unpack(out.getvalue())
+        self.assertIn('HOLD:MANIFEST_SET',str(ctx.exception))
+    def test_missing_declared_member_holds(self):
+        raw,receipt=self._real_closure()
+        import tarfile as tf
+        drop='customer-center/boot.py'
+        out=io.BytesIO()
+        with tf.open(fileobj=out,mode='w:gz') as t:
+            with tf.open(fileobj=io.BytesIO(raw),mode='r:gz') as s:
+                for m in s.getmembers():
+                    if m.name==drop:continue
+                    t.addfile(m,s.extractfile(m))
+        with self.assertRaises(RuntimeError) as ctx:u.unpack(out.getvalue())
+        self.assertIn('HOLD:',str(ctx.exception))
+
 class FixedPolicyPairSynthetic(unittest.TestCase):
     """Delta-2 direct regression, no root and no filesystem: the plan gate accepts
     the restored live pair, and accepts the declared pending bootstrap pair ONLY
