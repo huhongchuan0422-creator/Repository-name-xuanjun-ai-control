@@ -23,6 +23,39 @@ def archive(files,commit):
             x=tarfile.TarInfo('customer-center/'+p);x.size=len(b);t.addfile(x,io.BytesIO(b))
     return out.getvalue(),manifest
 
+class FixedPolicyPairSynthetic(unittest.TestCase):
+    """Delta-2 direct regression, no root and no filesystem: the plan gate accepts
+    the restored live pair, and accepts the declared pending bootstrap pair ONLY
+    when the protected backups verify byte-identical to the fixed originals (then
+    the plan uses the restored identity, equal to the later restored plan).
+    Unknown live bytes or drifted backups stay HOLD. Execution keeps the separate
+    live POLICY_RESTORE_NOT_COMPLETE gate in apply.
+    """
+    def _pair(self, live_exec, live_policy, old_wrapper, old_sudoers):
+        from scripts.pr122_account_admission import domestic_bootstrap as b
+        files={u.EXEC:live_exec,u.POLICY:live_policy}
+        backups={'old-wrapper':old_wrapper,'old-sudoers':old_sudoers}
+        with patch.object(u,'read',side_effect=lambda path:files[path]),\
+             patch.object(b,'new_wrapper',return_value=b'NEWWRAP'),\
+             patch.object(b,'new_policy',return_value=b'NEWPOL'),\
+             patch.object(b,'read',side_effect=lambda path,mode=None:backups[str(path).rsplit('/',1)[-1]]):
+            return u._fixed_policy_pair()
+    def test_restored_pair_returned_directly(self):
+        self.assertEqual(self._pair(u.expected_wrapper(),u.expected_policy(),b'X',b'Y'),(u.expected_wrapper(),u.expected_policy()))
+    def test_pending_pair_plans_from_verified_backups(self):
+        # Same returned identity as the restored case -> pending and restored plans are equal by contract.
+        self.assertEqual(self._pair(b'NEWWRAP',b'NEWPOL',u.expected_wrapper(),u.expected_policy()),(u.expected_wrapper(),u.expected_policy()))
+    def test_drifted_backup_holds(self):
+        with self.assertRaises(RuntimeError) as ctx:self._pair(b'NEWWRAP',b'NEWPOL',b'WRONG',u.expected_policy())
+        self.assertEqual(str(ctx.exception),'HOLD:BACKUP_DRIFT')
+    def test_unknown_live_bytes_hold(self):
+        with self.assertRaises(RuntimeError) as ctx:self._pair(b'OTHER',u.expected_policy(),u.expected_wrapper(),u.expected_policy())
+        self.assertEqual(str(ctx.exception),'HOLD:UNCHANGED_FIXED_POLICY')
+    def test_apply_keeps_full_live_restore_gate(self):
+        import inspect
+        src=inspect.getsource(u.apply)
+        self.assertIn("need(read(EXEC)==expected_wrapper() and read(POLICY)==expected_policy(),'POLICY_RESTORE_NOT_COMPLETE')",src)
+
 class UpgradeTests(unittest.TestCase):
     def setUp(self):
         self.assertEqual(os.geteuid(),0,'Disposable root fixture required')

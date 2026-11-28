@@ -103,6 +103,23 @@ def bundle(expected_zip_sha256=None):
 
 def expected_wrapper():return ('#!/bin/sh\nset -eu\n[ "$#" -eq 1 ] || exit 2\nexec /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LANG=C SUDO_UID="${SUDO_UID-}" /usr/bin/python3 -I -B '+str(BASE/'channel.py')+' "$1"\n').encode()
 def expected_policy():return ('githubrunner ALL=(root) NOPASSWD: '+', '.join(str(EXEC)+' '+x for x in ('inspect','plan','apply','rollback'))+'\n').encode()
+def _fixed_policy_pair():
+    # Restored state: the live pair already equals the original fixed bytes.
+    # Verified-pending state (read-only static plan for the same authorized
+    # workflow whose POLICY_RESTORE stage runs later): the live pair is exactly
+    # the declared bootstrap new wrapper/sudoers AND the protected backups are
+    # byte-identical to the fixed originals. The plan is then constructed from
+    # the backup bytes, so the pending and restored plans are equal by contract.
+    # Any other live bytes stay HOLD. Execution itself still requires the
+    # physically restored pair (POLICY_RESTORE_NOT_COMPLETE in apply).
+    live_exec,live_policy=read(EXEC),read(POLICY)
+    if live_exec==expected_wrapper() and live_policy==expected_policy():return live_exec,live_policy
+    from scripts.pr122_account_admission import domestic_bootstrap as bootstrap
+    need(live_exec==bootstrap.new_wrapper() and live_policy==bootstrap.new_policy(),'UNCHANGED_FIXED_POLICY')
+    old_wrapper=bootstrap.read(bootstrap.CONTROL/'old-wrapper',0o400)
+    old_sudoers=bootstrap.read(bootstrap.CONTROL/'old-sudoers',0o400)
+    need(old_wrapper==expected_wrapper() and old_sudoers==expected_policy(),'BACKUP_DRIFT')
+    return old_wrapper,old_sudoers
 def plan(ignore_transaction=False,expected_zip_sha256=None):
     owner();need(ignore_transaction or not os.path.lexists(CONTROL),'TRANSACTION_EXISTS_DO_NOT_RETRY')
     need(json.loads(read(BASE/'grant-state.json'))=={'state':'GRANTED'},'ORIGINAL_GRANTED_REQUIRED')
@@ -110,9 +127,9 @@ def plan(ignore_transaction=False,expected_zip_sha256=None):
     for path,mode in ((BASE/'channel.py',0o444),(BASE/ARCHIVE,0o400),(BASE/'grant-state.json',0o600),(EXEC,0o755),(POLICY,0o440)):need(stat.S_IMODE(path.stat().st_mode)==mode,'ORIGINAL_MODE_DRIFT')
     old,_,_=unpack(read(BASE/ARCHIVE));actual=snapshot(BASE/'candidate')
     need(set(actual)==set(old) and all(actual[p]['sha256']==sha(b) and actual[p]['mode']==0o400 for p,b in old.items()),'OLD_CANDIDATE_DRIFT')
-    need(read(EXEC)==expected_wrapper() and read(POLICY)==expected_policy(),'UNCHANGED_FIXED_POLICY')
+    wrapper,policy=_fixed_policy_pair()
     new,_,_,_=bundle(expected_zip_sha256)
-    return {'transaction':TXN,'new':new,'old':{'files':actual,'code_sha256':OLD_CODE,'tar_sha256':OLD_TAR,'wrapper_sha256':sha(read(EXEC)),'policy_sha256':sha(read(POLICY)),'grant_sha256':sha(read(BASE/'grant-state.json'))},'production_service_changes':0,'customer_install':'NOT_CALLED'}
+    return {'transaction':TXN,'new':new,'old':{'files':actual,'code_sha256':OLD_CODE,'tar_sha256':OLD_TAR,'wrapper_sha256':sha(wrapper),'policy_sha256':sha(policy),'grant_sha256':sha(read(BASE/'grant-state.json'))},'production_service_changes':0,'customer_install':'NOT_CALLED'}
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):raise RuntimeError('HOLD:APPROVAL_REDIRECT')
@@ -238,6 +255,9 @@ def apply(get=fetch,checkpoint=lambda stage:None,workflow_lease=None):
     with owner_lock(create_allowed=True):
         # Recheck all inputs and approval while holding both exclusion locks.
         need(read_plan()==p and authorize(p)==approved,'UNDER_LOCK_DRIFT')
+        # Full live recheck at execution: the POLICY_RESTORE stage must have
+        # physically restored the fixed originals before any rebind write.
+        need(read(EXEC)==expected_wrapper() and read(POLICY)==expected_policy(),'POLICY_RESTORE_NOT_COMPLETE')
         new,files,archive,code=bundle(pin);need(new==p['new'],'STAGING_DRIFT')
         if workflow_lease is not None:
             workflow_lease.assert_active();workflow_lease.authority()
