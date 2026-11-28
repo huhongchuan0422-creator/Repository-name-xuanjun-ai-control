@@ -116,6 +116,20 @@ class DevelopmentHost:
             raise ValueError('HOST_EXECUTOR_PROFILE_REQUIRED')
         return contract
 
+    def oauth_identity(self,session,requested_scopes):
+        """Resolve the authenticated caller's own protected host scope only."""
+        rows=[b for b in self.bindings if b['phase']=='EXECUTOR' and
+          b['tenant_id']==session.get('tenant_id') and b['principal_id']==session.get('principal_id')]
+        projects={b['project_id'] for b in rows}
+        if len(projects)!=1:raise ValueError('OAUTH_SELF_DEVELOPMENT_SCOPE_REQUIRED')
+        actions={action for b in rows for action in b['actions']}
+        allowed=set()
+        if 'task_development_status' in actions:allowed.add('task:read')
+        if actions-{'task_development_status'}:allowed.add('task:submit')
+        if not requested_scopes.issubset(allowed):raise ValueError('OAUTH_SELF_SCOPE_REJECTED')
+        return {'tenant_id':session['tenant_id'],'principal_id':session['principal_id'],
+          'project_id':next(iter(projects))}
+
     def visible(self,identity):
         allowed=set()
         for b in self.bindings:

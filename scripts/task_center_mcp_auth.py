@@ -24,12 +24,23 @@ def _b64sha(value):
 
 
 class MCPAuthorizationStore(object):
-    def __init__(self,connection_factory,tenant_id,issuer,resource,clock=time.time,*,current_formal_session=None):
+    def __init__(self,connection_factory,tenant_id,issuer,resource,clock=time.time,*,current_formal_session=None,trusted_redirect_uris=(),authorization_identity=None):
         self.connect=connection_factory;self.tenant_id=tenant_id
         self.issuer=issuer.rstrip('/');self.resource=resource;self.clock=clock
         if current_formal_session is not None and not callable(current_formal_session):
             raise ValueError('CURRENT_FORMAL_SESSION_CHECK_REQUIRED')
         self._formal_check=current_formal_session
+        if authorization_identity is not None and not callable(authorization_identity):
+            raise ValueError('TRUSTED_OAUTH_IDENTITY_RESOLVER_REQUIRED')
+        self._authorization_identity=authorization_identity
+        self._trusted_redirect_uris=tuple(trusted_redirect_uris)
+        for uri in self._trusted_redirect_uris:
+            if not isinstance(uri,str) or any(c in uri for c in ('\r','\n','*')):
+                raise ValueError('EXACT_HOST_OAUTH_REDIRECT_REQUIRED')
+            parsed=urlsplit(uri)
+            if (not parsed.netloc or parsed.username or parsed.password or parsed.fragment or
+                not (parsed.scheme=='https' or parsed.scheme=='http' and parsed.hostname in ('127.0.0.1','localhost','::1'))):
+                raise ValueError('EXACT_HOST_OAUTH_REDIRECT_REQUIRED')
         self._formal_bindings={}
         self._formal_lock=threading.Lock()
         self._next_prune=0
@@ -111,10 +122,10 @@ class MCPAuthorizationStore(object):
             for digest in digests:
                 self._formal_bindings[digest]=snapshot
 
-    @staticmethod
-    def _redirect(uri):
+    def _redirect(self,uri):
         if not isinstance(uri,str):
             raise ValueError('CHATGPT_REDIRECT_URI_REQUIRED')
+        if uri in self._trusted_redirect_uris:return uri
         parsed=urlsplit(uri)
         if (parsed.scheme!='https' or parsed.hostname!='chatgpt.com' or
                 parsed.username or parsed.password or parsed.fragment):
@@ -171,6 +182,17 @@ class MCPAuthorizationStore(object):
         if not requested or not requested.issubset(SCOPES):
             raise ValueError('OAUTH_SCOPE_REJECTED')
         self._assert_formal(session)
+        principal=session['principal_id'];project='project-mcp'
+        if 'TASK_EXECUTOR' in session.get('roles',[]):
+            if self._authorization_identity is None:
+                raise ValueError('OAUTH_SELF_SCOPE_NOT_CONNECTED')
+            identity=self._authorization_identity(session,requested)
+            if (not isinstance(identity,dict) or
+                identity.get('tenant_id')!=self.tenant_id or
+                identity.get('principal_id')!=principal or
+                not isinstance(identity.get('project_id'),str) or not identity['project_id']):
+                raise ValueError('OAUTH_SELF_IDENTITY_BINDING_REQUIRED')
+            project=identity['project_id']
         db=self.connect()
         try:
             row=db.execute('''SELECT redirect_uris_json FROM mcp_oauth_clients
@@ -184,7 +206,7 @@ class MCPAuthorizationStore(object):
               self.tenant_id,digest,params['client_id'],params['redirect_uri'],
               params['code_challenge'],self.resource,
               json.dumps(sorted(requested),separators=(',',':')),
-              session['principal_id'],'project-mcp',now+300))
+              principal,project,now+300))
             self._assert_formal(session)
             db.commit()
         finally:db.close()

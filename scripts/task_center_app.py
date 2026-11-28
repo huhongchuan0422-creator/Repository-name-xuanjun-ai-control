@@ -785,7 +785,7 @@ def build_handler(db_path, authority_key, tenant_id, principal_id,
                       self._external_path('/login.html')+'?next='+
                       __import__('urllib.parse').parse.quote(target,safe=''))
                     self.send_header('Cache-Control','no-store');self.end_headers();return
-                if 'TASK_CENTER_ADMIN' not in session['roles']:
+                if not {'TASK_CENTER_ADMIN','TASK_EXECUTOR'}.intersection(session['roles']):
                     self._send(403,_json_bytes({'error':'MCP_OWNER_REQUIRED'}),
                       'application/json; charset=utf-8');return
                 try:
@@ -1708,7 +1708,7 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
                 outbound_enabled=True,provider_connection_test_enabled=False,
                 external_origin=None,base_path='/',mcp_enabled=False,
                 mcp_model_worker_enabled=False,mcp_worker_adapters=None,
-                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None,handoff_binding_projection_enabled=False):
+                mcp_dispatch_config=None,mcp_development_host=None,correction_observer_interval=None,delivery_ledger_reader=None,handoff_host=None,ledger_bridge=None,mcp_claim_host=None,gateway_runtime=None,handoff_binding_projection_enabled=False,mcp_oauth_redirect_uris=()):
     if correction_observer_interval is not None and (type(correction_observer_interval) is not int or correction_observer_interval not in (180,300)):
         raise ValueError('CORRECTION_INTERVAL_180_OR_300_REQUIRED')
     if mcp_claim_host is not None:
@@ -1760,7 +1760,9 @@ def make_server(db_path, authority_key, tenant_id, principal_id,
         issuer=external_origin+(normalized_base[:-1] if normalized_base!='/' else '')
         resource=external_origin+(normalized_base if normalized_base!='/' else '/')+'mcp'
         mcp_auth_store=MCPAuthorizationStore(mcp_connect,tenant_id,issuer,resource,
-            current_formal_session=getattr(session_store,'is_current_formal_session',None))
+            current_formal_session=getattr(session_store,'is_current_formal_session',None),
+            trusted_redirect_uris=mcp_oauth_redirect_uris,
+            authorization_identity=(mcp_development_host.oauth_identity if mcp_development_host is not None else None))
         mcp_db=mcp_connect()
         try:ensure_mcp_task_schema(mcp_db)
         finally:mcp_db.close()
@@ -1837,6 +1839,7 @@ def main(argv=None, gateway_runtime=None, *, mcp_claim_host=None, mcp_developmen
     parser.add_argument('--external-origin')
     parser.add_argument('--base-path',default='/')
     parser.add_argument('--enable-mcp',action='store_true')
+    parser.add_argument('--mcp-oauth-redirect-uri',action='append',default=[])
     parser.add_argument('--allow-mcp-model-outbound',action='store_true')
     parser.add_argument('--mcp-dispatch-config-file')
     parser.add_argument('--mcp-development-config-file')
@@ -1970,6 +1973,7 @@ def main(argv=None, gateway_runtime=None, *, mcp_claim_host=None, mcp_developmen
                          mcp_dispatch_config=(load_dispatch_config(args.mcp_dispatch_config_file)
                            if args.mcp_dispatch_config_file else None),
                          mcp_development_host=mcp_development_host,
+                         mcp_oauth_redirect_uris=args.mcp_oauth_redirect_uri,
                          mcp_claim_host=mcp_claim_host,
                          correction_observer_interval=args.correction_observer_interval,
                          delivery_ledger_reader=delivery_ledger_reader,

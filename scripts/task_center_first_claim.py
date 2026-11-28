@@ -118,7 +118,7 @@ def main(argv=None):
     parser.add_argument("--task-id",required=True)
     parser.add_argument("--action",choices=("register","claim","status"),required=True)
     args=parser.parse_args(argv)
-    host=load_host(args.mcp_development_config_file)
+    host=load_host(args.mcp_development_config_file,db_path=args.db)
     assembly=FirstClaimAssembly(host)
     key=read_owned_secret_file(args.authority_key_file,"AUTHORITY_KEY").rstrip(chr(13)+chr(10)).encode()
     result=assembly.run(args.db,key,args.task_id,args.action)
