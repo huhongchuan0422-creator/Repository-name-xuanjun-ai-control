@@ -245,7 +245,15 @@ def main():
             if boundary is not None:options['identity_boundary']=boundary
             c.db.close();serve(configured_factory,Providers(config.get('providers',{})),Path(__file__).resolve().parent.parent/'deploy/pr122-customer-center/ui',**options);return
         if args.action=='worker':
-            p=Providers(config.get('providers',{}));result={'mail':drain_mail(c,p,'https://wenwenwenyiyiyi.work')}
+            p=Providers(config.get('providers',{}));
+            if mail_configuration is not None:
+                # Bound Resend-style channel: drain through the original deliver_outbox
+                # entries; the legacy SMTP drain would claim the row as UNKNOWN
+                # without provider IO and strand verification mail forever.
+                from scripts.community_mail_delivery import drain_outbox
+                result={'mail':drain_outbox(c)}
+            else:
+                result={'mail':drain_mail(c,p,'https://wenwenwenyiyiyi.work')}
             if selected==FULL:result['message']=drain_message(c,p)
         elif args.action=='import-authority':
             result=c.import_authority(json.loads(private_path(args.input).read_bytes()),base64.b64decode(config['authority_verify_key'],validate=True))

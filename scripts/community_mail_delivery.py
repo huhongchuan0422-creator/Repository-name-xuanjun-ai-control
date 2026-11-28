@@ -431,6 +431,17 @@ class MailDelivery:
             self.db.execute("UPDATE mail_provider_attempts SET outcome='DELIVERED',detail='DELIVERED_RECEIPT',detail_sha256=?,updated=? WHERE id=?",(_sha('DELIVERED_RECEIPT'),now,row['id']));self.db.execute("UPDATE mail_idempotency SET state='DELIVERED',updated=? WHERE attempt_id=?",(now,row['id']));self.db.commit();return self._result(row['message_key'])
         except BaseException:self.db.rollback();raise
 
+def drain_outbox(center):
+    """Worker drain for the bound mail channel: claim one PENDING outbox row and
+    reuse the original deliver_outbox/MailDelivery.send idempotency. Never performs
+    SMTP provider IO, so a row meant for the bound channel cannot be claimed and
+    stranded as UNKNOWN by the legacy SMTP drain when the process died between the
+    registration transaction and the inline delivery."""
+    row=center.db.execute("SELECT id FROM outbox WHERE status='PENDING' ORDER BY at,rowid LIMIT 1").fetchone()
+    if not row:return {'pending':False}
+    result=center.deliver_outbox(row['id'])
+    return {'pending':True,'outbox_id':row['id'],'state':result.get('state'),'reason':result.get('reason')}
+
 def install(center,bindings=(),transports=None):
     from scripts.pr122_customer_identity import install as install_identity
     install_identity(center) # IF-NOT-EXISTS DDL only; the frozen 3629 core installs the same tables on its lineage.

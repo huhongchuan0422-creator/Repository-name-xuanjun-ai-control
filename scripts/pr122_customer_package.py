@@ -19,6 +19,7 @@ def build(output,commit,tree):
     paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT/'clients/saas-console').rglob('*') if p.is_file())
     paths.update({'scripts/community_mail_delivery.py','scripts/authorization_consumption_community.py','tests/test_email_crm_identity_mail_chain.py','tests/test_community_mail_delivery.py','tests/test_customer_http_length_delta.py'})
     paths.update({'tests/test_crm_metric_compat_0959.py','tests/test_crm_storage_import_boundary_1010.py','tests/test_customer_factory_serve_1042.py'})
+    paths.update({'tests/test_customer_mail_worker_drain.py'})
     paths.add('scripts/community_license_region_areas.json')
     paths.add('docs/development/PR122_CUSTOMER_CENTER_CHANGE_CONTROL_20261016.md')
     paths.add('docs/development/PR122_CUSTOMER_CENTER_IDENTITY_CONTRACT_V1.md')
