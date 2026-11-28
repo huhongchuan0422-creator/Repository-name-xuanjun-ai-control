@@ -226,6 +226,15 @@ class Boundary:
             need(r is not None and not r['used'] and r['expires'] > c.now(), 'GRANT_UNAVAILABLE')
             stored = json.loads(c.decrypt(r['payload'], 'identity-grant:' + key))
             need(canonical(stored['scope']) == canonical(scope), 'GRANT_SCOPE')
+            # Contract: membership revoke consumes outstanding grants, so a later
+            # re-invitation never revives a grant issued before the revoke.
+            # The append-only audit ledger orders REVOKE against this grant's own
+            # ISSUE record; no schema change or membership guesswork is used.
+            revived = c.db.execute(
+                "SELECT 1 FROM audit WHERE project=? AND event='REVOKE' AND object_id=? AND seq>"
+                "(SELECT COALESCE(MAX(seq),0) FROM audit WHERE project=? AND event='IDENTITY_AUTHORIZATION_ISSUED' AND object_id=?)",
+                (scope['project_id'], scope['user_id'], scope['project_id'], scope['request_id'])).fetchone()
+            need(revived is None, 'GRANT_STALE')
             project, role, m = self.current(c, scope, stored['session_token'])
             need(m['id'] == r['mapping_id'] and m['version'] == stored['mapping_version']
                  and project['revision'] == stored['authority_revision'] and role == stored['role'], 'GRANT_STALE')

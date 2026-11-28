@@ -14,7 +14,8 @@ from unittest.mock import patch
 from scripts.pr122_customer_core import Center, Denied, Conflict, canonical
 from scripts.pr122_customer_http import App, COOKIE
 from scripts.pr122_customer_identity import (Boundary, SCHEMA, MAPPING_SCHEMA, SUBJECT,
-    EVIDENCE, CONSUME_PATH, import_mapping, signature, boundary_from_config)
+    EVIDENCE, CONSUME_PATH, import_mapping, signature, boundary_from_config,
+    install as install_identity)
 from scripts.pr122_customer_ops import validate_runtime_contexts
 from scripts.pr122_customer_providers import Providers
 from tests import test_pr122_customer_center as fixtures
@@ -25,6 +26,9 @@ class IdentityTests(unittest.TestCase):
 
     def setUp(self):
         fixtures.CustomerTests.setUp(self)
+        # Production initialization entry: the same identity DDL installer that
+        # ops.factory runs on the live center, applied to this synthetic database.
+        install_identity(self.c)
         self.service_key = b's' * 32
         self.trust = {'community-uk': {'key': self.service_key, 'audience': 'community',
                       'operations': {'community.access': ['OWNER', 'EDITOR', 'VIEWER']}}}

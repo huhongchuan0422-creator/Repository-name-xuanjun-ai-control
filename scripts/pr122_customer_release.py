@@ -111,14 +111,22 @@ def first_identity_evidence(descriptor,manifest_sha256,now):
                                              manifest_sha256=manifest_sha256,now=now)
     return True
 
-def plan(folder):
+def plan(folder,first_install=False):
+    """Static whole-scope plan. first_install=True defers only the two
+    DYNAMIC_FIELDS identity probes (protected venv bytes, service account)
+    that the ACCOUNT/RUNTIME stages create; both are re-run live and enforced
+    verbatim by workflow_apply (release.plan(folder) after the approved
+    stage checkpoints, DYNAMIC-stripped equality against the signed static
+    plan). Every other check executes identically and never on synthetic
+    substitutes: no dynamic value is invented or reported here."""
     need(os.geteuid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ','HOST_OR_ROOT')
     manifest,raw,files=source(folder)
     need(sys.version_info[:2]>=(3,11),'PYTHON_3_11_REQUIRED')
-    runtime_identity=isolated_python_identity()
+    runtime_identity=None if first_install else isolated_python_identity()
     import cryptography
     need(cryptography.__version__=='46.0.3','REVIEWED_CRYPTOGRAPHY_46_0_3_REQUIRED')
-    account=pwd.getpwnam('xuanjun-customer');need(account.pw_uid>0 and account.pw_gid>0 and account.pw_shell in ('/sbin/nologin','/usr/sbin/nologin','/bin/false'),'ISOLATED_ACCOUNT_REQUIRED')
+    account=None if first_install else pwd.getpwnam('xuanjun-customer')
+    if account is not None:need(account.pw_uid>0 and account.pw_gid>0 and account.pw_shell in ('/sbin/nologin','/usr/sbin/nologin','/bin/false'),'ISOLATED_ACCOUNT_REQUIRED')
     for p in (CODE,DATA,SNIPPET.parent,STATE/TXN,*[UNIT/u for u in UNITS]):need(not os.path.lexists(p),'PREEXISTING:'+str(p))
     from scripts.pr122_customer_core import Center
     from scripts.pr122_customer_providers import Providers
@@ -161,7 +169,8 @@ def plan(folder):
     need(nginx_uid>0,'NON_ROOT_NGINX_WORKER_REQUIRED')
     trust=private_config(CONFIG/'INDEPENDENT_REVIEW_TRUST.json')
     tar_sha=archive_binding(folder,manifest,raw)
-    result={'isolated_python':runtime_identity,'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'account_uid':account.pw_uid,'account_gid':account.pw_gid,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+    result={'source_tree':manifest['source_tree'],'artifact_tar_sha256':tar_sha,'scope_sha256':digest(canonical(manifest['files'])),'review_trust_sha256':trust_digest(trust),'state':'READONLY_PLAN','transaction':TXN,'manifest_sha256':digest(raw),'source_commit':manifest['source_commit'],'main_current':os.readlink(CURRENT),'previous_https_sha256':digest(old),'nginx':baseline,'config_sha256':digest((CONFIG/'config.json').read_bytes()),'runtime_config_sha256':digest((CONFIG/'runtime.json').read_bytes()),'target_acceptance_sha256':digest((CONFIG/'TARGET_ACCEPTANCE.json').read_bytes()),'production_changes':0}
+    if not first_install:result={'isolated_python':runtime_identity,'account_uid':account.pw_uid,'account_gid':account.pw_gid,**result}
     if login_only:
         result.update(deployment_profile=deployment.LOGIN_ONLY,permit_window_seconds=deployment.WINDOW_SECONDS,
                       login_acceptance_sha256=digest(canonical(acceptance['evidence'])))

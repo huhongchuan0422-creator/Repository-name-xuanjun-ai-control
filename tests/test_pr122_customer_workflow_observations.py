@@ -90,9 +90,9 @@ class CollectorTests(unittest.TestCase):
             plan=lambda ignore_transaction=False, expected_zip_sha256=None:
                 {'transaction': 'fixture', 'new': {'zip_sha256': expected_zip_sha256}})
         self.fake_release = SimpleNamespace(
-            plan=lambda folder: dict(self.static, isolated_python={'path': '/fixture/python'},
-                                     account_uid=601, account_gid=601),
+            plan=self.plan_fixture,
             source=lambda folder: (self.manifest, self.raw, self.files),
+            archive_binding=lambda folder, manifest, raw: self.static['artifact_tar_sha256'],
             CONFIG=release.CONFIG, TXN=release.TXN)
         self.venv = {'venv/bin/python': {'kind': 'file', 'mode': 0o755,
                                          'sha256': runtime.INTERPRETER_SHA256},
@@ -100,6 +100,14 @@ class CollectorTests(unittest.TestCase):
                                          'sha256': digest(b'fixture venv config')}}
         self.stdlib = {'/usr/lib/python3.11': {'os.py': digest(b'fixture stdlib')}}
         self.native = {'/usr/lib64/fixture-native.so': digest(b'fixture native')}
+
+    def plan_fixture(self, folder, first_install=False):
+        # Mirrors the release.plan contract: first_install refuses to report the
+        # dynamic identity probes; the live form carries them.
+        if first_install:
+            return dict(self.static)
+        return dict(self.static, isolated_python={'path': '/fixture/python'},
+                    account_uid=601, account_gid=601)
 
     def collect(self, **overrides):
         args = dict(release_module=self.fake_release, runtime_module=self.fake_runtime,
@@ -150,17 +158,56 @@ class CollectorTests(unittest.TestCase):
                                        bootstrap_module=FakeBootstrap(self.root / 'absent-control'))
         self.assertEqual(observations['adopt_receipts']['ACCOUNT'], digest(marker.read_bytes()))
 
-    def test_failing_release_plan_degrades_to_missing_static_plan(self):
-        def fail(folder): raise Denied('HOLD:PREEXISTING:/usr/local/lib/xuanjun-customer-center')
+    def test_failing_release_plan_still_collects_independent_facts(self):
+        # 20261128-1542 fresh-host regression: the live-form plan needs the
+        # protected venv (FileNotFoundError) and must not swallow the
+        # independent account/platform/runtime/policy/artifact sections.
+        def fail(folder, first_install=False):
+            if first_install: raise FileNotFoundError(
+                '/usr/local/lib/xuanjun-customer-runtime/venv/bin/python')
+            raise FileNotFoundError('/usr/local/lib/xuanjun-customer-runtime/venv/bin/python')
         broken = SimpleNamespace(plan=fail, source=self.fake_release.source,
+                                 archive_binding=self.fake_release.archive_binding,
                                  CONFIG=release.CONFIG, TXN=release.TXN)
         observations, reports = self.collect(release_module=broken)
         self.assertIsNone(observations['static_plan'])
-        self.assertIsNone(observations['inputs'])
-        self.assertEqual([row['section'] for row in reports], ['static_plan'])
+        sections = [row['section'] for row in reports]
+        self.assertIn('static_plan', sections)
+        self.assertIn('customer_apply', sections)
+        # Independent facts survived the plan HOLD.
+        stages = observations['inputs']['stages']
+        self.assertEqual(stages['ACCOUNT']['platform_sha256'], digest(canonical({'uid_min': 100})))
+        self.assertEqual(stages['RUNTIME']['runtime_template']['source_commit'],
+                         self.manifest['source_commit'])
+        self.assertEqual(stages['RUNTIME']['runtime_template']['stdlib_trees'], self.stdlib)
+        self.assertIsNotNone(stages['POLICY_RESTORE'])
+        self.assertEqual(observations['artifact']['artifact_tar_sha256'],
+                         self.static['artifact_tar_sha256'])
+        self.assertIsNone(stages['CUSTOMER_APPLY'])
+        missing = request.make_request(self.manifest, self.raw, observations)['missing_inputs']
+        self.assertIn('static_plan', missing)
+        self.assertIn('inputs.stages.CUSTOMER_APPLY', missing)
+        self.assertNotIn('inputs.stages.ACCOUNT.platform_sha256', missing)
+        self.assertNotIn('inputs.stages.RUNTIME', missing)
+        self.assertIsNone(request.make_request(self.manifest, self.raw, observations)['plan_candidate'])
+
+    def test_first_install_loop_never_calls_live_plan_form(self):
+        calls = []
+        def record(folder, first_install=False):
+            calls.append(first_install)
+            return self.plan_fixture(folder, first_install=first_install)
+        stub = SimpleNamespace(plan=record, source=self.fake_release.source,
+                               archive_binding=self.fake_release.archive_binding,
+                               CONFIG=release.CONFIG, TXN=release.TXN)
+        observations, reports = self.collect(release_module=stub)
+        self.assertEqual(calls, [True])
+        self.assertEqual(reports, [])
+        self.assertEqual(observations['inputs']['stages']['CUSTOMER_APPLY'], {'static_plan': self.static})
+        self.assertNotIn('isolated_python', observations['static_plan'])
         result = request.make_request(self.manifest, self.raw, observations)
-        self.assertIn('static_plan', result['missing_inputs'])
-        self.assertIsNone(result['plan_candidate'])
+        self.assertEqual(result['missing_inputs'], [])
+        self.assertTrue(request.validate_inputs(result['plan_candidate'], result['inputs_candidate'],
+                                                self.manifest, self.raw))
 
     def test_vendor_wheel_pin_mismatch_holds_the_runtime_section_only(self):
         bad = dict(self.wheel_shas)

@@ -120,12 +120,15 @@ def collect(folder, *, wheel_directory='/root/pr122-runtime-wheels', artifact_zi
     observations = {'static_plan': None, 'inputs': None, 'artifact': None,
                     'adopt_receipts': {stage: None for stage in workflow.STAGES},
                     'recovery_actions': {stage: sorted(workflow.RECOVERY[stage]) for stage in workflow.STAGES}}
-    plan_value = _section(lambda: release_module.plan(folder), 'static_plan', reports)
+    plan_value = _section(lambda: release_module.plan(folder, first_install=True), 'static_plan', reports)
     bundle = _section(lambda: release_module.source(folder), 'source', reports)
-    if plan_value is None or bundle is None: return observations
-    static = {key: value for key, value in plan_value.items() if key not in customer.DYNAMIC_FIELDS}
-    observations['static_plan'] = static
-    manifest, raw, files = bundle
+    static = None
+    if plan_value is not None:
+        static = {key: value for key, value in plan_value.items() if key not in customer.DYNAMIC_FIELDS}
+        observations['static_plan'] = static
+    manifest = raw = files = None
+    if bundle is not None:
+        manifest, raw, files = bundle
     adoption = observations['adopt_receipts']
 
     def probe():
@@ -148,12 +151,13 @@ def collect(folder, *, wheel_directory='/root/pr122-runtime-wheels', artifact_zi
         'account-adopt', reports)
 
     def runtime_input():
+        if bundle is None: raise Denied('SOURCE_UNPROVEN')
         _ = wheels_present(wheel_directory, runtime_module)
         tree = venv_tree() if venv_tree is not None else temp_venv_tree(runtime_module)
         members = stdlib() if stdlib is not None else stdlib_trees(runtime_module)
         natives = native() if native is not None else native_files(runtime_module)
         template = {'schema': 1, 'host': runtime_module.FIXED_HOST,
-                    'source_commit': static['source_commit'],
+                    'source_commit': (static or manifest)['source_commit'],
                     'runtime_module_sha256': digest(files[request.IMPLEMENTATIONS['RUNTIME']]),
                     'wheel_directory': str(wheel_directory),
                     'interpreter_sha256': runtime_module.INTERPRETER_SHA256,
@@ -178,19 +182,38 @@ def collect(folder, *, wheel_directory='/root/pr122-runtime-wheels', artifact_zi
         return {'plan_sha256': channel_module.sha(channel_module.canonical(value)),
                 'zip_sha256': artifact_zip_sha256}
 
+    def customer_input():
+        # Only the reviewable static scope enters the signed contract; the live
+        # plan recheck with the dynamic identity probes stays in workflow_apply.
+        if static is None: raise Denied('STATIC_PLAN_UNPROVEN')
+        return {'static_plan': json.loads(json.dumps(static))}
+
     producers = {'PROBE': lambda: {'receipt_sha256': probe_sha}, 'ACCOUNT': account_input,
                  'RUNTIME': runtime_input, 'POLICY_RESTORE': policy_input,
                  'CHANNEL_REBIND': channel_input,
-                 'CUSTOMER_APPLY': lambda: {'static_plan': json.loads(json.dumps(static))}}
+                 'CUSTOMER_APPLY': customer_input}
     stages = {}
     for stage in workflow.STAGES:
         stages[stage] = _section(producers[stage], stage.lower(), reports)
     observations['inputs'] = {'schema': 1, 'stages': stages}
+    def artifact_base():
+        if bundle is None: raise Denied('SOURCE_UNPROVEN')
+        value = {'source_commit': manifest['source_commit'], 'source_tree': manifest['source_tree'],
+                 'manifest_sha256': digest(raw),
+                 'artifact_tar_sha256': release_module.archive_binding(folder, manifest, raw)}
+        # The CI artifact must carry the same git/source identity as the plan; a
+        # live-plan disagreement is a HOLD, never a silently re-bound artifact.
+        if static is not None and any(value[key] != static[key] for key in
+                                      ('source_commit', 'source_tree', 'manifest_sha256',
+                                       'artifact_tar_sha256')):
+            raise Denied('ARTIFACT_PLAN_DRIFT')
+        return value
     if all(value is not None for value in (artifact_zip_sha256, artifact_id, ci_run_id)):
-        artifact = {key: static[key] for key in
-                    ('source_commit', 'source_tree', 'manifest_sha256', 'artifact_tar_sha256')}
-        artifact.update(artifact_zip_sha256=artifact_zip_sha256, artifact_id=artifact_id, ci_run_id=ci_run_id)
-        observations['artifact'] = artifact
+        artifact = _section(artifact_base, 'artifact', reports)
+        if artifact is not None:
+            artifact.update(artifact_zip_sha256=artifact_zip_sha256, artifact_id=artifact_id,
+                            ci_run_id=ci_run_id)
+            observations['artifact'] = artifact
     return observations
 
 
