@@ -8,14 +8,19 @@ import unittest
 from unittest import mock
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+import development_entry_intake as intake
 from development_entry_intake import (validate_event, bind_validated_receipt,
     bind_from_controlled_environment, main, TASK, ENTRIES)
 from task_supervisor import Supervisor
 
 REPO = 'owner/control'
+BOUND_TASK = 'tc-real-development-20261123-4d99c26f2b07'
+BOUND_DESTINATION = {'task_id': BOUND_TASK, 'pull_request_number': 17}
+WRITER_FIELDS = ('attempt_id', 'lease_id', 'fence', 'epoch', 'caller_id',
+                 'run_id', 'session_id', 'gateway_id', 'lock_provider_id')
 
-def fixture(entry='WORK'):
-    value = dict(schema=1, entry=entry, execution_path=ENTRIES[entry], task_id=TASK,
+def fixture(entry='WORK', task_id=TASK):
+    value = dict(schema=1, entry=entry, execution_path=ENTRIES[entry], task_id=task_id,
                  spec_sha256='a'*64, checkpoint_sha256='b'*64,
                  target_repository='owner/business', target_base_sha='c'*40,
                  code_commit='d'*40, event='CODE_READY', attempt_id='a1',
@@ -336,3 +341,74 @@ class HostDestinationTests(unittest.TestCase):
             self.assertEqual(post.call_args[0][0].full_url,
                 'https://api.github.com/repos/owner/control/issues/27/comments')
             self.assertEqual(post.call_count, 1)
+
+
+class WorkflowReceiptRuntimeTests(unittest.TestCase):
+    # Ported from the original PR150 entry-destination delivery (blob
+    # acaca737) unchanged except for popping the canonical-gate inputs that
+    # exist only on this contract lineage; the tested behavior, bindings and
+    # assertions are the original delivered ones.
+    def post_receipt(self, comment_task, bound_env):
+        value, event = fixture('WORK', comment_task)
+        handle, event_path = tempfile.mkstemp(); os.close(handle)
+        with open(event_path, 'w', encoding='utf-8') as stream:
+            json.dump(event, stream)
+        captured = {}
+        class Response(object):
+            status = 201
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+        def fake_open(request, timeout=15):
+            captured['url'] = request.full_url
+            captured['body'] = json.loads(request.data.decode('utf-8'))['body']
+            return Response()
+        env = {'GITHUB_EVENT_PATH': event_path, 'GITHUB_REPOSITORY': REPO,
+               'GITHUB_TOKEN': 'fixture-token',
+               'XJ_CANONICAL_LEDGER_PATH': '', 'XJ_CANDIDATE_ROOT': ''}
+        if bound_env: env['XJ_ENTRY_TASK_ID'] = BOUND_TASK
+        try:
+            with mock.patch.dict(os.environ, env):
+                os.environ.pop('XJ_CANONICAL_LEDGER_PATH', None)
+                os.environ.pop('XJ_CANDIDATE_ROOT', None)
+                if not bound_env:
+                    os.environ.pop('XJ_ENTRY_TASK_ID', None)
+                with mock.patch.object(
+                        intake, 'syntax_receipt', return_value=None), mock.patch.object(
+                        intake.urllib.request, 'urlopen', side_effect=fake_open):
+                    main(intake._host_destination())
+        finally:
+            os.unlink(event_path)
+        raw = captured['body'].split('\n', 1)[0]
+        self.assertTrue(raw.endswith(' -->'))
+        return captured, json.loads(
+            raw[len('<!-- XJ_DEV_ENTRY_RECEIPT '):-len(' -->')])
+
+    def test_workflow_binding_posts_valid_pr17_receipt_quoting_writer_binding(self):
+        with mock.patch.dict(os.environ, {'XJ_ENTRY_TASK_ID': BOUND_TASK}):
+            self.assertEqual(intake._host_destination(), dict(BOUND_DESTINATION))
+        captured, payload = self.post_receipt(BOUND_TASK, True)
+        self.assertEqual(captured['url'],
+            'https://api.github.com/repos/owner/control/issues/17/comments')
+        self.assertEqual(payload['status'], 'RECEIPT_VALIDATED_NOT_ADMITTED')
+        self.assertEqual(payload['task_id'], BOUND_TASK)
+        for key in WRITER_FIELDS + ('code_commit', 'target_base_sha',
+                                    'spec_sha256', 'checkpoint_sha256'):
+            self.assertIn(key, payload)
+        self.assertEqual(payload['authority_effect'], 'NONE')
+        self.assertIn('::SKIP_COMPLETION::', captured['body'])
+
+    def test_legacy_unbound_invocation_still_receipts_the_original_task(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('XJ_ENTRY_TASK_ID', None)
+            self.assertIsNone(intake._host_destination())
+        captured, payload = self.post_receipt(TASK, False)
+        self.assertEqual(payload['status'], 'RECEIPT_VALIDATED_NOT_ADMITTED')
+        self.assertEqual(payload['task_id'], TASK)
+        self.assertEqual(captured['url'],
+            'https://api.github.com/repos/owner/control/issues/17/comments')
+
+    def test_bound_env_fails_closed_for_other_task_body(self):
+        captured, payload = self.post_receipt(TASK, True)
+        self.assertEqual(payload['status'], 'REJECTED_INVALID_ENTRY_ENVELOPE')
+        self.assertEqual(payload['authority_effect'], 'NONE')
+        self.assertEqual(payload['source_comment_id'], 123)

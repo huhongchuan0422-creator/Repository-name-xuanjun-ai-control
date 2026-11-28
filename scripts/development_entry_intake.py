@@ -275,5 +275,15 @@ def main(destination=None):
     print(receipt['status'])
 
 
+def _host_destination():
+    # The workflow receipt job binds the host-selected task to the original
+    # PR 17 entry destination at the real call site; the comment body never
+    # selects it. Without a binding the original host task stays in force.
+    task = os.environ.get('XJ_ENTRY_TASK_ID')
+    if not task:
+        return None
+    return {'task_id': task, 'pull_request_number': 17}
+
+
 if __name__ == '__main__':
-    main()
+    main(_host_destination())
