@@ -262,6 +262,20 @@ class OpenAICompatibleAdapter(object):
                     parsed_usage['total_tokens'] != parsed_usage['input_tokens']+
                     parsed_usage['output_tokens']):
                 raise TypeError()
+            def detail(container,name,base_name):
+                # Per-task finance metering: real provider detail fields only.
+                # Absent or overlapping-inconsistent values stay None (unknown),
+                # never 0, and never block the original request flow.
+                inner=usage.get(container)
+                value=inner.get(name) if isinstance(inner,dict) else None
+                if type(value) is not int or value<0:return None
+                base=parsed_usage[base_name]
+                if base is not None and value>base:return None
+                return value
+            parsed_usage['cached_tokens']=detail('prompt_tokens_details',
+              'cached_tokens','input_tokens')
+            parsed_usage['reasoning_tokens']=detail('completion_tokens_details',
+              'reasoning_tokens','output_tokens')
         except Exception:
             raise ProviderError('PROTOCOL', 'INVALID_RESPONSE_SHAPE')
         return {'content': content, 'usage': parsed_usage,
@@ -386,6 +400,7 @@ class ModelControl(object):
               model_id TEXT NOT NULL,capabilities_json TEXT NOT NULL,
               enabled INTEGER NOT NULL,price_state TEXT NOT NULL,
               input_unit_cost REAL,output_unit_cost REAL,
+              currency TEXT,price_version TEXT,
               PRIMARY KEY(tenant_id,provider_id,model_id),
               FOREIGN KEY(tenant_id,provider_id) REFERENCES
               model_providers(tenant_id,provider_id))''',
@@ -425,7 +440,8 @@ class ModelControl(object):
               provider_id TEXT NOT NULL,model_id TEXT NOT NULL,
               input_tokens INTEGER NOT NULL,output_tokens INTEGER NOT NULL,
               cost_state TEXT NOT NULL,cost_value REAL,outcome TEXT NOT NULL,
-              observed_at REAL NOT NULL,PRIMARY KEY(tenant_id,request_id))''',
+              observed_at REAL NOT NULL,cached_tokens INTEGER,
+              reasoning_tokens INTEGER,PRIMARY KEY(tenant_id,request_id))''',
             '''CREATE TABLE IF NOT EXISTS model_call_attempts(
               tenant_id TEXT NOT NULL,request_id TEXT NOT NULL,
               attempt_number INTEGER NOT NULL,provider_id TEXT NOT NULL,
@@ -519,6 +535,9 @@ class ModelControl(object):
               model_id TEXT NOT NULL,input_tokens INTEGER,
               output_tokens INTEGER,cost_state TEXT NOT NULL,cost_value REAL,
               outcome TEXT NOT NULL,observed_at REAL NOT NULL,
+              task_id TEXT,attempt_id TEXT,cached_tokens INTEGER,
+              reasoning_tokens INTEGER,cost_basis TEXT,currency TEXT,
+              price_version TEXT,billing_route TEXT,
               PRIMARY KEY(tenant_id,request_id,attempt_number))''',
             '''CREATE TABLE IF NOT EXISTS approved_skills(
               tenant_id TEXT NOT NULL,skill_id TEXT NOT NULL,
@@ -574,6 +593,24 @@ class ModelControl(object):
             for name in ('input_usage_state','output_usage_state'):
                 if name not in evaluation_columns:
                     self.db.execute("ALTER TABLE model_evaluations ADD COLUMN %s TEXT NOT NULL DEFAULT 'KNOWN'"%name)
+            attempt_columns={x['name'] for x in self.db.execute(
+              'PRAGMA table_info(model_usage_attempts)')}
+            for name,decl in (('task_id','TEXT'),('attempt_id','TEXT'),
+                    ('cached_tokens','INTEGER'),('reasoning_tokens','INTEGER'),
+                    ('cost_basis','TEXT'),('currency','TEXT'),
+                    ('price_version','TEXT'),('billing_route','TEXT')):
+                if name not in attempt_columns:
+                    self.db.execute('ALTER TABLE model_usage_attempts ADD COLUMN %s %s'%(name,decl))
+            event_columns={x['name'] for x in self.db.execute(
+              'PRAGMA table_info(model_usage_events)')}
+            for name in ('cached_tokens','reasoning_tokens'):
+                if name not in event_columns:
+                    self.db.execute('ALTER TABLE model_usage_events ADD COLUMN %s INTEGER'%name)
+            catalog_columns={x['name'] for x in self.db.execute(
+              'PRAGMA table_info(model_catalog)')}
+            for name in ('currency','price_version'):
+                if name not in catalog_columns:
+                    self.db.execute('ALTER TABLE model_catalog ADD COLUMN %s TEXT'%name)
 
     @staticmethod
     def _origin(value):
@@ -982,8 +1019,11 @@ class ModelControl(object):
         self._admin()
         required={'provider_id','model_id','capabilities','enabled','price_state',
                   'input_unit_cost','output_unit_cost'}
-        if not isinstance(value,dict) or set(value)!=required:
+        if not isinstance(value,dict) or not required.issubset(set(value)) or \
+                set(value)-required-{'currency','price_version'}:
             raise ValueError('EXACT_MODEL_CONFIG_REQUIRED')
+        for key in ('currency','price_version'):
+            if value.get(key) is not None:_text(value[key],key)
         if not isinstance(value['capabilities'],list) or not value['capabilities']:
             raise ValueError('MODEL_CAPABILITIES_REQUIRED')
         if value['price_state'] not in PRICE_STATES:raise ValueError('VALID_PRICE_STATE_REQUIRED')
@@ -1004,12 +1044,15 @@ class ModelControl(object):
             if (provider['price_state']=='KNOWN_PAID' and
                     value['price_state']!='KNOWN_PAID'):
                 raise ValueError('PAID_PROVIDER_MODEL_MUST_BE_KNOWN_PAID')
-            self.db.execute('''INSERT OR REPLACE INTO model_catalog VALUES
-              (?,?,?,?,?,?,?,?)''',(self.tenant_id,
+            self.db.execute('''INSERT OR REPLACE INTO model_catalog(tenant_id,
+              provider_id,model_id,capabilities_json,enabled,price_state,
+              input_unit_cost,output_unit_cost,currency,price_version) VALUES
+              (?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,
               _text(value['provider_id'],'provider_id'),
               _text(value['model_id'],'model_id'),
               canonical(sorted(set(value['capabilities']))),int(value['enabled']),
-              value['price_state'],value['input_unit_cost'],value['output_unit_cost']))
+              value['price_state'],value['input_unit_cost'],value['output_unit_cost'],
+              value.get('currency'),value.get('price_version')))
             self.db.commit()
         except Exception:
             self.db.rollback();raise
@@ -1718,10 +1761,10 @@ class ModelControl(object):
                         receipt['provider_request_id']):
                     raise ValueError('EXACT_RECOVERED_RESULT_REQUIRED')
                 usage=recovered_result['usage']
-                if (not isinstance(usage,dict) or set(usage)!=
-                        {'input_tokens','output_tokens','total_tokens'} or
+                if (not isinstance(usage,dict) or not {'input_tokens','output_tokens','total_tokens'}.issubset(usage) or
+                        set(usage)-{'input_tokens','output_tokens','total_tokens','cached_tokens','reasoning_tokens'} or
                         any(type(usage[key]) is not int or usage[key]<0
-                            for key in usage) or
+                            for key in ('input_tokens','output_tokens','total_tokens')) or
                         usage['total_tokens']!=usage['input_tokens']+
                         usage['output_tokens']):
                     raise ValueError('EXACT_RECOVERED_USAGE_REQUIRED')
@@ -1833,10 +1876,11 @@ class ModelControl(object):
             if outcome=='RESULT_RECOVERED':
                 usage=recovered_result['usage']
                 self.db.execute('''UPDATE model_usage_attempts SET
-                  input_tokens=?,output_tokens=?,cost_state=?,cost_value=NULL,
+                  input_tokens=?,output_tokens=?,cached_tokens=?,reasoning_tokens=?,cost_state=?,cost_value=NULL,
                   outcome='RECOVERED_RESULT',observed_at=? WHERE tenant_id=?
                   AND request_id=? AND attempt_number=?''',(
-                  usage['input_tokens'],usage['output_tokens'],UNKNOWN,now,
+                  usage['input_tokens'],usage['output_tokens'],usage.get('cached_tokens'),
+                  usage.get('reasoning_tokens'),UNKNOWN,now,
                   self.tenant_id,request_id,row['attempts']))
             else:
                 self.db.execute('''INSERT OR REPLACE INTO model_quota_status
@@ -2090,7 +2134,7 @@ class ModelControl(object):
                 else:actual_state='KNOWN_ZERO';actual_cost=0.0
                 self._settle_reservation_locked(reservation['reservation_id'],
                                                 'SETTLED',now,actual_state,actual_cost)
-                self.db.execute('''INSERT INTO model_usage_attempts VALUES
+                self.db.execute('''INSERT INTO model_usage_attempts(tenant_id,request_id,attempt_number,provider_id,model_id,input_tokens,output_tokens,cost_state,cost_value,outcome,observed_at) VALUES
                   (?,?,?,?,?,?,?,?,?,?,?)''',(self.tenant_id,request_id,1,
                   provider_id,model_id,usage.get('input_tokens'),
                   usage.get('output_tokens'),actual_state,actual_cost,outcome,now))
@@ -2578,6 +2622,33 @@ class ModelControl(object):
           canonical(acceptance),now));self.db.commit()
         return {'task_id':task_id,'spec_recorded':True}
 
+    def finance_usage_readback(self, task_id):
+        """Read accounting metadata only; never infer a customer contract price.
+
+        Attempt rows are the resource ledger, not additive to request summaries.
+        Cache is included in input, reasoning in output; no double addition.
+        This method does not route responses to any assistant or session.
+        """
+        self.gateway.assert_task_context(self.context,task_id)
+        rows=[dict(x) for x in self.db.execute('''SELECT
+          r.task_id,r.attempt_id,r.role_id,t.parent_task_id,g.project_id,
+          a.request_id,a.attempt_number,a.provider_id,a.model_id,
+          a.input_tokens,a.output_tokens,a.cached_tokens,a.reasoning_tokens,
+          a.cost_state,a.cost_value,a.cost_basis,a.currency,a.price_version,
+          a.billing_route,a.outcome,a.observed_at
+          FROM model_usage_attempts a JOIN model_requests r
+          ON r.tenant_id=a.tenant_id AND r.request_id=a.request_id
+          JOIN tasks t ON t.task_id=r.task_id
+          JOIN gateway_task_metadata g ON g.tenant_id=r.tenant_id AND g.task_id=r.task_id
+          WHERE a.tenant_id=? AND r.task_id=?
+          ORDER BY a.request_id,a.attempt_number''',(self.tenant_id,task_id))]
+        return {'task_id':task_id,'resource_attempts':rows,
+          'customer_receivable':None,'customer_rule_state':'NOT_CONNECTED',
+          'collected':None,'collection_state':'NOT_OWNED_BY_METERING',
+          'credits':None,'subscription_units':None,'conversion':'NONE',
+          'overlap':{'cached_tokens':'SUBSET_OF_INPUT',
+            'reasoning_tokens':'SUBSET_OF_OUTPUT'}}
+
     def projection(self):
         has_connections=self.db.execute('''SELECT 1 FROM sqlite_master WHERE
           type='table' AND name='service_connections' ''').fetchone() is not None
@@ -2780,7 +2851,7 @@ class ModelScheduler(object):
           b.writer_principal,b.writer_valid_until,b.skill_snapshot_sha256,b.work_spec_sha256,
           b.module_version,b.source_metadata_json,b.source_metadata_mac,p.adapter_type,p.base_url,p.timeout_seconds,
           p.retry_limit,p.config_version,p.price_state AS provider_price,
-          m.price_state AS model_price,m.input_unit_cost,m.output_unit_cost,
+          m.price_state AS model_price,m.input_unit_cost,m.output_unit_cost,m.currency,m.price_version,
           a.principal_id AS instance_id,rt.phase AS role_phase,
           rt.writer_allowed AS role_writer_allowed
           FROM eligible r JOIN
@@ -3031,7 +3102,7 @@ class ModelScheduler(object):
                     self.control._settle_reservation_locked(
                       reservation['reservation_id'],'CANCELLED' if cancelled else
                       'SETTLED',now,UNKNOWN,None)
-                    self.db.execute('''INSERT INTO model_usage_attempts VALUES
+                    self.db.execute('''INSERT INTO model_usage_attempts(tenant_id,request_id,attempt_number,provider_id,model_id,input_tokens,output_tokens,cost_state,cost_value,outcome,observed_at) VALUES
                       (?,?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
                       row['attempts']+1,row['provider_id'],row['model_id'],None,
                       None,UNKNOWN,None,next_state,now))
@@ -3091,17 +3162,30 @@ class ModelScheduler(object):
                 raise ValueError('CALL_RESERVATION_REQUIRED')
             self.control._settle_reservation_locked(reservation_id,'SETTLED',now,
                                                     cost_state,cost_value)
-            self.db.execute('''INSERT INTO model_usage_attempts VALUES
+            self.db.execute('''INSERT INTO model_usage_attempts(tenant_id,request_id,attempt_number,provider_id,model_id,input_tokens,output_tokens,cost_state,cost_value,outcome,observed_at) VALUES
               (?,?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
               row['attempts']+1,row['provider_id'],row['model_id'],
               usage.get('input_tokens') if result else None,
               usage.get('output_tokens') if result else None,cost_state,
               cost_value,state,now))
+            self.db.execute('''UPDATE model_usage_attempts SET task_id=?,attempt_id=?,
+              cached_tokens=?,reasoning_tokens=?,cost_basis=?,currency=?,price_version=?
+              WHERE tenant_id=? AND request_id=? AND attempt_number=?''',(
+              row['task_id'],row['attempt_id'],usage.get('cached_tokens'),
+              usage.get('reasoning_tokens'),
+              'CATALOG_ESTIMATE' if cost_state=='KNOWN' else
+              'CATALOG_FREE' if cost_state=='KNOWN_ZERO' else None,
+              row['currency'],row['price_version'],row['tenant_id'],
+              row['request_id'],row['attempts']+1))
             if usage_complete:
-                self.db.execute('''INSERT OR REPLACE INTO model_usage_events VALUES
+                self.db.execute('''INSERT OR REPLACE INTO model_usage_events(tenant_id,request_id,provider_id,model_id,input_tokens,output_tokens,cost_state,cost_value,outcome,observed_at) VALUES
                   (?,?,?,?,?,?,?,?,?,?)''',(row['tenant_id'],row['request_id'],
                    row['provider_id'],row['model_id'],usage['input_tokens'],
                    usage['output_tokens'],cost_state,cost_value,state,now))
+                self.db.execute('''UPDATE model_usage_events SET cached_tokens=?,
+                  reasoning_tokens=? WHERE tenant_id=? AND request_id=?''',(
+                  usage.get('cached_tokens'),usage.get('reasoning_tokens'),
+                  row['tenant_id'],row['request_id']))
             self.db.execute('''UPDATE role_instances SET state=CASE WHEN
               desired_state='STOPPED' THEN 'STOPPED' ELSE 'IDLE' END,
               current_request_id=CASE WHEN ? IN ('FAILED','UNKNOWN') THEN

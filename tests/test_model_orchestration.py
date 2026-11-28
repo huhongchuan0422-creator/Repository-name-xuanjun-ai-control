@@ -361,7 +361,7 @@ class ModelOrchestrationTests(unittest.TestCase):
                     table=='model_catalog'):
                 attempted.append(True);other=sqlite3.connect(self.db,timeout=0)
                 try:
-                    other.execute('''INSERT INTO model_catalog VALUES
+                    other.execute('''INSERT INTO model_catalog(tenant_id,provider_id,model_id,capabilities_json,enabled,price_state,input_unit_cost,output_unit_cost) VALUES
                       (?,?,?,?,?,?,?,?)''',('tenant-a','race-price','late-free',
                       '["code"]',1,'KNOWN_FREE',0,0));other.commit()
                 except sqlite3.OperationalError as exc:blocked.append(str(exc))
@@ -446,7 +446,8 @@ class ModelOrchestrationTests(unittest.TestCase):
             self.assertEqual(ok['usage']['total_tokens'],5)
             unknown=adapter.invoke(self.url,SECRET,'no-usage',[],1)
             self.assertEqual(unknown['usage'],{'input_tokens':None,
-              'output_tokens':None,'total_tokens':None})
+              'output_tokens':None,'total_tokens':None,'cached_tokens':None,
+              'reasoning_tokens':None})
             with self.assertRaisesRegex(ProviderError,'AUTH'):adapter.invoke(self.url,SECRET,'auth',[],1)
             with self.assertRaisesRegex(ProviderError,'BILLING'):adapter.invoke(self.url,SECRET,'billing',[],1)
             with self.assertRaisesRegex(ProviderError,'RATE_LIMIT'):adapter.invoke(self.url,SECRET,'rate',[],1)

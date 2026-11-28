@@ -184,7 +184,12 @@ def settle(scheduler, row, receipt, now, query=False):
     if not valid: receipt={'requestId':row['request_id'],'state':'UNKNOWN'}
     # Narrow receipt surface, not arbitrary provider logs or credentials.
     receipt={k:receipt[k] for k in ('requestId','state','runId','sessionKey','actualRoute',
-             'errorCategory','checkpoint','result') if k in receipt}
+             'errorCategory','checkpoint','result','usage') if k in receipt}
+    if 'usage' in receipt:
+        source=receipt['usage'] if isinstance(receipt['usage'],dict) else {}
+        receipt['usage']={key:(source.get(key) if type(source.get(key)) is int
+          and source[key]>=0 else None) for key in
+          ('input_tokens','output_tokens','cached_tokens','reasoning_tokens')}
     state=receipt['state']; category=receipt.get('errorCategory')
     if state=='NO_EFFECT' and (receipt.get('runId') or receipt.get('sessionKey')):state='UNKNOWN'
     if state in ('ACCEPTED','SUCCEEDED') and not (receipt.get('runId') and receipt.get('sessionKey')):
@@ -215,6 +220,37 @@ def settle(scheduler, row, receipt, now, query=False):
             (next_state,category,canonical(checkpoint),canonical(receipt.get('result')),
              now,now)+identity+(row['attempts'],)).rowcount
         if changed!=1: raise ValueError('GATEWAY_RECEIPT_CAS_FAILED')
+        if next_state in ('SUCCEEDED','FAILED','CANCELLED','RETRY_WAIT','UNKNOWN'):
+            # Trusted native receipt metadata only; absent usage is unknown.
+            # Subscription/credits are not converted into cash or tokens.
+            usage=receipt.get('usage') or {}
+            route=receipt.get('actualRoute')
+            route=route if isinstance(route,dict) else {}
+            cached=usage.get('cached_tokens'); reasoning=usage.get('reasoning_tokens')
+            if cached is not None and usage.get('input_tokens') is not None and cached>usage['input_tokens']:
+                cached=None
+            if reasoning is not None and usage.get('output_tokens') is not None and reasoning>usage['output_tokens']:
+                reasoning=None
+            db.execute('''INSERT INTO model_usage_attempts(
+              tenant_id,request_id,attempt_number,provider_id,model_id,
+              input_tokens,output_tokens,cost_state,cost_value,outcome,observed_at,
+              task_id,attempt_id,cached_tokens,reasoning_tokens,billing_route)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+              ON CONFLICT(tenant_id,request_id,attempt_number) DO UPDATE SET
+              input_tokens=COALESCE(excluded.input_tokens,model_usage_attempts.input_tokens),
+              output_tokens=COALESCE(excluded.output_tokens,model_usage_attempts.output_tokens),
+              cached_tokens=COALESCE(excluded.cached_tokens,model_usage_attempts.cached_tokens),
+              reasoning_tokens=COALESCE(excluded.reasoning_tokens,model_usage_attempts.reasoning_tokens),
+              provider_id=CASE WHEN excluded.provider_id='UNKNOWN' THEN model_usage_attempts.provider_id ELSE excluded.provider_id END,
+              model_id=CASE WHEN excluded.model_id='UNKNOWN' THEN model_usage_attempts.model_id ELSE excluded.model_id END,
+              billing_route=COALESCE(excluded.billing_route,model_usage_attempts.billing_route),
+              outcome=excluded.outcome,observed_at=excluded.observed_at''',(
+              row['tenant_id'],row['request_id'],fresh['attempts'],
+              route.get('provider') if isinstance(route.get('provider'),str) else 'UNKNOWN',
+              route.get('model') if isinstance(route.get('model'),str) else 'UNKNOWN',
+              usage.get('input_tokens'),usage.get('output_tokens'),'UNKNOWN',None,
+              next_state,now,fresh['task_id'],fresh['attempt_id'],cached,reasoning,
+              route.get('billingRoute') if isinstance(route.get('billingRoute'),str) else None))
         db.execute('UPDATE model_gateway_dispatch SET receipt_json=?,excluded_json=? WHERE tenant_id=? AND request_id=?',
                    (canonical(receipt),canonical(excluded))+identity)
         db.execute("UPDATE role_instances SET state=?,current_request_id=?,last_checkpoint_json=?,updated_at=? WHERE tenant_id=? AND current_request_id=?",
