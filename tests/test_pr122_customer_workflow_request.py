@@ -489,7 +489,7 @@ class OriginalEntryTests(OfflineCase):
 
     def test_direct_owner_host_and_sudo_caller_are_checked_before_reads(self):
         cases = [('getuid', 1000), ('geteuid', 1000), ('getgid', 1000), ('getegid', 1000),
-                 ('host', 'foreign'), ('sudo', '1000')]
+                 ('host', 'foreign'), ('sudo', '1002')]
         for kind, value in cases:
             with self.subTest(kind=kind), ExitStack() as stack:
                 if kind in ('getuid', 'geteuid', 'getgid', 'getegid'): stack.enter_context(patch.object(release.os, kind, return_value=value))
@@ -499,6 +499,17 @@ class OriginalEntryTests(OfflineCase):
                     release.workflow_entry('/offline/source', 123)
         self.reader.assert_not_called()
         self.apply.assert_not_called()
+
+    def test_privileged_operator_sudo_session_is_admitted_after_host_and_root_checks(self):
+        # Installation ownership is the Owner gate, not the root session shape.
+        # Only the fixed unprivileged runner account (uid 1002) stays excluded,
+        # matching domestic_bootstrap.owner and channel owner conventions.
+        with self.subTest(), patch.dict(os.environ, {'SUDO_UID': '1000'}):
+            self.assertEqual(release.workflow_entry('/offline/source', 123), {'state': 'fixture-only'})
+        self.assertEqual(self.reader.call_args_list, [
+            call(release.CONFIG / 'WHOLE_WORKFLOW_PLAN.json', protected=True),
+            call(release.CONFIG / 'WHOLE_WORKFLOW_INPUTS.json', protected=True)])
+        self.apply.assert_called_once_with('/offline/source', 123, self.plan)
 
     def test_entry_rejects_boolean_negative_comment_and_missing_source(self):
         for folder, comment in (('/offline/source', True), ('/offline/source', 0),

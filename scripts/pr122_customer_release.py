@@ -258,7 +258,7 @@ def workflow_entry(folder,comment):
     from scripts import pr122_customer_workflow_request as request
     need(type(comment) is int and comment>0 and type(folder) is str and bool(folder),'WORKFLOW_ENTRY_ARGUMENTS')
     need(os.getuid()==os.geteuid()==os.getgid()==os.getegid()==0 and os.uname().nodename=='iZvt5t8tlrm8oiZ'
-         and os.environ.get('SUDO_UID') in (None,'0'),'WORKFLOW_DIRECT_OWNER_REQUIRED')
+         and os.environ.get('SUDO_UID') != '1002','WORKFLOW_DIRECT_OWNER_REQUIRED')
     from scripts.pr122_customer_attempts import protected_directory
     protected_directory(Path(folder))
     plan_value=request.read_json(CONFIG/'WHOLE_WORKFLOW_PLAN.json',protected=True)
