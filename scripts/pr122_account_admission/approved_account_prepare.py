@@ -173,10 +173,19 @@ def read_public_config(path):
         return f.read(131072).decode('utf-8')
 
 def secure_postcheck_tool(path):
-    need(path in ('/usr/bin/sudo', '/usr/bin/passwd'))
+    need(path in TOOL_CANONICAL_MODES)
     secure(Path(path).parent, directory=True)
-    row = os.lstat(path)
-    need(row.st_uid == row.st_gid == 0 and stat.S_ISREG(row.st_mode) and (row.st_nlink == 1) and (stat.S_IMODE(row.st_mode) in (493, 2541)))
+    need(tool_shape_ok(path, os.lstat(path)))
+
+# Exact per-path canonical distribution modes, octal literals.
+# The verified AL8/Anolis host ships /usr/bin/sudo as 0o4111 (owner-exec-only +
+# setuid), which the old shared (0o755, 0o4755) tuple wrongly rejected. This is a
+# pinned per-path allowlist, not a general setuid permission: root:root, regular
+# file and nlink 1 remain mandatory, and /usr/bin/passwd keeps its stricter set.
+TOOL_CANONICAL_MODES = {'/usr/bin/sudo': (0o755, 0o4111, 0o4755), '/usr/bin/passwd': (0o755, 0o4755)}
+
+def tool_shape_ok(path, row):
+    return (row.st_uid == row.st_gid == 0 and stat.S_ISREG(row.st_mode) and row.st_nlink == 1 and stat.S_IMODE(row.st_mode) in TOOL_CANONICAL_MODES[path])
 
 class OS:
 

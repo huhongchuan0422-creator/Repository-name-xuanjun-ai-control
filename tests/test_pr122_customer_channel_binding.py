@@ -3,34 +3,50 @@ from scripts.pr122_customer_channel_binding import bind
 from scripts.pr122_customer_core import Denied
 from unittest.mock import patch
 class BindingTests(unittest.TestCase):
-    def identity_members(self):
-        import tempfile,tarfile
+    def archive_bytes(self):
+        import tempfile
         from pathlib import Path
         from scripts.pr122_customer_package import build
-        with tempfile.TemporaryDirectory(prefix='identity-shape-synthetic-') as folder:
-            build(folder,'a'*40,'b'*40)
-            with tarfile.open(Path(folder)/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz') as archive:return archive.getmembers()
-    def test_exact_identity_103_and_legacy_envelope(self):
+        if not hasattr(self,'_archive_bytes'):
+            with tempfile.TemporaryDirectory(prefix='identity-shape-synthetic-') as folder:
+                build(folder,'a'*40,'b'*40)
+                self._archive_bytes=(Path(folder)/'PR122_CUSTOMER_CENTER_REVIEW_ONLY.tar.gz').read_bytes()
+        return self._archive_bytes
+    def identity_members(self):
+        import io,tarfile
+        with tarfile.open(fileobj=io.BytesIO(self.archive_bytes())) as archive:return archive.getmembers()
+    def identity_manifest(self):
+        import io,json,tarfile
+        with tarfile.open(fileobj=io.BytesIO(self.archive_bytes())) as archive:return json.loads(archive.extractfile('customer-center/CUSTOMER_MANIFEST.json').read())
+    def test_manifest_exact_closure_and_legacy_envelope(self):
         import tarfile
         from scripts.pr122_customer_channel_binding import validate_member_shape
-        members=self.identity_members();self.assertEqual(len(members),103);validate_member_shape(members)
+        members=self.identity_members();manifest=self.identity_manifest()
+        self.assertEqual({m.name for m in members},{'customer-center/CUSTOMER_MANIFEST.json',*['customer-center/'+x['path'] for x in manifest['files']]})
+        validate_member_shape(members,manifest)
         validate_member_shape([tarfile.TarInfo('customer-center/a'),tarfile.TarInfo('customer-center/b')])
-    def test_identity_incomplete_counts_and_oversize_rejected(self):
+    def test_identity_incomplete_and_oversize_rejected(self):
         import tarfile
         from scripts.pr122_customer_channel_binding import validate_member_shape
-        members=self.identity_members()
-        for count in (100,101,102):
-            with self.subTest(count=count),self.assertRaises(Denied):validate_member_shape(members[:count])
+        members=self.identity_members();manifest=self.identity_manifest()
+        for drop in (0,1,len(members)//2):
+            kept=members[:len(members)-1-drop] if drop<len(members)-1 else members[:1]
+            with self.subTest(kept=len(kept)),self.assertRaises(Denied):validate_member_shape(kept,manifest)
+        with self.assertRaises(Denied):validate_member_shape(members+[tarfile.TarInfo('customer-center/extra')],manifest)
         with self.assertRaises(Denied):validate_member_shape(members+[tarfile.TarInfo('customer-center/extra')])
-    def test_identity_baseline_substitution_and_missing_addition_rejected(self):
+    def test_identity_addition_substitution_and_missing_manifest_rejected(self):
         import copy
         from scripts.pr122_customer_channel_binding import validate_member_shape,IDENTITY_ADDITIONS
-        members=self.identity_members()
+        members=self.identity_members();manifest=self.identity_manifest()
         for addition in (True,False):
             changed=copy.deepcopy(members)
             entry=next(m for m in changed if (m.name.removeprefix('customer-center/') in IDENTITY_ADDITIONS)==addition and not m.name.endswith('/CUSTOMER_MANIFEST.json'))
             entry.name='customer-center/unapproved.py'
-            with self.subTest(addition=addition),self.assertRaises(Denied):validate_member_shape(changed)
+            with self.subTest(addition=addition),self.assertRaises(Denied):validate_member_shape(changed,manifest)
+        stripped=copy.deepcopy(members)
+        for i,m in enumerate(stripped):
+            if m.name=='customer-center/scripts/pr122_customer_identity.py':del stripped[i];break
+        with self.assertRaises(Denied):validate_member_shape(stripped,manifest)
     def test_identity_duplicate_link_and_traversal_still_rejected(self):
         import copy,tarfile
         from scripts.pr122_customer_channel_binding import validate_member_shape

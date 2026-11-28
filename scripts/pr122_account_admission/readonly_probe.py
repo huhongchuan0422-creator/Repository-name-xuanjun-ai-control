@@ -6,7 +6,7 @@ import stat
 import datetime
 import re
 
-APPROVED_SHA = '885b850864465a554d99adbdfb4b4d4e33abf5dc52e7dcf84f27597c247c0818'
+APPROVED_SHA = '0baaf83bcb171168d0e44431fe27f595f059cbc92a25740dbbf6b048287d932c'
 TOOLS = ('/usr/sbin/useradd', '/usr/sbin/nologin', '/usr/bin/passwd', '/usr/bin/sudo')
 HOOKS = ('/etc/shadow-maint/useradd-pre.d', '/etc/shadow-maint/useradd-post.d', '/etc/useradd.d')
 BOOLS = ('fixed_useradd_flags_supported', 'no_account_creation_hooks', 'no_supplementary_group_defaults')

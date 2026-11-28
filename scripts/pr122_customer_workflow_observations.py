@@ -76,7 +76,7 @@ def stdlib_trees(runtime_module):
             for name in dirs: runtime_module._root_chain(Path(base) / name)
             for name in names:
                 p = Path(base) / name
-                members[str(p.relative_to(root))] = digest(runtime_module._protected_bytes(p))
+                members[str(p.relative_to(root))] = digest(runtime_module._protected_bytes(p, allow_declared_pyc=True))
         out[root] = members
     return out or None
 
@@ -90,8 +90,11 @@ def native_files(runtime_module):
     for line in result.stdout.decode('utf-8', 'replace').splitlines():
         parts = line.split()
         if len(parts) < 3 or not parts[2].startswith('/'): continue
-        path = Path(parts[2])
-        if not any(str(path).startswith(x) for x in ('/usr/lib/', '/usr/lib64/', '/lib/', '/lib64/')):
+        # Normalize only the fixed /lib64->usr/lib64 and /lib->usr/lib distribution
+        # aliases (ldd prints alias paths); the canonical root-owned regular file
+        # is what gets opened, hashed and recorded. Nothing else is followed.
+        path = runtime_module.canonical_system_path(parts[2])
+        if not any(str(path).startswith(x) for x in ('/usr/lib/', '/usr/lib64/')):
             continue
         out[str(path)] = digest(runtime_module._protected_bytes(path))
     return out or None

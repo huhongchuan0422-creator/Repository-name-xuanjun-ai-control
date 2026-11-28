@@ -14,7 +14,7 @@ SCHEMA = 'PR122_IDENTITY_AUTHORIZATION_V1'
 FIELDS = {'schema', 'request_id', 'caller', 'audience', 'user_id', 'tenant_id',
           'project_id', 'operation', 'issued_unix', 'expires_unix', 'authorization_token'}
 CHANNEL = 'COMMUNITY_AUTHORIZATION_CONSUMPTION'
-PIN = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
+PIN = 'd51ca10c42572abaf9dd5ba5c09408947aaa79012ac47afab9219c55af7aa6cf'
 
 
 class ConsumptionUnknown(PermissionError):

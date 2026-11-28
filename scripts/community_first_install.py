@@ -25,7 +25,7 @@ class FirstInstallation:
     @classmethod
     def initialize(cls, directory, keys, active_key, realm, bindings, *, clock, mail_config=None, mail_secret_resolver=None, mail_http_opener=None, mail_smtp_factory=None, mail_receipt_lookup=None, mail_address_resolver=None):
         _require_nonroot()
-        if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!='cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0':
+        if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!='d51ca10c42572abaf9dd5ba5c09408947aaa79012ac47afab9219c55af7aa6cf':
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
         if (type(realm) is not dict or set(realm) != {'project','tenant','customer','title','expires','authority_ref'}
                 or type(realm['expires']) is not int or not callable(clock)):

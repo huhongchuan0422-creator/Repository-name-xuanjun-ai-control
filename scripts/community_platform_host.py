@@ -17,7 +17,7 @@ from scripts.community_saas_phase2 import Principal
 from scripts.pr122_customer_core import Center
 from scripts.community_mini_application import MiniApplication
 
-CORE_SHA256 = 'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
+CORE_SHA256 = 'd51ca10c42572abaf9dd5ba5c09408947aaa79012ac47afab9219c55af7aa6cf'
 FIELDS = {'version','center_root','runtime_directory','application_config',
           'principals','bindings','operations','reviewers','socket_path',
           'https_origin','nginx_uid','nginx_gid'}

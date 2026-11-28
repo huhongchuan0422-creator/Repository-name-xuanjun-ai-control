@@ -156,7 +156,7 @@ class MerchantOnboarding:
         if type(center) is not Center or type(reviewers) is not dict or (not reviewers and not has_admin_templates(center,'/merchant/onboarding')):
             raise ValueError('EXISTING_CENTER_AND_PROTECTED_REVIEWERS_REQUIRED')
         if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!=\
-                'cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0':
+                'd51ca10c42572abaf9dd5ba5c09408947aaa79012ac47afab9219c55af7aa6cf':
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
         if any(type(k) is not str or not k or type(v) is not str or not v for k,v in reviewers.items()):
             raise ValueError('ORIGINAL_REVIEWER_PROJECT_BINDING_REQUIRED')

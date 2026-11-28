@@ -11,30 +11,37 @@ import tarfile
 from scripts.pr122_customer_core import canonical,digest,Denied
 
 ORIGINAL_SHA='0804e33edac6ad07a711456c0c15708266b2ad8a75c4cb3bdc5964a9b79a96bd'
-# Exact 58b1dbbc 99-file baseline path set, plus the three identity additions.
-# This is not a generic increase of the legacy 100-member envelope.
+# The three identity additions must stay present in every identity-shaped candidate.
+# Shape is checked as the exact closure of the archive's own CUSTOMER_MANIFEST.json
+# (member set == declared file set + the manifest itself), never as a frozen member
+# count: the reviewed source chain grows legitimately and a hardcoded count (the old
+# 99+3+1=103 / IDENTITY_BASE_PATHS_SHA256 pin of the 58b1dbbc era) goes stale and
+# rejects every later reviewed superset. Manifest/path-set drift stays observable
+# through the receipt's manifest_sha256 and the per-file byte-hash checks below.
 IDENTITY_ADDITIONS=frozenset({'scripts/pr122_customer_identity.py',
     'tests/test_pr122_customer_identity.py',
     'docs/development/PR122_CUSTOMER_CENTER_IDENTITY_CONTRACT_V1.md'})
-IDENTITY_BASE_PATHS_SHA256='88200b5319005bc1e56a20c37f1ba822c8520a81dc2f3c64b4f26b5bfc225a6a'
 
-def validate_member_shape(ms):
-    if not 1<len(ms)<=103 or len({m.name for m in ms})!=len(ms) or any(not m.isfile() or not m.name.startswith('customer-center/') or '..' in Path(m.name).parts or m.size>8000000 for m in ms):raise Denied('CANDIDATE_MEMBERS')
-    paths={m.name[len('customer-center/'):] for m in ms}
-    if paths & IDENTITY_ADDITIONS or len(ms)>100:
-        if len(ms)!=103 or not IDENTITY_ADDITIONS <= paths or 'CUSTOMER_MANIFEST.json' not in paths:raise Denied('IDENTITY_CANDIDATE_SHAPE')
-        baseline=paths-IDENTITY_ADDITIONS-{'CUSTOMER_MANIFEST.json'}
-        if len(baseline)!=99 or digest(canonical(sorted(baseline)))!=IDENTITY_BASE_PATHS_SHA256:raise Denied('IDENTITY_CANDIDATE_BASE_PATHS')
+def validate_member_shape(ms,manifest=None):
+    names=[m.name for m in ms]
+    if not 1<len(ms) or len(set(names))!=len(names) or any(not m.isfile() or not m.name.startswith('customer-center/') or '..' in Path(m.name).parts or m.size>8000000 for m in ms):raise Denied('CANDIDATE_MEMBERS')
+    paths={name[len('customer-center/'):] for name in names}
+    if manifest is None:
+        # Legacy pre-identity envelope: only valid while it contains NO identity addition.
+        if paths & IDENTITY_ADDITIONS:raise Denied('IDENTITY_CANDIDATE_SHAPE')
+        return
+    if not IDENTITY_ADDITIONS <= paths:raise Denied('IDENTITY_CANDIDATE_SHAPE')
+    declared={item['path'] for item in manifest['files']}
+    if len(declared)!=len(manifest['files']) or 'CUSTOMER_MANIFEST.json' in declared or paths!=declared|{'CUSTOMER_MANIFEST.json'}:raise Denied('CANDIDATE_MANIFEST_SET')
 
 def bind(original,archive,wheel_folder=None):
     if digest(original)!=ORIGINAL_SHA:raise Denied('EXACT_ORIGINAL_CHANNEL_REQUIRED')
     if len(archive)>10000000:raise Denied('CANDIDATE_ARCHIVE_LIMIT')
     with tarfile.open(fileobj=io.BytesIO(archive),mode='r:gz') as t:
         ms=t.getmembers()
-        validate_member_shape(ms)
-        raw=t.extractfile('customer-center/CUSTOMER_MANIFEST.json').read();manifest=json.loads(raw)
-        files=manifest['files']
-        if len(files)!=len(ms)-1 or {m.name for m in ms}!={'customer-center/CUSTOMER_MANIFEST.json',*['customer-center/'+x['path'] for x in files]}:raise Denied('CANDIDATE_MANIFEST_SET')
+        if not any(m.name=='customer-center/CUSTOMER_MANIFEST.json' for m in ms):raise Denied('CANDIDATE_MEMBERS')
+        raw=t.extractfile('customer-center/CUSTOMER_MANIFEST.json').read();manifest=json.loads(raw);files=manifest['files']
+        validate_member_shape(ms,manifest)
         for item in files:
             if Path(item['path']).is_absolute() or '..' in Path(item['path']).parts:raise Denied('CANDIDATE_PATH')
             b=t.extractfile('customer-center/'+item['path']).read()
@@ -65,8 +72,15 @@ def bind(original,archive,wheel_folder=None):
             path=Path(folder)/name
             for parent in path.parents:secure(parent,directory=True)
             st=path.lstat()
-            need(st.st_uid==0 and stat.S_ISREG(st.st_mode) and st.st_nlink==1 and not st.st_mode & 0o022 and st.st_size<=20000000)
             relative=path.relative_to(site).as_posix()
+            parts=path.relative_to(site).parts
+            # Compile-time bytecode cache under an already-pinned vendor package
+            # directory, incl. dnf/hardlink-deduped nlink==2 pyc, is tolerated for
+            # the walk only: not trusted content, not counted toward the closure,
+            # and every other file still needs exact pinned bytes and nlink==1.
+            declared_pyc=len(parts)>=3 and parts[-2]=='__pycache__' and parts[-1].endswith('.cpython-311.pyc') and any(k.startswith(parts[0]+'/') for k in expected)
+            need(st.st_uid==0 and stat.S_ISREG(st.st_mode) and (st.st_nlink==1 or (declared_pyc and st.st_nlink==2)) and not st.st_mode & 0o022 and st.st_size<=20000000)
+            if declared_pyc:continue
             need(relative in expected and sha(path.read_bytes())==expected[relative])
             actual.add(relative)
     need(actual==set(expected))

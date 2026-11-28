@@ -147,8 +147,9 @@ class Center:
     def password(self,p,salt):
         if type(p) is not str or not 12<=len(p)<=128: raise ValueError('PASSWORD_12_TO_128')
         return hashlib.scrypt(p.encode(),salt=salt,n=16384,r=8,p=1,dklen=32)
-    def challenge(self,kind,user,payload,ttl=600):
-        token=secrets.token_urlsafe(32)
+    def challenge(self,kind,user,payload,ttl=600,token=None):
+        # token=None keeps the original urlsafe generation for every non-bind challenge.
+        if token is None: token=secrets.token_urlsafe(32)
         self.db.execute('INSERT INTO challenges VALUES(?,?,?,?,?,0)',(digest(token.encode()),kind,user,self.encrypt(canonical(payload),'challenge'),self.now()+ttl))
         return token
     def consume(self,token,kind,user=None):
@@ -436,7 +437,7 @@ class Center:
     def binding_challenge(self,uid,pid,channel,subject):
         if channel not in ('TELEGRAM','FEISHU') or type(subject) is not str or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',subject): raise ValueError('INVALID_CHANNEL_SUBJECT')
         with self.tx():
-            self.project(uid,pid); self.limit('bind:'+uid,8); token=self.challenge('bind',uid,{'project':pid,'channel':channel,'subject':subject},300); self.audit(pid,uid,'BIND_CHALLENGE',channel)
+            self.project(uid,pid); self.limit('bind:'+uid,8); token=self.challenge('bind',uid,{'project':pid,'channel':channel,'subject':subject},300,token=secrets.token_hex(32)); self.audit(pid,uid,'BIND_CHALLENGE',channel)
         return {'challenge':token,'expires_in':300,'state':'AWAIT_PROVIDER_AND_WEB_CONFIRMATION'}
     def channel_event(self,channel,event_id,subject,text,*,now=None,provider_occurred_at=None):
         """Only called after actual provider adapter verification, never public JSON directly."""

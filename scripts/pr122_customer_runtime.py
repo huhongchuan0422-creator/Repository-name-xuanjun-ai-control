@@ -97,13 +97,27 @@ def _root_chain(path):
         _runtime_need(stat.S_ISDIR(s.st_mode) and s.st_uid==s.st_gid==0 and
                       not s.st_mode&0o022, 'UNSAFE_PROTECTED_DIRECTORY')
 
-def _protected_bytes(path, limit=50000000):
+def _is_declared_pyc(path):
+    # Compiled-cache filename shape only; the declared-scope restriction comes
+    # from the fixed roots of the callers that opt into allow_declared_pyc.
+    p=Path(path);return p.parent.name=='__pycache__' and p.name.endswith('.pyc')
+
+def _protected_input_ok(a,limit,declared_pyc=False):
+    # Verified hosts (dnf/hawkey hardlink dedup) ship stdlib/site-packages
+    # __pycache__/*.pyc with st_nlink==2. Accepting exactly nlink 2 for declared
+    # pyc files inside fixed canonical roots is a pinned layout fact, not a
+    # general hardlink permission: root:root, regular, no setgid/world-write
+    # and the size bound all still apply, everything else stays nlink==1.
+    return (stat.S_ISREG(a.st_mode) and a.st_uid==a.st_gid==0 and
+            (a.st_nlink==1 or (declared_pyc and a.st_nlink==2)) and
+            not a.st_mode&0o6022 and 0<=a.st_size<=limit)
+
+def _protected_bytes(path,limit=50000000,allow_declared_pyc=False):
     path=Path(path);_root_chain(path.parent)
     fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
     try:
         a=os.fstat(fd)
-        _runtime_need(stat.S_ISREG(a.st_mode) and a.st_uid==a.st_gid==0 and
-                      a.st_nlink==1 and not a.st_mode&0o6022 and 0<=a.st_size<=limit,
+        _runtime_need(_protected_input_ok(a,limit,allow_declared_pyc and _is_declared_pyc(path)),
                       'UNSAFE_PROTECTED_INPUT')
         chunks=[];size=0
         while True:
@@ -117,6 +131,24 @@ def _protected_bytes(path, limit=50000000):
                       and size==a.st_size,'PROTECTED_INPUT_DRIFT')
         return b''.join(chunks)
     finally:os.close(fd)
+
+SYSTEM_LIBRARY_ALIASES={'/lib64':'/usr/lib64','/lib':'/usr/lib'}
+
+def canonical_system_path(path):
+    """Map only the two fixed distribution library-alias directories onto their
+    canonical roots after proving the alias itself (root-owned, exactly the one
+    relative symlink the verified layout ships). Any other path is returned
+    unchanged and stays subject to the strict no-follow protected readers; the
+    alias branch fails closed on traversal or an unexpected alias shape."""
+    text=str(path)
+    alias=next((x for x in SYSTEM_LIBRARY_ALIASES if text==x or text.startswith(x+'/')),None)
+    if alias is None:return Path(text)
+    rel=Path(text).relative_to(alias).parts
+    _runtime_need('..' not in rel,'SYSTEM_ALIAS_PATH')
+    s=os.lstat(alias)
+    _runtime_need(stat.S_ISLNK(s.st_mode) and s.st_uid==s.st_gid==0 and
+                  os.readlink(alias)==SYSTEM_LIBRARY_ALIASES[alias].lstrip('/'),'SYSTEM_ALIAS_SHAPE')
+    return Path(SYSTEM_LIBRARY_ALIASES[alias],*rel)
 
 def _relative_runtime_path(name):
     _runtime_need(type(name) is str and name and '\\' not in name and '\x00' not in name,
@@ -154,12 +186,12 @@ def _source_identity(contract):
             for name in dirs:_root_chain(Path(base)/name)
             for name in files:
                 p=Path(base)/name
-                actual[str(p.relative_to(root))]=digest(_protected_bytes(p))
+                actual[str(p.relative_to(root))]=digest(_protected_bytes(p,allow_declared_pyc=True))
         _runtime_need(type(expected) is dict and actual==expected,'STDLIB_CLOSURE_DRIFT')
     for path,sha in native.items():
-        p=Path(path)
+        p=canonical_system_path(path)
         _runtime_need(p.is_absolute() and '..' not in p.parts and
-                      any(str(p).startswith(root) for root in ('/usr/lib/','/usr/lib64/','/lib/','/lib64/')),
+                      any(str(p).startswith(root) for root in ('/usr/lib/','/usr/lib64/')),
                       'NATIVE_SOURCE_PATH')
         _runtime_need(type(sha) is str and len(sha)==64 and digest(_protected_bytes(p))==sha,
                       'NATIVE_SOURCE_DRIFT')
@@ -179,7 +211,7 @@ def _runtime_tree(root):
             _runtime_need(s.st_uid==s.st_gid==0 and (stat.S_ISLNK(s.st_mode) or not s.st_mode&0o7022),'RUNTIME_OWNERSHIP_MODE')
             if stat.S_ISDIR(s.st_mode):out[rel]={'kind':'directory','mode':stat.S_IMODE(s.st_mode)}
             elif stat.S_ISREG(s.st_mode):
-                out[rel]={'kind':'file','mode':stat.S_IMODE(s.st_mode),'sha256':digest(_protected_bytes(p))}
+                out[rel]={'kind':'file','mode':stat.S_IMODE(s.st_mode),'sha256':digest(_protected_bytes(p,allow_declared_pyc=True))}
             else:
                 aliases={'venv/bin/python3':'python','venv/bin/python3.11':'python','venv/lib64':'lib'}
                 _runtime_need(stat.S_ISLNK(s.st_mode) and rel in aliases and

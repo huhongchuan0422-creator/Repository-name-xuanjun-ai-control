@@ -15,7 +15,7 @@ from scripts.community_merchant_contract import scope,payment_amount
 
 class CenterIdentity(IdentityPort):
     def __init__(self,center,runtime,appid,scenes):
-        if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!='cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0':
+        if hashlib.sha256(Path(__file__).with_name('pr122_customer_core.py').read_bytes()).hexdigest()!='d51ca10c42572abaf9dd5ba5c09408947aaa79012ac47afab9219c55af7aa6cf':
             raise PermissionError('PINNED_CENTER_SOURCE_REQUIRED')
         if type(center) is not Center or type(scenes) is not dict or not scenes:
             raise ValueError('EXISTING_CENTER_REQUIRED')

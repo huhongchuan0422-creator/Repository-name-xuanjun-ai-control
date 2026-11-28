@@ -12,7 +12,7 @@ from pathlib import Path
 from scripts.pr122_customer_core import Center
 
 COOKIE='__Host-xj_customer'
-PIN='cfd3c9d634ddd41d4b59dd4a3ca374d1f1bbcec009c22878e9560d21ae9365b0'
+PIN='d51ca10c42572abaf9dd5ba5c09408947aaa79012ac47afab9219c55af7aa6cf'
 
 def token(headers):
     if (len(headers.get_all('Cookie',[]))>1 or
